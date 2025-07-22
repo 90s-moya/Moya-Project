@@ -1,0 +1,107 @@
+# ===============================
+# 공통 무시 항목 (OS, 편집기, 임시 파일 등)
+# ===============================
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# macOS 디렉토리 속성
+.AppleDouble
+.LSOverride
+
+# node_modules, dist, 빌드 아웃풋 전역 무시
+node_modules/
+dist/
+build/
+.cache/
+
+# ===============================
+# BE
+# ===============================
+# IntelliJ IDEA 설정
+.idea/
+*.iml
+*.iws
+out/
+
+# Java 빌드 결과물
+*.class
+*.jar
+*.war
+*.ear
+*.db
+
+# Gradle 관련
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+build/
+
+# Spring Boot devtools
+spring-boot-devtools.properties
+
+# 백엔드 환경변수 파일
+backend/.env
+
+# ===============================
+# FE
+# ===============================
+# npm/yarn/pnpm 관련 로그
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 빌드 결과물
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/dist/
+frontend/.turbo/
+frontend/.vite/
+
+# 프론트엔드 환경변수 파일
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# 편집기 설정
+.vscode/
+cursor.json
+
+# ===============================
+# AI
+# ===============================
+# Python 캐시 및 실행 중 생성 파일
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# 가상환경 디렉토리
+.venv/
+venv/
+ENV/
+env/
+
+# Pipenv / Poetry
+Pipfile.lock
+poetry.lock
+
+# FastAPI 및 일반 Python 앱 관련
+*.sqlite3
+instance/
+*.egg-info/
+.mypy_cache/
+.pytest_cache/
+.cache/
+*.ipynb_checkpoints/
+
+# AI 환경변수 파일
+ai/.env
