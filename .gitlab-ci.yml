@@ -19,6 +19,7 @@ build-be:
   only:
     - be-dev
     - be-main
+    - master
 
 # BE - 개발 환경 배포
 deploy-be-dev:
@@ -55,3 +56,4 @@ deploy-be-prod:
     - ec2
   only:
     - be-main
+    - master
