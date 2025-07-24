@@ -25,7 +25,13 @@ deploy-be-dev:
     - docker pull $DOCKER_IMAGE:$CI_COMMIT_BRANCH
     - docker stop be-dev || true
     - docker rm be-dev || true
-    - docker run -d --name be-dev -p 8081:8080 $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+    - docker run -d \
+        --name be-dev \
+        -p 8081:8080 \
+        -e DB_URL="$DB_URL_DEV" \
+        -e DB_USERNAME="$DB_USERNAME" \
+        -e DB_PASSWORD="$DB_PASSWORD" \
+        $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   only:
     - be/dev
 
@@ -36,8 +42,12 @@ deploy-be-prod:
     - docker pull $DOCKER_IMAGE:$CI_COMMIT_BRANCH
     - docker stop be-main || true
     - docker rm be-main || true
-    - docker run -d --name be-main -p 8080:8080 $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+    - docker run -d \
+        --name be-main \
+        -p 8080:8080 \
+        -e DB_URL="$DB_URL_PROD" \
+        -e DB_USERNAME="$DB_USERNAME" \
+        -e DB_PASSWORD="$DB_PASSWORD" \
+        $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   only:
     - be/main
-
-# 추후 프론트엔드, AI 추가..
