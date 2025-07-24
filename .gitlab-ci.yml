@@ -15,8 +15,8 @@ build-be:
     - docker build -t $DOCKER_IMAGE:$CI_COMMIT_BRANCH ./backend
     - docker push $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   only:
-    - be/dev
-    - be/main
+    - be-dev
+    - be-main
 
 # BE - 개발 환경 배포
 deploy-be-dev:
@@ -33,7 +33,7 @@ deploy-be-dev:
         -e DB_PASSWORD="$DB_PASSWORD" \
         $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   only:
-    - be/dev
+    - be-dev
 
 # BE - 프로덕션 환경 배포
 deploy-be-prod:
@@ -50,4 +50,4 @@ deploy-be-prod:
         -e DB_PASSWORD="$DB_PASSWORD" \
         $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   only:
-    - be/main
+    - be-main
