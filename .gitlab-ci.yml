@@ -14,6 +14,8 @@ build-be:
   script:
     - docker build -t $DOCKER_IMAGE:$CI_COMMIT_BRANCH ./backend
     - docker push $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
   only:
     - be-dev
     - be-main
@@ -32,6 +34,8 @@ deploy-be-dev:
         -e DB_USERNAME="$DB_USERNAME" \
         -e DB_PASSWORD="$DB_PASSWORD" \
         $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
   only:
     - be-dev
 
@@ -49,5 +53,7 @@ deploy-be-prod:
         -e DB_USERNAME="$DB_USERNAME" \
         -e DB_PASSWORD="$DB_PASSWORD" \
         $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
   only:
     - be-main
