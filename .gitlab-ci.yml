@@ -14,12 +14,6 @@ build-be:
   script:
     - docker build -t $DOCKER_IMAGE:$CI_COMMIT_BRANCH ./backend
     - docker push $DOCKER_IMAGE:$CI_COMMIT_BRANCH
-  after_script:
-    - |
-      source .gitlab/ci/mattermost_notify.sh
-      if [[ "$CI_JOB_STATUS" != "success" ]]; then
-        notify_mattermost build fail - "백엔드 빌드 실패"
-      fi
   tags:
     - ec2
   only:
@@ -40,20 +34,12 @@ deploy-be-dev:
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
-  after_script:
-    - |
-      source .gitlab/ci/mattermost_notify.sh
-      if [[ "$CI_JOB_STATUS" == "success" ]]; then
-        notify_mattermost deploy success 개발
-      else
-        notify_mattermost deploy fail 개발 "개발 서버 배포 실패"
-      fi
   tags:
     - ec2
   only:
     - be-dev
 
-# BE - 운영 환경 배포
+# BE - 프로덕션 환경 배포
 deploy-be-prod:
   stage: deploy
   script:
@@ -66,16 +52,9 @@ deploy-be-prod:
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
-  after_script:
-    - |
-      source .gitlab/ci/mattermost_notify.sh
-      if [[ "$CI_JOB_STATUS" == "success" ]]; then
-        notify_mattermost deploy success 운영
-      else
-        notify_mattermost deploy fail 운영 "운영 서버 배포 실패"
-      fi
   tags:
     - ec2
   only:
     - be-main
     - master
+
