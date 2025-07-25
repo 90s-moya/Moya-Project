@@ -2,9 +2,10 @@ package com.moya.service.user;
 
 import com.moya.domain.user.User;
 import lombok.Builder;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
-
+@Getter
 public class UserInfo {
 
 	private Long userId;

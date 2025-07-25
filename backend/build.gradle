@@ -47,7 +47,9 @@ dependencyManagement {
 //		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
 	}
 }
-
+test {
+	useJUnitPlatform()
+}
 tasks.named('test') {
 	useJUnitPlatform()
 }

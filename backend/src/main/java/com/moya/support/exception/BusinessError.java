@@ -12,6 +12,13 @@ public enum BusinessError {
 	// 유저 관련 Error
 	USER_SIGNUP_PASSWORD_NOT_MATCH(BAD_REQUEST, "password와 confirmPassword가 다릅니다.");
 
+	//ai 모의 면접 관련 Error
+
+
+	//화상채팅 관련 Error
+
+
+
 
 	private final HttpStatus httpStatus;
 	private final String message;
