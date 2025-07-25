@@ -7,7 +7,6 @@ variables:
 
 before_script:
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-  - source .gitlab/ci/mattermost_notify.sh
 
 # BE - 빌드
 build-be:
@@ -17,8 +16,9 @@ build-be:
     - docker push $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   after_script:
     - |
+      source .gitlab/ci/mattermost_notify.sh
       if [[ "$CI_JOB_STATUS" != "success" ]]; then
-        notify_mattermost build fail - "빌드 실패"
+        notify_mattermost build fail - "백엔드 빌드 실패"
       fi
   tags:
     - ec2
@@ -42,6 +42,7 @@ deploy-be-dev:
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   after_script:
     - |
+      source .gitlab/ci/mattermost_notify.sh
       if [[ "$CI_JOB_STATUS" == "success" ]]; then
         notify_mattermost deploy success 개발
       else
@@ -67,6 +68,7 @@ deploy-be-prod:
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   after_script:
     - |
+      source .gitlab/ci/mattermost_notify.sh
       if [[ "$CI_JOB_STATUS" == "success" ]]; then
         notify_mattermost deploy success 운영
       else
