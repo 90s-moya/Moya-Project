@@ -4,54 +4,24 @@ stages:
 
 variables:
   DOCKER_IMAGE: gyujh630/moya-be
-  MATTERMOST_WEBHOOK: https://meeting.ssafy.com/hooks/pcebpjkxftr9889opyiu3i9mbh
 
-# 공통 함수 정의
-.send_mattermost_message:
-  script:
-    - |
-      function notify_mattermost() {
-        local type="$1"     # build, deploy
-        local status="$2"   # success, fail
-        local env="$3"      # 개발, 운영 (build는 없음)
-        local error_msg="${4:-""}"
-
-        local emoji=":white_check_mark:"
-        local title=""
-
-        if [[ "$type" == "build" ]]; then
-          title="*백엔드 빌드 실패*"
-          emoji=":x:"
-        else
-          if [[ "$status" == "fail" ]]; then
-            emoji=":x:"
-            title="*백엔드 ${env}서버 배포 실패*"
-          else
-            title="*백엔드 ${env}서버 배포 완료*"
-          fi
-        fi
-
-        curl -X POST -H 'Content-Type: application/json' -d "{
-          \"username\": \"🚀 Moya CI/CD Bot\",
-          \"text\": \"${emoji} ${title}\nbranch: \`$CI_COMMIT_BRANCH\`\ncommitter: *$GITLAB_USER_NAME*\ncommit message: $CI_COMMIT_MESSAGE${error_msg:+\nerror: $error_msg}\"
-        }" $MATTERMOST_WEBHOOK
-      }
-    - export -f notify_mattermost
+before_script:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - source .gitlab/ci/mattermost_notify.sh
 
 # BE - 빌드
 build-be:
   stage: build
-  extends: .send_mattermost_message
   script:
-    - set -e
     - docker build -t $DOCKER_IMAGE:$CI_COMMIT_BRANCH ./backend
     - docker push $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   after_script:
     - |
       if [[ "$CI_JOB_STATUS" != "success" ]]; then
-        notify_mattermost "build" "fail" "" "$(tail -n 20 /root/.gitlab-runner/builds/*/builds.log | tr '\n' ' ' | cut -c -500)"
+        notify_mattermost build fail - "빌드 실패"
       fi
-  tags: [ec2]
+  tags:
+    - ec2
   only:
     - be-dev
     - be-main
@@ -60,51 +30,50 @@ build-be:
 # BE - 개발 환경 배포
 deploy-be-dev:
   stage: deploy
-  extends: .send_mattermost_message
   script:
-    - set -e
     - docker pull $DOCKER_IMAGE:$CI_COMMIT_BRANCH
     - docker stop be-dev || true
     - docker rm be-dev || true
-    - |
-      docker run -d --name be-dev -p 8081:8080 \
-        -e DB_URL="$DB_URL_DEV" \
-        -e DB_USERNAME="$DB_USERNAME" \
-        -e DB_PASSWORD="$DB_PASSWORD" \
-        $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+    - >
+      docker run -d --name be-dev -p 8081:8080
+      -e DB_URL="$DB_URL_DEV"
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   after_script:
     - |
       if [[ "$CI_JOB_STATUS" == "success" ]]; then
-        notify_mattermost "deploy" "success" "개발"
+        notify_mattermost deploy success 개발
       else
-        notify_mattermost "deploy" "fail" "개발" "$(tail -n 20 /root/.gitlab-runner/builds/*/builds.log | tr '\n' ' ' | cut -c -500)"
+        notify_mattermost deploy fail 개발 "개발 서버 배포 실패"
       fi
-  tags: [ec2]
-  only: [be-dev]
+  tags:
+    - ec2
+  only:
+    - be-dev
 
 # BE - 운영 환경 배포
 deploy-be-prod:
   stage: deploy
-  extends: .send_mattermost_message
   script:
-    - set -e
     - docker pull $DOCKER_IMAGE:$CI_COMMIT_BRANCH
     - docker stop be-main || true
     - docker rm be-main || true
-    - |
-      docker run -d --name be-main -p 8080:8080 \
-        -e DB_URL="$DB_URL_PROD" \
-        -e DB_USERNAME="$DB_USERNAME" \
-        -e DB_PASSWORD="$DB_PASSWORD" \
-        $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+    - >
+      docker run -d --name be-main -p 8080:8080
+      -e DB_URL="$DB_URL_PROD"
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   after_script:
     - |
       if [[ "$CI_JOB_STATUS" == "success" ]]; then
-        notify_mattermost "deploy" "success" "운영"
+        notify_mattermost deploy success 운영
       else
-        notify_mattermost "deploy" "fail" "운영" "$(tail -n 20 /root/.gitlab-runner/builds/*/builds.log | tr '\n' ' ' | cut -c -500)"
+        notify_mattermost deploy fail 운영 "운영 서버 배포 실패"
       fi
-  tags: [ec2]
+  tags:
+    - ec2
   only:
     - be-main
     - master
