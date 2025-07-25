@@ -44,5 +44,5 @@ interfaces → service → domain ← infras
 
 - 모든 Repository 인터페이스는 `domain` layer에 정의하고,  
   구현체는 반드시 `infras` layer에 구현해주세요.
-           
+            
 이를 통해 **DIP (Dependency Inversion Principle)** 을 준수합니다.
