@@ -117,4 +117,7 @@
   body {
     @apply bg-background text-foreground;
   }
+  html, body {
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
 }

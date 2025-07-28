@@ -1,1 +1,5 @@
-// AI 면접 라우트
+import type { RouteObject } from "react-router-dom";
+
+const interviewRoutes: RouteObject[] = [];
+
+export default interviewRoutes;

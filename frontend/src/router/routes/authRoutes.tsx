@@ -1,1 +1,6 @@
-// 로그인 및 회원가입 라우트
+// src/router/routes/homeRoutes.tsx
+import type { RouteObject } from "react-router-dom";
+
+const authRoutes: RouteObject[] = [];
+
+export default authRoutes;
