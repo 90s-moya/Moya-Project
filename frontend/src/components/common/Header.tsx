@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Header() {
   return (
-    <header className="flex items-center justify-between px-6 py-4 border-b border-[#dedee4]">
+    <header className="flex fixed w-full z-11 items-center justify-between px-6 py-4 border-b border-[#dedee4]">
       <div className="flex items-center space-x-8">
         <div className="text-[#2b7fff] text-2xl font-bold">MOYA</div>
         <nav className="flex space-x-8">

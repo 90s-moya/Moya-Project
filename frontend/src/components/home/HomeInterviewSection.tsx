@@ -1,8 +1,15 @@
 import { Button } from "@/components/ui/button";
 
-export default function HomeInterviewSection() {
+type Props = {
+  vh: string;
+};
+
+export default function HomeInterviewSection({ vh }: Props) {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#c8b5ff] via-[#b8c5ff] to-[#a8d5ff]">
+    <div
+      className=" bg-gradient-to-b from-[#c8b5ff] via-[#b8c5ff] to-[#a8d5ff]"
+      style={{ height: vh }}
+    >
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
