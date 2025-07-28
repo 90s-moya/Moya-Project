@@ -1,1 +1,6 @@
-// AI 면접 라우트
+// src/router/routes/homeRoutes.tsx
+import type { RouteObject } from "react-router-dom";
+
+const interviewRoutes: RouteObject[] = [];
+
+export default interviewRoutes;
