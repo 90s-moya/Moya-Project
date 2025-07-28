@@ -12,7 +12,7 @@ export default function HomePage() {
         <div className="absolute bottom-40 right-1/3 w-40 h-40 bg-blue-300/25 rounded-full blur-xl"></div>
       </div>
 
-      <Header></Header>
+      <Header scrollBg />
       <FullPageScroll></FullPageScroll>
     </div>
   );
