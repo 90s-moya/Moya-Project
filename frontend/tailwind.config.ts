@@ -7,6 +7,9 @@ const config: Config = {
       fontFamily: {
         sans: ['"Pretendard Variable"', "sans-serif"],
       },
+      maxWidth: {
+        "screen-1180": "1180px",
+      },
     },
   },
   plugins: [],

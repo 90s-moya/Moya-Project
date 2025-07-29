@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import CloudFriends from "@/assets/images/cloud-friends.png";
 
 export default function HomeStudySection() {
   return (
@@ -18,41 +19,21 @@ export default function HomeStudySection() {
             당신만을 위한 모의 면접을 시작할 수 있습니다.
           </p>
 
-          <Button className="bg-[#2b7fff] hover:bg-[#1e5fd4] text-white px-8 py-4 text-lg rounded-lg font-medium">
-            면접 스터디 시작하기
-          </Button>
+          <div className="pt-6 flex justify-center lg:justify-start">
+            <Button className="bg-[#2b7fff] hover:bg-blue-500 text-white px-6 py-9 text-lg md:text-xl font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200">
+              면접 스터디 시작하기
+            </Button>
+          </div>
         </div>
 
         {/* Character Illustrations */}
         <div className="flex-1 flex justify-end items-center relative">
-          <div className="relative">
-            {/* Main cloud character */}
-            <div className="relative">
-              <img
-                src="/placeholder.svg?height=400&width=350"
-                alt="MOYA Character"
-                className="w-80 h-96 object-contain"
-              />
-            </div>
-
-            {/* Smaller character with graduation cap */}
-            <div className="absolute bottom-0 left-0">
-              <img
-                src="/placeholder.svg?height=150&width=150"
-                alt="Study Character"
-                className="w-32 h-32 object-contain"
-              />
-            </div>
-
-            {/* Yellow star decoration */}
-            <div className="absolute top-8 right-8">
-              <img
-                src="/placeholder.svg?height=60&width=60"
-                alt="Star"
-                className="w-12 h-12 object-contain"
-              />
-            </div>
-          </div>
+          <img
+            src={CloudFriends}
+            alt="AI 면접 캐릭터"
+            className="w-[480px] md:w-[520px] lg:w-[580px] h-auto drop-shadow-xl scale-x-[-1]"
+            draggable={false}
+          />
         </div>
       </main>
     </div>

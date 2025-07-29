@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 // scrollBg라는 prop은 홈페이지에만 해당됩니다.
 interface HeaderProps {
@@ -34,40 +35,40 @@ export default function Header({ scrollBg = false }: HeaderProps) {
           : "bg-white border-b border-[#dedee4] shadow"
       }`}
     >
-      <div className="max-w-5xl mx-auto flex items-center justify-between h-20 px-8">
+      <div className="max-w-[1180px] mx-auto flex items-center justify-between h-20 px-8">
         {/* 좌측: 로고 */}
         <div className="flex-1 flex justify-start">
           <div className="text-[#2b7fff] text-2xl font-bold select-none">
-            MOYA
+            <Link to="/">MOYA</Link>
           </div>
         </div>
         {/* 중앙: 네비게이션 */}
         <nav className="flex-1 flex justify-center">
           <div className="flex space-x-10">
-            <a
-              href="/interview/start"
+            <Link
+              to="/interview/start"
               className={`font-semibold transition-colors ${
                 scrolled ? "text-[#1b1c1f]" : "text-white"
               } hover:text-[#2b7fff]`}
             >
               AI 모의면접
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="#"
               className={`font-semibold transition-colors ${
                 scrolled ? "text-[#1b1c1f]" : "text-white"
               } hover:text-[#2b7fff]`}
             >
               면접 스터디
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              to="#"
               className={`font-semibold transition-colors ${
                 scrolled ? "text-[#1b1c1f]" : "text-white"
               } hover:text-[#2b7fff]`}
             >
               마이페이지
-            </a>
+            </Link>
           </div>
         </nav>
         {/* 우측: 로그인/회원가입 */}

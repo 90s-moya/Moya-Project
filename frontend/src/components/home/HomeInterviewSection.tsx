@@ -33,8 +33,8 @@ export default function HomeInterviewSection() {
           </p>
 
           {/* CTA 버튼 */}
-          <div className="pt-6">
-            <Button className="bg-[#2b7fff] hover:bg-blue-600 text-white px-10 py-4 text-lg md:text-xl font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200">
+          <div className="pt-6 flex justify-center lg:justify-end">
+            <Button className="bg-[#2b7fff] hover:bg-blue-500 text-white px-6 py-9 text-lg md:text-xl font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200">
               AI 모의 면접 시작하기
             </Button>
           </div>
