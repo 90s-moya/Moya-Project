@@ -1,15 +1,8 @@
 import { Button } from "@/components/ui/button";
 
-type Props = {
-  vh: string;
-};
-
-export default function HomeStudySection({ vh }: Props) {
+export default function HomeStudySection() {
   return (
-    <div
-      className=" bg-gradient-to-b from-[#c8b5ff] via-[#b8a8ff] to-[#a8d8ff]"
-      style={{ height: vh }}
-    >
+    <div className="h-screen bg-gradient-to-b from-[#c8b5ff] via-[#b8a8ff] to-[#a8d8ff]">
       {/* Main Content */}
       <main className="flex items-center justify-between px-6 py-16 max-w-7xl mx-auto">
         <div className="flex-1 max-w-2xl">

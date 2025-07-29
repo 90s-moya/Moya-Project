@@ -1,5 +1,7 @@
-import FullPageScroll from "@/components/common/FullPageScroll";
 import Header from "@/components/common/Header";
+import HomeInterviewSection from "@/components/home/HomeInterviewSection";
+import HomeIntroSection from "@/components/home/HomeIntroSection";
+import HomeStudySection from "@/components/home/HomeStudySection";
 
 export default function HomePage() {
   return (
@@ -13,7 +15,9 @@ export default function HomePage() {
       </div>
 
       <Header scrollBg />
-      <FullPageScroll></FullPageScroll>
+      <HomeIntroSection></HomeIntroSection>
+      <HomeInterviewSection></HomeInterviewSection>
+      <HomeStudySection></HomeStudySection>
     </div>
   );
 }
