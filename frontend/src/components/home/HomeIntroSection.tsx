@@ -1,121 +1,71 @@
-type Props = {
-  vh: string;
-};
+import WhiteCharacter from "@/assets/images/white-character.png";
+import AiCharacter from "@/assets/images/ai-character.png";
+import Heart from "@/assets/images/heart.png";
+import WhiteMoya from "@/assets/images/white-moya.png";
+import Clover from "@/assets/images/clover.png";
 
-export default function HomeIntroSection({ vh }: Props) {
+export default function HomeIntroSection() {
   return (
-    <main
-      className="relative z-10 flex items-center justify-center px-8"
-      style={{ height: vh }}
-    >
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
-        {/* Left Character */}
-        <div className="flex justify-center lg:justify-end">
-          <div className="relative">
-            {/* Star decoration */}
-            <div className="absolute -top-8 -left-8 text-yellow-400 text-3xl">
-              ⭐
-            </div>
-
-            {/* Cloud character placeholder */}
-            <div className="w-48 h-56 bg-gradient-to-b from-white to-gray-100 rounded-full relative shadow-lg">
-              {/* Face */}
-              <div className="absolute top-16 left-1/2 transform -translate-x-1/2">
-                <div className="flex space-x-3">
-                  <div className="w-2 h-2 bg-black rounded-full"></div>
-                  <div className="w-2 h-2 bg-black rounded-full"></div>
-                </div>
-                <div className="w-1 h-1 bg-black rounded-full mx-auto mt-2"></div>
-              </div>
-
-              {/* Blush */}
-              <div className="absolute top-20 left-8 w-4 h-3 bg-pink-200 rounded-full opacity-60"></div>
-              <div className="absolute top-20 right-8 w-4 h-3 bg-pink-200 rounded-full opacity-60"></div>
-
-              {/* Body */}
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-32 h-24 bg-slate-700 rounded-t-3xl"></div>
-
-              {/* Tablet */}
-              <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-16 h-12 bg-gray-200 rounded border-2 border-gray-300"></div>
-            </div>
-          </div>
+    <section className="relative w-full h-screen bg-gradient-to-b from-[#dbcdfc] via-[#c9d7ff] to-[#d8f5ff] overflow-hidden">
+      <div className="max-w-7xl mx-auto h-full flex items-center justify-between px-8 relative">
+        {/* 왼쪽 캐릭터 */}
+        <div className="flex-shrink-0 transform translate-x-4 translate-y-2">
+          <img
+            src={WhiteCharacter}
+            alt="화이트 캐릭터"
+            className="w-96 h-auto"
+            draggable={false}
+          />
         </div>
 
-        {/* Center Content */}
-        <div className="text-center space-y-6">
-          {/* Speech bubble */}
-          <div className="relative inline-block">
-            <div className="bg-red-500 text-white px-4 py-2 rounded-full relative">
-              <span className="text-lg font-medium">모야?</span>
-              <div className="absolute top-2 right-2 text-white">❤️</div>
-            </div>
-          </div>
-
-          {/* Main heading */}
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-8">
+        {/* 중앙 텍스트 + 장식 요소들 */}
+        <div className="relative flex flex-col items-center justify-center text-center px-4">
+          {/* 하트 */}
+          <img
+            src={Heart}
+            alt="하트"
+            className="absolute -top-20 -left-34 w-32 md:w-36"
+            draggable={false}
+          />
+          {/* 클로버 */}
+          <img
+            src={Clover}
+            alt="클로버"
+            className="absolute top-4 -right-15 w-20 md:w-24"
+            draggable={false}
+          />
+          {/* 텍스트 */}
+          <h2
+            className="text-white text-5xl md:text-6xl font-extrabold drop-shadow-md mb-3"
+            style={{ transform: "translateX(-100px)" }}
+          >
+            모야?
+          </h2>
+          <h3
+            className="text-white text-4xl md:text-5xl font-extrabold drop-shadow-md mb-6"
+            style={{ transform: "translateX(30px)" }}
+          >
             모의 면접이야!
-          </h1>
-
-          {/* MOYA logo */}
-          <div className="text-6xl md:text-8xl font-bold text-white relative">
-            M
-            <span className="relative inline-block">
-              O
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-                  <span className="text-black text-sm">😊</span>
-                </div>
-              </div>
-            </span>
-            YA
-          </div>
-
-          {/* Decorative elements */}
-          <div className="absolute top-0 right-0 text-green-400 text-2xl">
-            🌟
-          </div>
-          <div className="absolute bottom-0 left-0 text-yellow-400 text-xl">
-            ✨
-          </div>
+          </h3>
+          {/* MOYA 이미지 로고 */}
+          <img
+            src={WhiteMoya}
+            alt="MOYA 로고"
+            className="w-80 md:w-96"
+            draggable={false}
+          />
         </div>
 
-        {/* Right AI Character */}
-        <div className="flex justify-center lg:justify-start">
-          <div className="relative">
-            {/* Sparkle decoration */}
-            <div className="absolute -top-4 -right-4 text-white text-2xl">
-              ✨
-            </div>
-
-            {/* AI Monitor */}
-            <div className="w-48 h-40 bg-slate-600 rounded-lg shadow-lg relative">
-              {/* Screen */}
-              <div className="absolute top-4 left-4 right-4 bottom-12 bg-gradient-to-b from-blue-100 to-blue-200 rounded">
-                {/* AI Character face */}
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <div className="flex justify-center space-x-2 mb-2">
-                      <div className="w-2 h-2 bg-slate-600 rounded-full"></div>
-                      <div className="w-2 h-2 bg-slate-600 rounded-full"></div>
-                    </div>
-                    <div className="w-8 h-1 bg-slate-600 rounded-full mx-auto"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI Label */}
-              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-slate-700 text-white px-4 py-1 rounded-full text-sm font-bold">
-                AI
-              </div>
-            </div>
-
-            {/* Small decorative cloud */}
-            <div className="absolute -bottom-4 -left-4 w-8 h-6 bg-green-300 rounded-full flex items-center justify-center text-xs">
-              😊
-            </div>
-          </div>
+        {/* 오른쪽 캐릭터 */}
+        <div className="flex-shrink-0 transform translate-y-2">
+          <img
+            src={AiCharacter}
+            alt="AI 캐릭터"
+            className="w-72 h-auto"
+            draggable={false}
+          />
         </div>
       </div>
-    </main>
+    </section>
   );
 }
