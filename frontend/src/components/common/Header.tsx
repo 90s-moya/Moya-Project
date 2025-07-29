@@ -45,7 +45,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
         <nav className="flex-1 flex justify-center">
           <div className="flex space-x-10">
             <a
-              href="#"
+              href="/interview/start"
               className={`font-semibold transition-colors ${
                 scrolled ? "text-[#1b1c1f]" : "text-white"
               } hover:text-[#2b7fff]`}

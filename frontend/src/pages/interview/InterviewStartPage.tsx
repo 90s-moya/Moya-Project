@@ -1,38 +1,12 @@
+// InterviewStartPage.tsx
+
 import { Button } from "@/components/ui/button"
+import Header from "@/components/common/Header"
 
 export default function Component() {
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center">
-            <div className="text-2xl font-bold text-blue-500">MOYA</div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              AI 모의 면접
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              면접 스터디
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              마이페이지
-            </a>
-          </nav>
-
-          {/* User section */}
-          <div className="flex items-center space-x-4">
-            <span className="text-gray-700">000님</span>
-            <Button variant="outline" size="sm">
-              로그아웃
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Header scrollBg={false} />
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-6 py-16">

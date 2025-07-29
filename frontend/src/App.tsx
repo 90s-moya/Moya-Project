@@ -1,10 +1,13 @@
+// src/App.tsx
+
 import "./App.css";
-import HomePage from "./pages/HomePage";
+import { BrowserRouter } from "react-router-dom";
+import AppRoutes from "./router";
 
 export default function App() {
   return (
-    <>
-      <HomePage />
-    </>
+    <BrowserRouter>
+      <AppRoutes></AppRoutes>
+    </BrowserRouter>
   );
 }
