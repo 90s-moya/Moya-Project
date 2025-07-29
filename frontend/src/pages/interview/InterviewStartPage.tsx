@@ -2,8 +2,13 @@
 
 import { Button } from "@/components/ui/button"
 import Header from "@/components/common/Header"
+import { useNavigate } from "react-router-dom";
 
 export default function Component() {
+  const navigate = useNavigate()
+  const handleStartInterview = () => {
+    navigate("/interview/documentlist")
+  }
   return (
     <div className="min-h-screen bg-gray-50">
       <Header scrollBg={false} />
@@ -59,7 +64,8 @@ export default function Component() {
           </div>
 
           {/* Start button */}
-          <Button size="lg" className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 text-lg rounded-full">
+          <Button onClick={handleStartInterview} 
+            size="lg" className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 text-lg rounded-full">
             면접시작
           </Button>
         </div>

@@ -1,29 +1,18 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Upload, FileText } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 export default function DocumentUpload() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState("이력서")
   const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: File[] }>({
-    이력서: [
-      new File([""], "이력서_김철수.pdf", { type: "application/pdf" }),
-      new File([""], "경력기술서.pdf", { type: "application/pdf" }),
-      new File([""], "자격증명서.pdf", { type: "application/pdf" }),
-    ],
-    포트폴리오: [
-      new File([""], "디자인_포트폴리오.pdf", { type: "application/pdf" }),
-      new File([""], "프로젝트_결과물.pdf", { type: "application/pdf" }),
-      new File([""], "작품집.pdf", { type: "application/pdf" }),
-    ],
-    자기소개서: [
-      new File([""], "자기소개서_최종.pdf", { type: "application/pdf" }),
-      new File([""], "지원동기서.pdf", { type: "application/pdf" }),
-      new File([""], "성장과정서.pdf", { type: "application/pdf" }),
-    ],
+    이력서: [],
+    포트폴리오: [],
+    자기소개서: [],
   })
 
   const tabs = ["이력서", "포트폴리오", "자기소개서"]
@@ -31,7 +20,6 @@ export default function DocumentUpload() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || [])
     const pdfFiles = files.filter((file) => file.type === "application/pdf")
-
     setUploadedFiles((prev) => ({
       ...prev,
       [activeTab]: [...prev[activeTab], ...pdfFiles],
@@ -46,7 +34,6 @@ export default function DocumentUpload() {
     event.preventDefault()
     const files = Array.from(event.dataTransfer.files)
     const pdfFiles = files.filter((file) => file.type === "application/pdf")
-
     setUploadedFiles((prev) => ({
       ...prev,
       [activeTab]: [...prev[activeTab], ...pdfFiles],
@@ -60,30 +47,23 @@ export default function DocumentUpload() {
     }))
   }
 
+  const handleNext = () => {
+    navigate("/interview/modelist")
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Logo */}
           <div className="flex items-center">
             <div className="text-2xl font-bold text-blue-500">MOYA</div>
           </div>
-
-          {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              AI 모의 면접
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              면접 스터디
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              마이페이지
-            </a>
+            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">AI 모의 면접</a>
+            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">면접 스터디</a>
+            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">마이페이지</a>
           </nav>
-
-          {/* User section */}
           <div className="flex items-center space-x-4">
             <span className="text-gray-700">로그인</span>
             <Button className="bg-blue-500 hover:bg-blue-600 text-white">00님</Button>
@@ -93,7 +73,6 @@ export default function DocumentUpload() {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-6 py-8">
-        {/* Title */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-800 mb-2">AI와 함께할 서류를 선택해주세요</h1>
         </div>
@@ -120,20 +99,29 @@ export default function DocumentUpload() {
         {/* Upload Area */}
         <div className="bg-gray-200 rounded-lg p-8 mb-8">
           <div className="grid grid-cols-4 gap-4 mb-4">
-            {/* 이미 업로드된 파일들 (왼쪽 3칸) */}
-            {uploadedFiles[activeTab].slice(0, 3).map((file, index) => (
-              <div key={index} className="bg-white rounded-lg p-4 border-2 border-gray-300 relative group">
-                <div className="flex flex-col items-center justify-center h-32">
-                  <FileText className="w-8 h-8 text-blue-500 mb-2" />
-                  <p className="text-xs text-gray-600 text-center truncate w-full">{file.name}</p>
+            {[0, 1, 2].map((index) => {
+              const file = uploadedFiles[activeTab][index]
+              return file ? (
+                <div key={index} className="bg-white rounded-lg p-4 border-2 border-gray-300 relative group">
+                  <div className="flex flex-col items-center justify-center h-32">
+                    <FileText className="w-8 h-8 text-blue-500 mb-2" />
+                    <p className="text-xs text-gray-600 text-center truncate w-full">{file.name}</p>
+                  </div>
+                  <button
+                    onClick={() => removeFile(index)}
+                    className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600"
+                  >
+                    ×
+                  </button>
                 </div>
-                <div className="absolute top-2 right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs">✓</span>
+              ) : (
+                <div key={index} className="bg-white rounded-lg p-4 border-2 border-dashed border-gray-200 h-32 flex items-center justify-center">
+                  <p className="text-gray-300 text-sm">빈 슬롯</p>
                 </div>
-              </div>
-            ))}
+              )
+            })}
 
-            {/* 새 파일 업로드 칸 (오른쪽 1칸) */}
+            {/* Upload Slot */}
             <div
               className="bg-white rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors cursor-pointer"
               onDragOver={handleDragOver}
@@ -164,7 +152,9 @@ export default function DocumentUpload() {
         {/* Bottom Section */}
         <div className="flex justify-between items-center">
           <div className="text-gray-500">1/4</div>
-          <Button className="bg-blue-500 hover:bg-blue-600 text-white px-8">다음</Button>
+          <Button onClick={handleNext} className="bg-blue-500 hover:bg-blue-600 text-white px-8">
+            다음
+          </Button>
         </div>
       </main>
     </div>
