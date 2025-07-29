@@ -35,7 +35,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
           : "bg-white border-b border-[#dedee4] shadow"
       }`}
     >
-      <div className="max-w-5xl mx-auto flex items-center justify-between h-20 px-8">
+      <div className="max-w-[1180px] mx-auto flex items-center justify-between h-20 px-8">
         {/* 좌측: 로고 */}
         <div className="flex-1 flex justify-start">
           <div className="text-[#2b7fff] text-2xl font-bold select-none">
