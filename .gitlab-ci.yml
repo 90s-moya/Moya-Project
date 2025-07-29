@@ -33,6 +33,9 @@ deploy-be-dev:
       -e DB_URL="$DB_URL_DEV"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
+      -e JWT_SECRET="$JWT_SECRET"
+      -e MAIL_USERNAME="$MAIL_USERNAME"
+      -e MAIL_PASSWORD="$MAIL_PASSWORD"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
@@ -51,6 +54,9 @@ deploy-be-prod:
       -e DB_URL="$DB_URL_PROD"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
+      -e JWT_SECRET="$JWT_SECRET"
+      -e MAIL_USERNAME="$MAIL_USERNAME"
+      -e MAIL_PASSWORD="$MAIL_PASSWORD"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
