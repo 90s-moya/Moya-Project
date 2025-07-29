@@ -1,29 +1,28 @@
 package com.moya.service.user;
 
 import com.moya.domain.user.User;
+import com.moya.service.auth.AuthUserInfo;
 import lombok.Builder;
-import lombok.Getter;
 
 import java.time.LocalDateTime;
-@Getter
+import java.util.UUID;
+
 public class UserInfo {
+    private UUID userId;
+    private String nickname;
 
-	private Long userId;
-	private String username;
-	private LocalDateTime createAt;
+    @Builder
+    private UserInfo(UUID userId, String nickname) {
+        this.userId = userId;
+        this.nickname = nickname;
 
-	@Builder
-	private UserInfo(Long userId, String username, LocalDateTime createAt) {
-		this.userId = userId;
-		this.username = username;
-		this.createAt = createAt;
-	}
 
-	public static UserInfo from(User user) {
-		return UserInfo.builder()
-			.userId(user.getId())
-			.username(user.getUsername())
-			.createAt(user.getCreatedAt())
-			.build();
-	}
+    }
+
+    public static UserInfo from(User user) {
+        return UserInfo.builder()
+                .userId(user.getId())
+                .nickname(user.getNickname())
+                .build();
+    }
 }
