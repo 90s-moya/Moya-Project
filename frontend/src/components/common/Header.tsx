@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
+// scrollBg라는 prop은 홈페이지에만 해당됩니다.
 interface HeaderProps {
   scrollBg?: boolean;
 }
@@ -11,22 +12,15 @@ export default function Header({ scrollBg = false }: HeaderProps) {
   useEffect(() => {
     if (!scrollBg) return; // 메인페이지가 아니면 스크롤 이벤트 등록 X
 
-    const scrollContainer = document.querySelector(".scroll-container");
     const onScroll = () => {
-      if (scrollContainer) {
-        setScrolled(scrollContainer.scrollTop > 10);
-      }
+      setScrolled(window.scrollY > 10);
     };
 
-    if (scrollContainer) {
-      scrollContainer.addEventListener("scroll", onScroll);
-      setScrolled(scrollContainer.scrollTop > 10);
-    }
+    window.addEventListener("scroll", onScroll);
+    onScroll(); // mount 시 스크롤 위치 즉시 반영
 
     return () => {
-      if (scrollContainer) {
-        scrollContainer.removeEventListener("scroll", onScroll);
-      }
+      window.removeEventListener("scroll", onScroll);
     };
   }, [scrollBg]);
 
