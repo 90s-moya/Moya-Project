@@ -1,4 +1,6 @@
-import type { RouteObject } from "react-router-dom";
+// src/router/index.tsx
+
+import { useRoutes, type RouteObject } from "react-router-dom";
 
 import authRoutes from "./routes/authRoutes";
 import interviewRoutes from "./routes/interviewRoutes";
@@ -16,5 +18,6 @@ const routes: RouteObject[] = [
     element: <HomePage />,
   },
 ];
-
-export default routes;
+export default function AppRoutes() {
+  return useRoutes(routes);
+}
