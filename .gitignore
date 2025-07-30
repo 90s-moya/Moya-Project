@@ -75,6 +75,8 @@ frontend/*.local
 # 편집기 설정
 .vscode/
 cursor.json
+# .claude 폴더 전체 무시
+.claude/
 
 # ===============================
 # AI
