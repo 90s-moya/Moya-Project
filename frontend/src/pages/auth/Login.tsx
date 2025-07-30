@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
+import AuthApi from '@/api/authApi';
 
 const Login: React.FC = () => {
+  AuthApi.signUp
   return (
     <div className="min-h-screen w-full bg-white flex overflow-hidden">
       {/* Left Side - Illustration with Gradient Background (그라데이션 + 환영메시지 + 캐릭터) */}
