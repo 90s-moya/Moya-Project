@@ -58,7 +58,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
           <Link to="/interview/start" className={navLinkClass(linkColor)}>
             AI 모의면접
           </Link>
-          <Link to="#" className={navLinkClass(linkColor)}>
+          <Link to="/study" className={navLinkClass(linkColor)}>
             면접 스터디
           </Link>
           <Link to="#" className={navLinkClass(linkColor)}>
