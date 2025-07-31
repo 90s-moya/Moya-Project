@@ -1,5 +1,6 @@
 package com.moya.domain.room;
 
+import com.moya.domain.BaseEntity;
 import com.moya.domain.category.Category;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Room {
+public class Room extends BaseEntity {
     @Id
     @GeneratedValue
     @GenericGenerator(name = "uuid2", strategy = "uuid2")

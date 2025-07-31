@@ -41,7 +41,7 @@ public class RoomInfo {
                 .maxUser(room.getMax_user())
                 .expiredAt(room.getExpired_at())
                 .openAt(room.getOpen_at())
-                .categoryName(room.getCategory_id().getName()) // 주의: LAZY 초기화 필요
+                .categoryName(room.getCategory_id().getName())
                 .build();
     }
 }
