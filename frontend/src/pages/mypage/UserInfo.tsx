@@ -1,6 +1,10 @@
 import React from 'react';
+import Header from '@/components/common/Header';
+import Sidebar from '@/components/mypage/Sidebar';
+import { useNavigate } from 'react-router-dom';
 
 const UserInfo: React.FC = () => {
+  const navigate = useNavigate();
   const handleNicknameChange = () => {
     alert('닉네임 변경 페이지로 이동합니다.');
   };
@@ -15,95 +19,17 @@ const UserInfo: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    if (confirm('로그아웃 하시겠습니까?')) {
-      alert('로그아웃 되었습니다.');
-    }
-  };
-
-  const handleNavigation = (menu: string) => {
-    alert(`${menu} 페이지로 이동합니다.`);
+  const handleSidebarNavigation = (menu: string) => {
+    navigate(`/mypage/${menu}`);
   };
 
   return (
     <div className="min-h-screen bg-white">
-      {/* 상단바 */}
-      <header className="w-full h-20 bg-white flex items-center justify-between px-8 border-b border-gray-100">
-        {/* MOYA 로고 */}
-        <div className="text-[50px] font-bold text-[#2B7FFF] leading-[2em] tracking-wide">
-          MOYA
-        </div>
-        
-        {/* 네비게이션 메뉴 */}
-        <div className="flex items-center gap-20">
-          <button 
-            onClick={() => handleNavigation('AI 모의 면접')} 
-            className="text-lg font-semibold text-[#1B1C1F] hover:text-[#2B7FFF] transition-colors"
-          >
-            AI 모의 면접
-          </button>
-          <button 
-            onClick={() => handleNavigation('면접 스터디')} 
-            className="text-lg font-semibold text-[#1B1C1F] hover:text-[#2B7FFF] transition-colors"
-          >
-            면접 스터디
-          </button>
-          <button 
-            onClick={() => handleNavigation('마이페이지')} 
-            className="text-lg font-semibold text-[#1B1C1F] hover:text-[#2B7FFF] transition-colors"
-          >
-            마이페이지
-          </button>
-        </div>
-
-        {/* 로그아웃 & 사용자명 */}
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={handleLogout} 
-            className="text-sm font-semibold text-[#6F727C] hover:text-[#404249] transition-colors"
-          >
-            로그아웃
-          </button>
-          <div className="bg-[#2B7FFF] text-white px-4 py-2 rounded-[10px] text-sm font-semibold">
-            최참빛님
-          </div>
-        </div>
-      </header>
+      <Header />
 
       {/* 메인 콘텐츠 */}
       <div className="flex max-w-7xl mx-auto px-8 py-12">
-        {/* 사이드바 */}
-        <aside className="w-80 mr-12">
-          <h1 className="text-[40px] font-semibold text-[#1B1C1F] mb-8 leading-[1.4]">
-            마이페이지
-          </h1>
-          
-          <div className="bg-[#F4F4F6] rounded-[10px] p-5">
-            <div className="flex flex-col gap-6">
-              <button className="text-left text-lg font-semibold text-[#2B7FFF]">
-                회원정보
-              </button>
-              <button 
-                onClick={() => handleNavigation('이력서 및 포트폴리오')} 
-                className="text-left text-lg font-semibold text-[#6F727C] hover:text-[#2B7FFF] transition-colors"
-              >
-                이력서 및 포트폴리오
-              </button>
-              <button 
-                onClick={() => handleNavigation('모의 면접 결과')} 
-                className="text-left text-lg font-semibold text-[#6F727C] hover:text-[#2B7FFF] transition-colors"
-              >
-                모의 면접 결과
-              </button>
-              <button 
-                onClick={() => handleNavigation('면접 스터디 피드백')} 
-                className="text-left text-lg font-semibold text-[#6F727C] hover:text-[#2B7FFF] transition-colors"
-              >
-                면접 스터디 피드백
-              </button>
-            </div>
-          </div>
-        </aside>
+        <Sidebar activeMenu="userinfo" onNavigate={handleSidebarNavigation} />
 
         {/* 메인 콘텐츠 영역 */}
         <main className="flex-1">
@@ -123,7 +49,7 @@ const UserInfo: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="flex-1 h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center px-4">
                   <span className="text-sm font-semibold text-[#1B1C1F] leading-[1.714]">
-                    최참빛
+                    
                   </span>
                 </div>
                 <button 
@@ -142,7 +68,7 @@ const UserInfo: React.FC = () => {
               </label>
               <div className="h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center px-4">
                 <span className="text-sm font-semibold text-[#1B1C1F] leading-[1.714]">
-                  rlawhdtn97@naver.com
+                  
                 </span>
               </div>
             </div>
@@ -155,7 +81,7 @@ const UserInfo: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="flex-1 h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center px-4">
                   <span className="text-sm font-semibold text-[#1B1C1F] leading-[1.714]">
-                    *********
+                   
                   </span>
                 </div>
                 <button 
