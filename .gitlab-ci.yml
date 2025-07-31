@@ -30,6 +30,8 @@ deploy-be-dev:
     - docker rm be-dev || true
     - >
       docker run -d --name be-dev -p 8081:8080
+      -v /home/ubuntu/files-dev:/app/files-dev
+      -e FILE_PATH=/app/files-dev
       -e DB_URL="$DB_URL_DEV"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
@@ -51,6 +53,8 @@ deploy-be-prod:
     - docker rm be-main || true
     - >
       docker run -d --name be-main -p 8080:8080
+      -v /home/ubuntu/files:/app/files
+      -e FILE_PATH=/app/files
       -e DB_URL="$DB_URL_PROD"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
