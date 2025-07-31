@@ -99,7 +99,9 @@ public class SecurityConfig {
                     "/v1/user/random",
                     "/v1/user/check-nickname",
                     "/css/**").permitAll()
-                .anyRequest().authenticated()
+                    .requestMatchers("v1/docs",
+                            "/v1/docs/**").authenticated()
+                    .anyRequest().authenticated()
             );
 
         http
