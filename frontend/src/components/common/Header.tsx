@@ -61,7 +61,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
           <Link to="/study" className={navLinkClass(linkColor)}>
             면접 스터디
           </Link>
-          <Link to="#" className={navLinkClass(linkColor)}>
+          <Link to="/mypage/userinfo" className={navLinkClass(linkColor)}>
             마이페이지
           </Link>
         </nav>
@@ -75,7 +75,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
             로그인
           </Link>
           <Button className="bg-[#2b7fff] hover:bg-blue-600 text-white text-lg px-6 py-2 rounded-lg">
-            <Link to="">회원가입</Link>
+            <Link to="/signup/detail">회원가입</Link>
           </Button>
         </div>
       </div>

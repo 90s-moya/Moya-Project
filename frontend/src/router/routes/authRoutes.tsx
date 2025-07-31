@@ -8,7 +8,7 @@ import LoginSucceeded from "../../pages/auth/LoginSucceeded";
 const authRoutes: RouteObject[] = [
   { path: "/login", element: <Login /> },
   { path: "/signup", element: <Signup />},
-  { path: "/signupdetail", element: <SignupDetail /> }, 
+  { path: "/signup/detail", element: <SignupDetail /> }, 
   { path: "/succeeded", element: <LoginSucceeded /> },
 ];
 

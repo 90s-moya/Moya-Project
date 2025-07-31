@@ -1,7 +1,7 @@
 // src/router/routes/homeRoutes.tsx
 import type { RouteObject } from "react-router-dom";
 
-import UserInfo from "@/pages/mypage/UserInfo.";
+import UserInfo from "@/pages/mypage/UserInfo";
 import Resume from "@/pages/mypage/Resume";
 import Portfolio from "@/pages/mypage/Portfolio";
 import Result from "@/pages/mypage/Result";
