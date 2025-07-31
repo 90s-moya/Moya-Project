@@ -63,7 +63,7 @@ public class SecurityConfig {
     private static final String[] PERMIT_ALL_PATTERNS = {
             "/token/**",
             "/v1/auth/**",
-            "/api/v1/user/check/email",
+            "/v1/user/check/email",
             "/css/**"
     };
 
@@ -98,6 +98,7 @@ public class SecurityConfig {
                     "/v1/user/check-email",
                     "/v1/user/random",
                     "/v1/user/check-nickname",
+                    "/v1/room/*",
                     "/css/**").permitAll()
                 .anyRequest().authenticated()
             );
