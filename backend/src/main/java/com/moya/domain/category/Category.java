@@ -1,5 +1,6 @@
 package com.moya.domain.category;
 
+import com.moya.domain.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -13,7 +14,7 @@ import java.util.UUID;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Category {
+public class Category extends BaseEntity {
     @Id
     @GeneratedValue
     @GenericGenerator(name = "uuid2", strategy = "uuid2")
