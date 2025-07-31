@@ -1,17 +1,13 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 
 const LoginSucceeded: React.FC = () => {
-  const navigate = useNavigate();
 
   const goToProfile = () => {
     // 실제 구현: navigate('/profile/setup');
-    alert('이력서 및 포트폴리오 등록 페이지로 이동합니다.');
   };
 
   const goToHome = () => {
     // 실제 구현: navigate('/');
-    alert('홈 페이지로 이동합니다.');
   };
 
   return (
@@ -31,10 +27,7 @@ const LoginSucceeded: React.FC = () => {
       <div className="flex-1 bg-white flex flex-col justify-center items-center px-30 py-20 xl:px-20 xl:py-15 xl:flex-col lg:px-5 lg:py-7.5">
         <div className="max-w-[480px] xl:max-w-[400px]">
           <h1 className="font-['Wix_Madefor_Display'] font-semibold text-[40px] leading-[1.4] text-[#1B1C1F] text-center mb-15 xl:text-[28px] xl:text-center xl:mb-10 lg:text-[24px]">
-            최참빛님,<br />
-            로그인이 완료되었습니다!<br />
-            서류를 등록하고<br /> 
-            서비스를 받아보세요!
+            
           </h1>
           
           <div className="flex flex-col gap-[18px]">

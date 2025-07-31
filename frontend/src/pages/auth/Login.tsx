@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
 import AuthApi from '@/api/authApi';
+import { Link } from "react-router-dom";
+
 
 const Login: React.FC = () => {
   AuthApi.signUp
@@ -87,7 +88,7 @@ const Login: React.FC = () => {
                 <div className="flex items-center justify-center gap-2 text-sm">
                   <span className="text-gray-600">아직 회원이 아니신가요?</span>
                   <button className="text-blue-500 font-semibold hover:text-blue-600 transition-colors">
-                    회원가입
+                    <Link to="/signup/detail">회원가입</Link>
                   </button>
                 </div>
               </div>
