@@ -30,6 +30,7 @@ public class Docs extends BaseEntity {
         this.fileUrl=fileUrl;
     }
 
+
     public static Docs create(UUID userId,String fileUrl,DocsStatus docsStatus){
         return Docs.builder()
                 .userId(userId)
@@ -37,4 +38,5 @@ public class Docs extends BaseEntity {
                 .docsStatus(docsStatus)
                 .build();
     }
+
 }

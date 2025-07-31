@@ -7,6 +7,7 @@
     public interface DocsRepository {
         Docs save(Docs docs);
         List<Docs> finAllByUserId(UUID userId);
-        Optional<Docs> findById(UUID id);
-        Docs removeById(UUID id);
+        Optional<Docs> findByIdAndUserId(UUID id,UUID userId);
+        void delete(Docs docs);
+        long countByUserIdAndDocsStatus(UUID userId, DocsStatus docsStatus);
     }

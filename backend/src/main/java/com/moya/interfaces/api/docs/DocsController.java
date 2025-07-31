@@ -1,8 +1,9 @@
-package com.moya.interfaces.api.docs.request;
+package com.moya.interfaces.api.docs;
 
 import com.moya.domain.docs.DocsStatus;
-import com.moya.service.docs.DocsInfo;
-import com.moya.service.docs.DocsService;
+import com.moya.interfaces.api.docs.request.DocsRequest;
+import com.moya.interfaces.api.docs.request.DocsSaveRequest;
+import com.moya.service.docs.*;
 import com.moya.support.file.FileStorageService;
 import com.moya.support.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
@@ -24,15 +27,21 @@ public class DocsController {
     public ResponseEntity<DocsInfo> save(@AuthenticationPrincipal CustomUserDetails user,
                                          @RequestParam("file") MultipartFile file,
                                          @RequestParam("status") DocsStatus docsStatus) throws IOException {
-        if (!"application/pdf".equals(file.getContentType())) {
-            return ResponseEntity.badRequest().body(null);
-        }
+        DocsSaveCommand command = new DocsSaveCommand(user.getUserId(), docsStatus, file, null);
 
-        String savedFilePath = fileStorageService.save(file);
-
-        DocsSaveRequest request = new DocsSaveRequest(savedFilePath, docsStatus);
-        DocsInfo docsInfo = docsService.saveDocs(request.toCommand(user.getUserId()));
-
+        DocsInfo docsInfo = docsService.saveDocs(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(docsInfo);
+
+
+    }
+    @GetMapping("/me")
+    public ResponseEntity<List<DocsInfo>> getDocs(@AuthenticationPrincipal CustomUserDetails user){
+        return ResponseEntity.ok(docsService.getDocs(new GetDocsCommand(user.getUserId())));
+    }
+    @DeleteMapping("/{docsId}")
+    public ResponseEntity<Void> deleteDocs(@AuthenticationPrincipal CustomUserDetails user,
+                                           @PathVariable UUID docsId){
+        docsService.deleteDocs(new DocsCommand(docsId,user.getUserId()));
+        return ResponseEntity.ok(null);
     }
 }

@@ -2,6 +2,7 @@ package com.moya.infras.docs;
 
 import com.moya.domain.docs.Docs;
 import com.moya.domain.docs.DocsRepository;
+import com.moya.domain.docs.DocsStatus;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -23,16 +24,23 @@ public class DocsRepositoryImpl implements DocsRepository {
         return docsJpaRepository.findAllByUserId(userId);
     }
 
+
     @Override
-    public Optional<Docs> findById(UUID id) {
-        return docsJpaRepository.findById(id);
+    public Optional<Docs> findByIdAndUserId(UUID id,UUID userId) {
+        return docsJpaRepository.findByIdAndUserId(id,userId);
     }
 
-    public Docs removeById(UUID id) {
-        Docs docs = docsJpaRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Docs not found with id: " + id));
 
-        docsJpaRepository.deleteById(id);
-        return docs;
+
+    @Override
+    public void delete(Docs docs) {
+        docsJpaRepository.delete(docs);
     }
+
+    @Override
+    public long countByUserIdAndDocsStatus(UUID userId, DocsStatus docsStatus) {
+       return docsJpaRepository.countByUserIdAndDocsStatus(userId,docsStatus);
+    }
+
+
 }
