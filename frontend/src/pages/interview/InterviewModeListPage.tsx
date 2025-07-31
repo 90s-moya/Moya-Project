@@ -2,9 +2,12 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import Header from "@/components/common/Header"
+import { useNavigate } from "react-router-dom"
 
 export default function InterviewerSelection() {
   const [selectedPersonality, setSelectedPersonality] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   const handlePersonalitySelect = (personalityId: string) => {
     setSelectedPersonality(personalityId)
@@ -12,43 +15,16 @@ export default function InterviewerSelection() {
 
   const handleNext = () => {
     if (selectedPersonality) {
-      alert("다음 단계로 이동합니다!")
+      navigate("/interview/setup")
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center">
-            <div className="text-2xl font-bold text-blue-500">MOYA</div>
-          </div>
-
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              AI 모의 면접
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              면접 스터디
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">
-              마이페이지
-            </a>
-          </nav>
-
-          {/* User section */}
-          <div className="flex items-center space-x-4">
-            <span className="text-gray-700">로그인</span>
-            <Button className="bg-blue-500 hover:bg-blue-600 text-white">00님</Button>
-          </div>
-        </div>
-      </header>
+      <Header scrollBg={false} />
 
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-6 py-16">
+      <main className="max-w-4xl mx-auto px-6 py-16 mt-16">
         {/* Title */}
         <div className="text-center mb-16">
           <h1 className="text-2xl font-bold text-gray-800">AI 면접관 성향 선택</h1>
@@ -59,16 +35,19 @@ export default function InterviewerSelection() {
           {/* 대화형 */}
           <div className="flex flex-col items-center">
             {/* Image Placeholder */}
-            <div className="w-64 h-40 bg-gray-400 rounded-lg mb-6"></div>
+            <div className={`w-64 h-40 rounded-lg mb-6 transition-opacity duration-200 
+              ${selectedPersonality === "conversational" ? "opacity-100" : "opacity-50"}`}>
+              <div className="w-full h-full bg-gray-400 rounded-lg" />
+            </div>
 
             {/* Selection Button */}
             <Button
               onClick={() => handlePersonalitySelect("conversational")}
-              className={`w-64 h-14 text-base font-medium rounded-lg transition-all ${
-                selectedPersonality === "conversational"
+              className={`w-64 h-14 text-base font-medium rounded-lg transition-all duration-200
+                ${selectedPersonality === "conversational"
                   ? "bg-blue-600 text-white ring-2 ring-blue-700"
-                  : "bg-blue-500 hover:bg-blue-600 text-white"
-              }`}
+                  : "bg-blue-500 text-white opacity-50 hover:opacity-100 hover:bg-blue-600"
+                }`}
             >
               <div className="text-center">
                 <div>대화형</div>
@@ -80,16 +59,19 @@ export default function InterviewerSelection() {
           {/* 압박형 */}
           <div className="flex flex-col items-center">
             {/* Image Placeholder */}
-            <div className="w-64 h-40 bg-gray-400 rounded-lg mb-6"></div>
+            <div className={`w-64 h-40 rounded-lg mb-6 transition-opacity duration-200 
+              ${selectedPersonality === "pressure" ? "opacity-100" : "opacity-50"}`}>
+              <div className="w-full h-full bg-gray-400 rounded-lg" />
+            </div>
 
             {/* Selection Button */}
             <Button
               onClick={() => handlePersonalitySelect("pressure")}
-              className={`w-64 h-14 text-base font-medium rounded-lg transition-all ${
-                selectedPersonality === "pressure"
+              className={`w-64 h-14 text-base font-medium rounded-lg transition-all duration-200
+                ${selectedPersonality === "pressure"
                   ? "bg-blue-600 text-white ring-2 ring-blue-700"
-                  : "bg-blue-500 hover:bg-blue-600 text-white"
-              }`}
+                  : "bg-blue-500 text-white opacity-50 hover:opacity-100 hover:bg-blue-600"
+                }`}
             >
               <div className="text-center">
                 <div>압박형</div>
@@ -105,7 +87,7 @@ export default function InterviewerSelection() {
           <Button
             onClick={handleNext}
             disabled={!selectedPersonality}
-            className={`px-8 py-3 text-lg rounded-lg ${
+            className={`px-8 py-3 text-lg rounded-lg transition-all duration-200 ${
               selectedPersonality
                 ? "bg-blue-500 hover:bg-blue-600 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"

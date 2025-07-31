@@ -2,14 +2,19 @@
 
 import { Button } from "@/components/ui/button"
 import Header from "@/components/common/Header"
+import { useNavigate } from "react-router-dom";
 
 export default function Component() {
+  const navigate = useNavigate()
+  const handleStartInterview = () => {
+    navigate("/interview/documentlist")
+  }
   return (
     <div className="min-h-screen bg-gray-50">
       <Header scrollBg={false} />
-
+      
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-6 py-16">
+      <main className="max-w-4xl mx-auto px-6 py-16 mt-16">
         <div className="text-center">
           {/* Illustration */}
           <div className="mb-12 flex justify-center">
@@ -59,7 +64,8 @@ export default function Component() {
           </div>
 
           {/* Start button */}
-          <Button size="lg" className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 text-lg rounded-full">
+          <Button onClick={handleStartInterview} 
+            size="lg" className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 text-lg rounded-full">
             면접시작
           </Button>
         </div>
