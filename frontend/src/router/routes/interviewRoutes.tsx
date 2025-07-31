@@ -4,7 +4,7 @@ import InterviewStartPage from "@/pages/interview/InterviewStartPage";
 import InterviewDocumentListPage from "@/pages/interview/InterviewDocumentListPage";
 import InterviewModeListPage from "@/pages/interview/InterviewModeListPage";
 import InterviewSetupPage from "@/pages/interview/InterviewSetupPage";
-import InterviewSetupCompletionPage from "@/pages/interview/InterviewSetupCompletionPage";
+import InterviewPage from "@/pages/interview/InterviewPage";
 
 const interviewRoutes: RouteObject[] = [
     {
@@ -24,8 +24,8 @@ const interviewRoutes: RouteObject[] = [
         element: <InterviewSetupPage />,
     },
     {
-        path: "interview/setup/completion",
-        element: <InterviewSetupCompletionPage />,
+        path: "interview",
+        element: <InterviewPage />,
     },
 ];
 export default interviewRoutes;

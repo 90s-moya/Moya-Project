@@ -12,9 +12,9 @@ export default function Component() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header scrollBg={false} />
-
+      
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-6 py-16">
+      <main className="max-w-4xl mx-auto px-6 py-16 mt-16">
         <div className="text-center">
           {/* Illustration */}
           <div className="mb-12 flex justify-center">
