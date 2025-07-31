@@ -30,4 +30,10 @@ public class RoomController {
         roomService.deleteRoom(roomId);
         // TODO: 성공여부 리턴
     }
+
+    // 면접 스터디 방 상세 조회
+    @GetMapping("/{roomId}")
+    public RoomInfo getRoom(@PathVariable UUID roomId) {
+        return null;
+    }
 }
