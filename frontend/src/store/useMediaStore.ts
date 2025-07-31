@@ -11,5 +11,15 @@ type MediaStore = {
 export const useMediaStore = create<MediaStore>((set, get) => ({
   micStream: null,
   cameraStream: null,
-  setMicStream: (stream) => set,
+  setMicStream: (stream) => set({ micStream: stream }),
+  setCameraStream: (stream) => set({ cameraStream: stream }),
+  stopAll: () => {
+    get()
+      .micStream?.getTracks()
+      .forEach((t) => t.stop());
+    get()
+      .cameraStream?.getTracks()
+      .forEach((t) => t.stop());
+    set({ micStream: null, cameraStream: null });
+  },
 }));
