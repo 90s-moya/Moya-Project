@@ -26,7 +26,7 @@ spring:
     multipart:
       enabled: true
       max-file-size: 3MB
-      max-request-size: 18MB
+      max-request-size: 9MB
   jpa:
     hibernate:
       ddl-auto: update
