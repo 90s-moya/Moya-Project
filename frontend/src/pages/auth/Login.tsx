@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { Mail, Lock } from 'lucide-react';
 import AuthApi from '@/api/authApi';
 import { Link } from "react-router-dom";
