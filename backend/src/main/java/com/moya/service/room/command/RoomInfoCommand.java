@@ -1,4 +1,4 @@
-package com.moya.service.room;
+package com.moya.service.room.command;
 
 import com.moya.domain.room.Room;
 import lombok.Builder;
@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter
-public class RoomInfo {
+public class RoomInfoCommand {
     private UUID id;
     private String title;
     private String body;
@@ -19,9 +19,9 @@ public class RoomInfo {
     private String categoryName;
 
     @Builder
-    private RoomInfo(UUID id, String title, String body, String conversation,
-                     int maxUser, LocalDateTime expiredAt, LocalDateTime openAt,
-                     String categoryName) {
+    private RoomInfoCommand(UUID id, String title, String body, String conversation,
+                            int maxUser, LocalDateTime expiredAt, LocalDateTime openAt,
+                            String categoryName) {
         this.id = id;
         this.title = title;
         this.body = body;
@@ -32,8 +32,8 @@ public class RoomInfo {
         this.categoryName = categoryName;
     }
 
-    public static RoomInfo from(Room room) {
-        return RoomInfo.builder()
+    public static RoomInfoCommand from(Room room) {
+        return RoomInfoCommand.builder()
                 .id(room.getId())
                 .title(room.getTitle())
                 .body(room.getBody())
