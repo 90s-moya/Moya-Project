@@ -1,9 +1,11 @@
 package com.moya.interfaces.api.room;
 
-import com.moya.domain.room.Room;
-import com.moya.service.room.RoomInfo;
+import com.moya.service.room.command.RoomDetailCommand;
+import com.moya.service.room.command.RoomInfoCommand;
 import com.moya.service.room.RoomService;
 import lombok.RequiredArgsConstructor;
+import org.apache.coyote.Response;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,9 +18,9 @@ public class RoomController {
     private final RoomService roomService;
     // 면접 스터디 전체 방 조회
     @GetMapping()
-    public List<RoomInfo> getAllRooms() {
+    public List<RoomInfoCommand> getAllRooms() {
         return roomService.getAllRooms().stream()
-                .map(RoomInfo::from)
+                .map(RoomInfoCommand::from)
                 .toList();
     }
 
@@ -33,7 +35,8 @@ public class RoomController {
 
     // 면접 스터디 방 상세 조회
     @GetMapping("/{roomId}")
-    public RoomInfo getRoom(@PathVariable UUID roomId) {
-        return null;
+    public ResponseEntity<RoomDetailCommand> getRoom(@PathVariable UUID roomId) {
+        RoomDetailCommand rdc = roomService.getRoomDetail(roomId);
+        return ResponseEntity.ok(rdc);
     }
 }
