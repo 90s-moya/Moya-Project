@@ -15,6 +15,7 @@ import com.moya.service.room.command.RoomDetailCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 import java.util.UUID;
@@ -75,7 +76,7 @@ public class RoomService {
     public UUID createRoom(CreateRoomRequest createRoomRequest, UUID userId){
         // 방 만들기
         Category category = categoryRepository.findById(createRoomRequest.getCategory_id()).orElseThrow(() -> new RuntimeException("해당 카테고리가 없습니다."));
-
+        System.out.println(category.toString());
         Room room = Room.builder()
                 .category_id(category)
                 .conversation(null)
