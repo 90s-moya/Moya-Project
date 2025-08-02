@@ -1,11 +1,14 @@
 package com.moya.interfaces.api.room;
 
+import com.moya.interfaces.api.room.request.CreateRoomRequest;
 import com.moya.service.room.command.RoomDetailCommand;
 import com.moya.service.room.command.RoomInfoCommand;
 import com.moya.service.room.RoomService;
+import com.moya.support.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.apache.coyote.Response;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -38,5 +41,14 @@ public class RoomController {
     public ResponseEntity<RoomDetailCommand> getRoom(@PathVariable UUID roomId) {
         RoomDetailCommand rdc = roomService.getRoomDetail(roomId);
         return ResponseEntity.ok(rdc);
+    }
+
+    // 면접 스터디 방 생성
+    @PostMapping()
+    public UUID createRoom(CreateRoomRequest createRoomRequest, @AuthenticationPrincipal CustomUserDetails user) {
+        // 방 만들고
+        UUID roomId = roomService.createRoom(createRoomRequest, user.getUserId());
+
+        return null;
     }
 }
