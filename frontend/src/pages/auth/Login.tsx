@@ -1,6 +1,7 @@
 import { Mail, Lock } from "lucide-react";
 import AuthApi from "@/api/authApi";
 import { Link } from "react-router-dom";
+import cloud_friends from "@/assets/images/cloud-friends.png";
 
 const Login: React.FC = () => {
   // AuthApi.signUp
@@ -19,13 +20,7 @@ const Login: React.FC = () => {
 
         {/* Character Illustration - 하단 중앙 */}
         <div className="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-          <div className="w-80 h-80 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20">
-            <div className="text-center text-white">
-              <div className="text-6xl mb-4">🤖</div>
-              <p className="text-lg font-medium opacity-90">MOYA 캐릭터</p>
-              <p className="text-sm opacity-70">이미지를 여기에 넣으세요</p>
-            </div>
-          </div>
+              <img src="/src/assets/images/cloud-friends.png" alt="로고" />
         </div>
       </div>
 
