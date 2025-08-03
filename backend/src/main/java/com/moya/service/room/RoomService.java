@@ -12,11 +12,9 @@ import com.moya.domain.user.UserRepository;
 import com.moya.interfaces.api.room.request.CreateRoomRequest;
 import com.moya.service.room.command.MasterInfo;
 import com.moya.service.room.command.RoomDetailCommand;
-import com.moya.service.room.command.RoomInfoCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 import java.util.UUID;
