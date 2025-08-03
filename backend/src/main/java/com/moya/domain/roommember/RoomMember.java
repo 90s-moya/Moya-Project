@@ -4,13 +4,11 @@ import com.moya.domain.BaseEntity;
 import com.moya.domain.room.Room;
 import com.moya.domain.user.User;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Getter
+@Builder
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RoomMember extends BaseEntity {

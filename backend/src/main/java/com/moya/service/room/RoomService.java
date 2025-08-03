@@ -1,15 +1,21 @@
 package com.moya.service.room;
 
+import com.moya.domain.category.Category;
+import com.moya.domain.category.CategoryRepository;
 import com.moya.domain.room.Room;
 import com.moya.domain.room.RoomRepository;
 import com.moya.domain.roommember.RoomMember;
+import com.moya.domain.roommember.RoomMemberId;
 import com.moya.domain.roommember.RoomMemberRepository;
 import com.moya.domain.user.User;
+import com.moya.domain.user.UserRepository;
+import com.moya.interfaces.api.room.request.CreateRoomRequest;
 import com.moya.service.room.command.MasterInfo;
 import com.moya.service.room.command.RoomDetailCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +25,8 @@ import java.util.UUID;
 public class RoomService {
     private final RoomRepository roomRepository;
     private final RoomMemberRepository roomMemberRepository;
+    private final CategoryRepository  categoryRepository;
+    private final UserRepository userRepository;
 
     // 면접 스터디 전체 조회
     @Transactional(readOnly = true)
@@ -61,5 +69,35 @@ public class RoomService {
                 .joinUsers(joinUsers)
                 .masterInfo(masterInfo)
                 .build();
+    }
+
+    // 방 생성
+    @Transactional
+    public UUID createRoom(CreateRoomRequest createRoomRequest, UUID userId){
+        // 방 만들기
+        Category category = categoryRepository.findById(createRoomRequest.getCategory_id()).orElseThrow(() -> new RuntimeException("해당 카테고리가 없습니다."));
+        System.out.println(category.toString());
+        Room room = Room.builder()
+                .category_id(category)
+                .conversation(null)
+                .max_user(createRoomRequest.getMax_user())
+                .title(createRoomRequest.getTitle())
+                .body(createRoomRequest.getBody())
+                .expired_at(createRoomRequest.getExpire_at())
+                .open_at(createRoomRequest.getOpen_at())
+                .build();
+        Room makedRoom = roomRepository.save(room);
+        User user = userRepository.findById(userId).orElseThrow(()->new RuntimeException("해당 유저가 없습니다."));
+
+        // 구성원에 방장으로 유저 넣어주기
+        RoomMember member = RoomMember.builder()
+                .roomMemberId(new RoomMemberId(makedRoom.getId(), userId))
+                .room_id(makedRoom)
+                .user_id(user)
+                .is_master(true)
+                .build();
+        roomMemberRepository.save(member);
+
+        return makedRoom.getId();
     }
 }
