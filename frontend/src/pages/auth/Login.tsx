@@ -1,10 +1,39 @@
 import { Mail, Lock } from "lucide-react";
-import AuthApi from "@/api/authApi";
 import { Link } from "react-router-dom";
-import cloud_friends from "@/assets/images/cloud-friends.png";
+import { useState } from "react";
+import { useAuthStore } from "@/store/useAuthStore";
+import { useNavigate } from "react-router-dom";
 
 const Login: React.FC = () => {
-  // AuthApi.signUp
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { login } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setErrorMsg("이메일과 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMsg("");
+
+    try {
+      await login({ email, password });
+      console.log("로그인 성공");
+      navigate("/"); // 메인 페이지로 이동
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "로그인에 실패했습니다.";
+      setErrorMsg(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full bg-white flex overflow-hidden">
       {/* Left Side - Illustration with Gradient Background (그라데이션 + 환영메시지 + 캐릭터) */}
@@ -14,7 +43,7 @@ const Login: React.FC = () => {
           <h2 className="text-5xl font-semibold text-white leading-tight drop-shadow-lg">
             MOYA에
             <br />
-            다시 오신걸 환영합니다!
+            오신걸 환영합니다!
           </h2>
         </div>
 
@@ -52,6 +81,8 @@ const Login: React.FC = () => {
                   <input
                     id="email"
                     type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="이메일을 입력하세요"
                     className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors"
                   />
@@ -70,15 +101,23 @@ const Login: React.FC = () => {
                   <input
                     id="password"
                     type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     placeholder="비밀번호를 입력하세요"
                     className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors"
                   />
                 </div>
               </div>
 
-              <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 px-6 rounded-xl transition-colors duration-200 shadow-lg hover:shadow-xl text-lg">
-                로그인
+              <button
+                onClick={handleLogin}
+                disabled={isLoading}
+                className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 px-6 rounded-xl transition-colors duration-200 shadow-lg hover:shadow-xl text-lg"
+              >
+                {isLoading ? "로그인 중..." : "로그인"}
               </button>
+
+              {errorMsg && <p className="text-red-500 text-sm">{errorMsg}</p>}
 
               <div className="text-center space-y-2">
                 <button className="text-sm text-blue-500 hover:text-blue-600 transition-colors">

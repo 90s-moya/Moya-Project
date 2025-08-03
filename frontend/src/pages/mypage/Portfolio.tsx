@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import Header from '@/components/common/Header';
 import Sidebar from '@/components/mypage/Sidebar';
+import FileUpload from '@/components/common/FileUpload';
 import { useNavigate } from 'react-router-dom';
 
 const Portfolio: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'resume' | 'portfolio'>('portfolio');
   const navigate = useNavigate();
 
-  const handleFileUpload = () => {
-    alert('포트폴리오 파일을 업로드합니다.');
-    // 실제 구현: file input 또는 drag & drop
+  const handleFileUpload = (file: File) => {
+    console.log('업로드된 파일:', file);
+    // TODO: 실제 서버 업로드 로직 구현
+    alert(`${file.name} 파일이 업로드되었습니다.`);
   };
 
   const handleSidebarNavigation = (menu: string) => {
@@ -21,7 +23,7 @@ const Portfolio: React.FC = () => {
       <Header />
 
       {/* 메인 콘텐츠 */}
-      <div className="flex max-w-7xl mx-auto px-8 py-12">
+      <div className="flex max-w-7xl mx-auto px-8 py-12 pt-32">
         <Sidebar activeMenu="resume" onNavigate={handleSidebarNavigation} />
 
         {/* 메인 콘텐츠 영역 */}
@@ -46,39 +48,13 @@ const Portfolio: React.FC = () => {
             </button>
           </div>
 
-          {/* 메인 콘텐츠 박스 */}
-          <div className="w-full max-w-[880px] h-[360px] bg-[#FAFAFC] border border-[#EFEFF3] rounded-[10px] flex flex-col items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              {/* 아이콘 */}
-              <div className="w-9 h-9 bg-white flex items-center justify-center">
-                <svg width="27" height="27" viewBox="0 0 27 27" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path 
-                    d="M3.375 6.75H23.625M3.375 13.5H23.625M3.375 20.25H23.625M8.4375 6.75V20.25M18.5625 6.75V20.25" 
-                    stroke="#989AA2" 
-                    strokeWidth="2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              
-              {/* 메시지 텍스트 */}
-              <p className="text-center text-[#6F727C] font-semibold text-base leading-[1.875] mb-3">
-                {activeTab === 'resume' 
-                  ? '현재 등록된 이력서가 존재하지 않아요.\n이력서를 등록해보세요'
-                  : '현재 등록된 포트폴리오가 존재하지 않아요.\n포트폴리오를 등록해보세요'
-                }
-              </p>
-              
-              {/* 등록 버튼 */}
-              <button 
-                onClick={handleFileUpload}
-                className="bg-[#2B7FFF] hover:bg-[#1E6FE8] text-white px-4 py-2 rounded-[10px] text-sm font-semibold leading-[1.714] transition-colors h-10"
-              >
-                {activeTab === 'resume' ? '이력서 등록하기' : '포트폴리오 등록하기'}
-              </button>
-            </div>
-          </div>
+          {/* 파일 업로드 영역 */}
+          <FileUpload 
+            onFileSelect={handleFileUpload}
+            type={activeTab}
+            accept={activeTab === 'resume' ? '.pdf,.doc,.docx' : '.pdf,.doc,.docx,.ppt,.pptx'}
+            maxSize={10}
+          />
         </main>
       </div>
 

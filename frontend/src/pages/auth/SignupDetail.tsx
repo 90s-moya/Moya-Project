@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import AuthApi from '@/api/authApi';
+import UserApi from '@/api/userApi';
+import { useNavigate } from 'react-router-dom';
 
 interface FormData {
   nickname: string;
@@ -22,26 +25,230 @@ const SignupDetail: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
   const [isCodeSent, setIsCodeSent] = useState(false);
+  const [messages, setMessages] = useState({
+    nickname: { error: '', success: '' },
+    email: { error: '', success: '' },
+    otp: { error: '', success: '' },
+    general: { error: '', success: '' }
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [isNicknameChecked, setIsNicknameChecked] = useState(false);
+  const [isEmailDuplicateChecked, setIsEmailDuplicateChecked] = useState(false);
+  
+  const navigate = useNavigate();
 
+  // 입력값 변경 시 중복 확인 상태 리셋
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+    
+    if (field === 'nickname') {
+      setIsNicknameChecked(false);
+      setMessages(prev => ({
+        ...prev,
+        nickname: { error: '', success: '' }
+      }));
+    }
+    if (field === 'email') {
+      setIsEmailDuplicateChecked(false);
+      setIsCodeSent(false);
+      setIsEmailVerified(false);
+      setMessages(prev => ({
+        ...prev,
+        email: { error: '', success: '' },
+        otp: { error: '', success: '' }
+      }));
+    }
+  };
+
+  const handleEmailDuplicateCheck = async () => {
+    if (!formData.email) {
+      setMessages(prev => ({
+        ...prev,
+        email: { error: '이메일을 입력해주세요.', success: '' }
+      }));
+      return;
+    }
+
+    try {
+      const res = await UserApi.checkEmail(formData.email);
+      console.log('이메일 중복 확인 응답:', res);
+      console.log('이메일 중복 확인 데이터:', res.data);
+      
+      if (res.data.isAvailable) {
+        setIsEmailDuplicateChecked(true);
+        setMessages(prev => ({
+          ...prev,
+          email: { error: '', success: '사용 가능한 이메일입니다.' }
+        }));
+      } else {
+        setMessages(prev => ({
+          ...prev,
+          email: { error: '이미 사용 중인 이메일입니다.', success: '' }
+        }));
+        setIsEmailDuplicateChecked(false);
+      }
+    } catch (error: any) {
+      console.error('이메일 중복 확인 에러:', error);
+      console.error('에러 응답:', error.response);
+      setMessages(prev => ({
+        ...prev,
+        email: { error: '이메일 중복 확인에 실패했습니다.', success: '' }
+      }));
+    }
+  };
+
+  const handleEmailVerification = async () => {
+    if (!isEmailDuplicateChecked) {
+      setMessages(prev => ({
+        ...prev,
+        otp: { error: '먼저 이메일 중복 확인을 해주세요.', success: '' }
+      }));
+      return;
+    }
+
+    try {
+      await AuthApi.sendOtp({ email: formData.email, type: 'signup' });
+      setIsCodeSent(true);
+      setMessages(prev => ({
+        ...prev,
+        otp: { error: '', success: '인증번호가 발송되었습니다.' }
+      }));
+    } catch (error: any) {
+      setMessages(prev => ({
+        ...prev,
+        otp: { error: '인증번호 발송에 실패했습니다.', success: '' }
+      }));
+    }
   };
   
-  const handleEmailVerification = () => {
-    // 이메일 인증 요청 로직
-    setIsCodeSent(true);
+  const handleCodeVerification = async () => {
+    if (!formData.verificationCode) {
+      setMessages(prev => ({
+        ...prev,
+        otp: { error: '인증번호를 입력해주세요.', success: '' }
+      }));
+      return;
+    }
+
+    try {
+      await AuthApi.verifyOtp({
+        email: formData.email,
+        type: 'signup',
+        otp: formData.verificationCode
+      });
+      setIsEmailVerified(true);
+      setMessages(prev => ({
+        ...prev,
+        otp: { error: '', success: '이메일 인증이 완료되었습니다.' }
+      }));
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || '인증번호가 올바르지 않습니다.';
+      setMessages(prev => ({
+        ...prev,
+        otp: { error: errorMessage, success: '' }
+      }));
+    }
+  };
+
+  const handleNicknameCheck = async () => {
+    if (!formData.nickname) {
+      setMessages(prev => ({
+        ...prev,
+        nickname: { error: '닉네임을 입력해주세요.', success: '' }
+      }));
+      return;
+    }
+
+    try {
+      const res = await UserApi.checkNickname(formData.nickname);
+      console.log('닉네임 중복 확인 응답:', res);
+      console.log('닉네임 중복 확인 데이터:', res.data);
+      
+      if (res.data.isAvailable) {
+        setIsNicknameChecked(true);
+        setMessages(prev => ({
+          ...prev,
+          nickname: { error: '', success: '사용 가능한 닉네임입니다.' }
+        }));
+      } else {
+        setMessages(prev => ({
+          ...prev,
+          nickname: { error: '이미 사용 중인 닉네임입니다.', success: '' }
+        }));
+        setIsNicknameChecked(false);
+      }
+    } catch (error: any) {
+      console.error('닉네임 중복 확인 에러:', error);
+      console.error('에러 응답:', error.response);
+      setMessages(prev => ({
+        ...prev,
+        nickname: { error: '닉네임 중복 확인에 실패했습니다.', success: '' }
+      }));
+    }
+  };
+
+  const handleRandomNickname = async () => {
+    try {
+      const res = await UserApi.getRandomNickname();
+      setFormData(prev => ({ ...prev, nickname: res.data.nickname }));
+      setIsNicknameChecked(false); // 랜덤 닉네임 생성 후 중복 확인 필요
+      setMessages(prev => ({
+        ...prev,
+        nickname: { error: '', success: '랜덤 닉네임이 생성되었습니다. 중복 확인을 해주세요.' }
+      }));
+    } catch (error: any) {
+      setMessages(prev => ({
+        ...prev,
+        nickname: { error: '랜덤 닉네임 생성에 실패했습니다.', success: '' }
+      }));
+    }
   };
   
-  const handleCodeVerification = () => {
-    // 인증코드 확인 로직
-    setIsEmailVerified(true);
+  const handleSignup = async () => {
+    if (!isFormValid) return;
+    
+    setIsLoading(true);
+    setMessages(prev => ({
+      ...prev,
+      general: { error: '', success: '' }
+    }));
+    
+    try {
+      const signupData = {
+        email: formData.email,
+        password: formData.password,
+        password_confirm: formData.confirmPassword,
+        nickname: formData.nickname,
+        otp: formData.verificationCode
+      };
+      
+      const res = await AuthApi.signUp(signupData);
+      setMessages(prev => ({
+        ...prev,
+        general: { error: '', success: '회원가입이 완료되었습니다!' }
+      }));
+      console.log('회원가입 성공:', res.data);
+      
+      // 3초 후 로그인 페이지로 이동
+      setTimeout(() => {
+        navigate('/login');
+      }, 3000);
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || '회원가입에 실패했습니다.';
+      setMessages(prev => ({
+        ...prev,
+        general: { error: errorMessage, success: '' }
+      }));
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const isPasswordMatch = formData.password === formData.confirmPassword && formData.password !== '';
-  const isFormValid = formData.nickname && formData.email && isEmailVerified && formData.password && isPasswordMatch;
+  const isFormValid = formData.nickname && isNicknameChecked && formData.email && isEmailDuplicateChecked && isEmailVerified && formData.password && isPasswordMatch;
 
   return (
     <div className="min-h-screen flex">
@@ -57,13 +264,7 @@ const SignupDetail: React.FC = () => {
         
         {/* Character Illustration - 하단 중앙 */}
         <div className="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-          <div className="w-80 h-80 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20">
-            <div className="text-center text-white">
-              <div className="text-6xl mb-4">🤖</div>
-              <p className="text-lg font-medium opacity-90">MOYA 캐릭터</p>
-              <p className="text-sm opacity-70">이미지를 여기에 넣으세요</p>
-            </div>
-          </div>
+              <img src="/src/assets/images/cloud-friends.png" alt="로고" />
         </div>
       </div>
 
@@ -83,17 +284,40 @@ const SignupDetail: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 닉네임
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={formData.nickname}
-                  onChange={(e) => handleInputChange('nickname', e.target.value)}
-                  placeholder="닉네임을 입력해주세요"
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                />
-                <button className="px-6 py-3 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-colors whitespace-nowrap">
-                  중복 확인
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={formData.nickname}
+                    onChange={(e) => handleInputChange('nickname', e.target.value)}
+                    placeholder="닉네임을 입력해주세요"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                  />
+                  <button 
+                    onClick={handleNicknameCheck}
+                    disabled={!formData.nickname || isNicknameChecked}
+                    className="px-6 py-3 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  >
+                    {isNicknameChecked ? '확인완료' : '중복 확인'}
+                  </button>
+                </div>
+                <button 
+                  onClick={handleRandomNickname}
+                  className="text-sm text-blue-500 hover:text-blue-600 transition-colors"
+                >
+                  랜덤 닉네임 생성
                 </button>
+                {/* Nickname messages */}
+                {messages.nickname.error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                    {messages.nickname.error}
+                  </div>
+                )}
+                {messages.nickname.success && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-sm">
+                    {messages.nickname.success}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -104,21 +328,53 @@ const SignupDetail: React.FC = () => {
               </label>
               <div className="space-y-3">
                 {/* Email input */}
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    placeholder="이메일을 입력해주세요"
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  />
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      placeholder="이메일을 입력해주세요"
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                    />
+                    <button 
+                      onClick={handleEmailDuplicateCheck}
+                      disabled={!formData.email || isEmailDuplicateChecked}
+                      className="px-6 py-3 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    >
+                      {isEmailDuplicateChecked ? '확인완료' : '중복 확인'}
+                    </button>
+                  </div>
+                  {/* Email messages */}
+                  {messages.email.error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                      {messages.email.error}
+                    </div>
+                  )}
+                  {messages.email.success && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-sm">
+                      {messages.email.success}
+                    </div>
+                  )}
+                  
                   <button 
                     onClick={handleEmailVerification}
-                    disabled={!formData.email}
-                    className="px-6 py-3 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                    disabled={!isEmailDuplicateChecked || isCodeSent}
+                    className="w-full px-6 py-3 bg-green-500 text-white text-sm font-semibold rounded-xl hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
-                    인증 요청
+                    {isCodeSent ? 'OTP 발송완료' : 'OTP 발송 요청'}
                   </button>
+                  {/* OTP messages */}
+                  {messages.otp.error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+                      {messages.otp.error}
+                    </div>
+                  )}
+                  {messages.otp.success && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-sm">
+                      {messages.otp.success}
+                    </div>
+                  )}
                 </div>
                 
                 {/* Verification code */}
@@ -168,6 +424,7 @@ const SignupDetail: React.FC = () => {
                 <p className="text-xs text-gray-500 mt-1">
                   8자 이상, 영문/숫자/특수문자 조합
                 </p>
+
                 
                 {/* Confirm password */}
                 <div>
@@ -197,12 +454,25 @@ const SignupDetail: React.FC = () => {
               </div>
             </div>
 
+            {/* General Error/Success Messages */}
+            {messages.general.error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                {messages.general.error}
+              </div>
+            )}
+            {messages.general.success && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
+                {messages.general.success}
+              </div>
+            )}
+
             {/* Submit Button */}
             <button 
-              disabled={!isFormValid}
+              onClick={handleSignup}
+              disabled={!isFormValid || isLoading}
               className="w-full bg-blue-500 text-white py-4 rounded-xl text-lg font-semibold hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
             >
-              회원가입 완료
+              {isLoading ? '처리중...' : '회원가입 완료'}
             </button>
             
             {/* Login Link */}
