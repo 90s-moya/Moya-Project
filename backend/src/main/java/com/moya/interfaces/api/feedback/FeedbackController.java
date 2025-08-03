@@ -1,14 +1,13 @@
 package com.moya.interfaces.api.feedback;
 
+import com.moya.interfaces.api.feedback.request.FeedbackRequest;
 import com.moya.service.feedback.FeedbackService;
 import com.moya.service.feedback.command.FeedbackInfoCommand;
 import com.moya.support.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +26,12 @@ public class FeedbackController {
         return ResponseEntity.ok(feedback);
     }
 
-
+    // 피드백 보내기
+    @PostMapping()
+    public ResponseEntity<UUID> sendFeedback(@RequestBody FeedbackRequest request, @AuthenticationPrincipal CustomUserDetails user) {
+        UUID senderId = user.getUserId();
+        UUID feedbackId = feedbackService.sendFeedback(request, senderId);
+        return ResponseEntity.ok(feedbackId);
+    }
 
 }

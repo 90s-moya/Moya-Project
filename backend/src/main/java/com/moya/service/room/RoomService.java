@@ -75,7 +75,6 @@ public class RoomService {
     public UUID createRoom(CreateRoomRequest createRoomRequest, UUID userId){
         // 방 만들기
         Category category = categoryRepository.findById(createRoomRequest.getCategory_id()).orElseThrow(() -> new RuntimeException("해당 카테고리가 없습니다."));
-        System.out.println(category.toString());
         Room room = Room.builder()
                 .categoryId(category)
                 .conversation(null)
