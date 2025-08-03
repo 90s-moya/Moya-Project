@@ -12,6 +12,7 @@ import com.moya.domain.user.UserRepository;
 import com.moya.interfaces.api.room.request.CreateRoomRequest;
 import com.moya.service.room.command.MasterInfo;
 import com.moya.service.room.command.RoomDetailCommand;
+import com.moya.service.room.command.RoomInfoCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,10 +63,10 @@ public class RoomService {
         return RoomDetailCommand.builder()
                 .title(room.getTitle())
                 .body(room.getBody())
-                .maxUser(room.getMax_user())
-                .openAt(room.getOpen_at())
-                .expiredAt(room.getExpired_at())
-                .categoryName(room.getCategory_id().getName())
+                .maxUser(room.getMaxUser())
+                .openAt(room.getOpenAt())
+                .expiredAt(room.getExpiredAt())
+                .categoryName(room.getCategoryId().getName())
                 .joinUsers(joinUsers)
                 .masterInfo(masterInfo)
                 .build();
@@ -78,13 +79,13 @@ public class RoomService {
         Category category = categoryRepository.findById(createRoomRequest.getCategory_id()).orElseThrow(() -> new RuntimeException("해당 카테고리가 없습니다."));
         System.out.println(category.toString());
         Room room = Room.builder()
-                .category_id(category)
+                .categoryId(category)
                 .conversation(null)
-                .max_user(createRoomRequest.getMax_user())
+                .maxUser(createRoomRequest.getMax_user())
                 .title(createRoomRequest.getTitle())
                 .body(createRoomRequest.getBody())
-                .expired_at(createRoomRequest.getExpire_at())
-                .open_at(createRoomRequest.getOpen_at())
+                .expiredAt(createRoomRequest.getExpire_at())
+                .openAt(createRoomRequest.getOpen_at())
                 .build();
         Room makedRoom = roomRepository.save(room);
         User user = userRepository.findById(userId).orElseThrow(()->new RuntimeException("해당 유저가 없습니다."));
@@ -99,5 +100,11 @@ public class RoomService {
         roomMemberRepository.save(member);
 
         return makedRoom.getId();
+    }
+
+    // 내가 속한 면접 스터디 조회
+    @Transactional
+    public List<Room> getMyRooms(UUID user_id){
+        return roomRepository.findMyRoom(user_id);
     }
 }

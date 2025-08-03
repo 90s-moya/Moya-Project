@@ -24,12 +24,15 @@ public class Room extends BaseEntity {
     private UUID id;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", referencedColumnName = "category_id")
-    private Category category_id;
+    private Category categoryId;
     private String conversation;
-    private int max_user;
+    @Column(name="max_user")
+    private int maxUser;
     private String title;
     private String body;
-    private LocalDateTime expired_at;
-    private LocalDateTime open_at;
+    @Column(name="expired_at")
+    private LocalDateTime expiredAt;
+    @Column(name="open_at")
+    private LocalDateTime openAt;
 
 }

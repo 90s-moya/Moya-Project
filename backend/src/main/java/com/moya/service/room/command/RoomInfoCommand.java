@@ -38,10 +38,10 @@ public class RoomInfoCommand {
                 .title(room.getTitle())
                 .body(room.getBody())
                 .conversation(room.getConversation())
-                .maxUser(room.getMax_user())
-                .expiredAt(room.getExpired_at())
-                .openAt(room.getOpen_at())
-                .categoryName(room.getCategory_id().getName())
+                .maxUser(room.getMaxUser())
+                .expiredAt(room.getExpiredAt())
+                .openAt(room.getOpenAt())
+                .categoryName(room.getCategoryId().getName())
                 .build();
     }
 }
