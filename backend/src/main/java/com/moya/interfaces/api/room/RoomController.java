@@ -46,8 +46,15 @@ public class RoomController {
     @PostMapping()
     public UUID createRoom(@RequestBody CreateRoomRequest createRoomRequest, @AuthenticationPrincipal CustomUserDetails user) {
         // 방 만들고
-        System.out.println("===============================들어오셈==================");
         UUID roomId = roomService.createRoom(createRoomRequest, user.getUserId());
         return roomId;
+    }
+
+    // 내 면접 스터디 방 조회
+    @GetMapping("/me")
+    public List<RoomInfoCommand> getMyRoom(@AuthenticationPrincipal CustomUserDetails user) {
+        return roomService.getMyRooms(user.getUserId()).stream()
+                .map(RoomInfoCommand::from)
+                .toList();
     }
 }
