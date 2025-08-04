@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Mic, Camera } from "lucide-react";
 import Header from "@/components/common/Header";
 import { useNavigate } from "react-router-dom";
+import FileUploadSection from "@/components/study/FileUploadSection";
 
 export default function StudySetupPage() {
   // 카메라 및 마이크 상태 확인용 변수
@@ -54,39 +55,51 @@ export default function StudySetupPage() {
     <div className="min-h-screen bg-white">
       <Header scrollBg={false} />
 
-      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-20 text-[17px] leading-relaxed">
-        <div className="flex gap-8 flex-col lg:flex-row mb-12">
-          {/* Camera */}
-          <div className="flex-1">
-            <div
-              className="relative bg-gray-900 rounded-lg overflow-hidden"
-              style={{ aspectRatio: "4/3" }}
-            >
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                className={`w-full h-full object-cover ${
-                  isCameraOn ? "block" : "hidden"
-                }`}
-              />
-              {!isCameraOn && (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-white text-2xl">
-                      카메라를 활성화해주세요
-                    </div>
-                  </div>
+      <main className="max-w-[1180px] mx-auto px-4 md:px-6 pt-[80px] pb-20 text-[17px] leading-relaxed">
+        {/* 타이틀 */}
+        <h1 className="text-3xl font-bold text-center mb-12">
+          면접스터디를 위한 환경을 설정해 주세요
+        </h1>
+
+        {/* 콘텐츠 영역 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start mb-16">
+          {/* 카메라 박스 */}
+          <div
+            className="w-full rounded-2xl border-4 border-blue-500 bg-gray-100 shadow-md overflow-hidden"
+            style={{ aspectRatio: "4 / 3" }}
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className={`w-full h-full object-cover ${
+                isCameraOn ? "block" : "hidden"
+              }`}
+            />
+            {!isCameraOn && (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center text-xl text-gray-600">
+                  카메라를 활성화해주세요
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
-          {/* Mic 상태 패널 */}
-          <div className="w-full lg:w-80 space-y-6 text-[17px]">
-            {/* 카메라 상태 */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          {/* 우측: 파일 업로드 */}
+          <div className="space-y-6">
+            <FileUploadSection label="이력서" type="resume" />
+            <FileUploadSection label="포트폴리오" type="portfolio" />
+            <FileUploadSection label="자기소개서" type="introduction" />
+          </div>
+        </div>
+
+        {/* 카메라 및 마이크 상태 + 버튼 */}
+        <div className="flex flex-col items-center space-y-6">
+          {/* 마이크/카메라 상태 */}
+          <div className="grid grid-cols-2 gap-4 w-full max-w-md">
+            {/* 카메라 */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
               <div className="flex items-center gap-2">
                 <Camera
                   className={`w-6 h-6 ${
@@ -104,8 +117,8 @@ export default function StudySetupPage() {
               </span>
             </div>
 
-            {/* 마이크 상태 */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            {/* 마이크 */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
               <div className="flex items-center gap-2">
                 <Mic
                   className={`w-6 h-6 ${
@@ -123,27 +136,27 @@ export default function StudySetupPage() {
               </span>
             </div>
           </div>
-        </div>
 
-        {/* 버튼 영역 */}
-        <div className="flex justify-end gap-4">
-          <Button
-            onClick={startStream}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6"
-          >
-            테스트하기
-          </Button>
-          <Button
-            onClick={() => navigate("/study/room")}
-            disabled={!isCameraOn || !isMicOn}
-            className={`px-8 ${
-              isCameraOn && isMicOn
-                ? "bg-blue-500 hover:bg-blue-600 text-white"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-          >
-            다음
-          </Button>
+          {/* 버튼 */}
+          <div className="flex justify-center gap-6 mt-6">
+            <Button
+              onClick={startStream}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-6 text-lg"
+            >
+              카메라 및 마이크 시작
+            </Button>
+            <Button
+              onClick={() => navigate("/study/room")}
+              disabled={!isCameraOn || !isMicOn}
+              className={`px-8 py-6 text-lg ${
+                isCameraOn && isMicOn
+                  ? "bg-blue-500 hover:bg-blue-600 text-white"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              참여하기
+            </Button>
+          </div>
         </div>
       </main>
     </div>

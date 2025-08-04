@@ -3,20 +3,20 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { jwtDecode } from "jwt-decode";
 import type { AxiosError } from "axios";
-import api from "@/api/index";
+import AuthApi from "@/api/authApi";
+import UserApi from "@/api/userApi";
 
 // ✅ 유저 정보 타입
 interface UserInfo {
-  userId: number;
-  username: string;
-  name: string;
+  userId: string;
+  nickname: string;
   email: string;
   createAt: string;
 }
 
 // ✅ JWT payload 타입
 interface JwtPayload {
-  userId: number;
+  userId: string;
   iat: number;
   exp: number;
 }
@@ -26,11 +26,15 @@ interface AuthState {
   token: string;
   user: UserInfo | null;
   isLogin: boolean;
+  UUID: string;
+  tutorialStatus: string;
 
-  login: (user: { username: string; password: string }) => Promise<void>;
-  logout: () => void;
+  login: (user: { email: string; password: string }) => Promise<void>;
+  logout: () => Promise<void>;
   getToken: () => string;
-  changeProfile: (user: Partial<UserInfo>) => void;
+  getUUID: () => string;
+  updateUserInfo: (user: Partial<UserInfo>) => void;
+  fetchUserInfo: () => Promise<void>;
 }
 
 // ✅ JWT 토큰 디코딩 함수
@@ -38,8 +42,7 @@ const decodeTokenToUser = (token: string): UserInfo => {
   const payload = jwtDecode<JwtPayload>(token);
   return {
     userId: payload.userId,
-    username: "",
-    name: "",
+    nickname: "",
     email: "",
     createAt: "",
   };
@@ -52,21 +55,27 @@ export const useAuthStore = create<AuthState>()(
       token: "",
       user: null,
       isLogin: false,
+      UUID: "",
+      tutorialStatus: "",
 
       login: async (loginInfo) => {
         try {
-          const res = await api.post("/user/login", loginInfo); // ✨axios 인스턴스 사용
-          const { accessToken, user } = res.data.data;
+          const res = await AuthApi.login(loginInfo);
+          const { token, UUID, tutorialStatus } = res.data;
 
-          if (!accessToken || typeof accessToken !== "string") {
+          if (!token || typeof token !== "string") {
             throw new Error("유효한 토큰이 아닙니다.");
           }
 
-          const decodedUser = user ?? decodeTokenToUser(accessToken);
+          // 로그인 성공 후 사용자 정보 조회
+          const userRes = await UserApi.getMyInfo();
+          const user = userRes.data;
 
           set({
-            token: accessToken,
-            user: decodedUser,
+            token,
+            UUID,
+            tutorialStatus,
+            user,
             isLogin: true,
           });
         } catch (err: unknown) {
@@ -76,19 +85,33 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
-        set({
-          token: "",
-          user: null,
-          isLogin: false,
-        });
+      logout: async () => {
+        try {
+          // 서버에 로그아웃 요청
+          await AuthApi.logout();
+        } catch (error) {
+          console.error("로그아웃 API 요청 실패:", error);
+        } finally {
+          // API 실패 여부와 관계없이 로컬 상태는 정리
+          set({
+            token: "",
+            user: null,
+            isLogin: false,
+            UUID: "",
+            tutorialStatus: "",
+          });
+        }
       },
 
       getToken: () => {
         return get().token;
       },
 
-      changeProfile: (userUpdate) => {
+      getUUID: () => {
+        return get().UUID;
+      },
+
+      updateUserInfo: (userUpdate) => {
         const currentUser = get().user;
         if (currentUser) {
           set({
@@ -97,6 +120,15 @@ export const useAuthStore = create<AuthState>()(
               ...userUpdate,
             },
           });
+        }
+      },
+
+      fetchUserInfo: async () => {
+        try {
+          const res = await UserApi.getMyInfo();
+          set({ user: res.data });
+        } catch (error) {
+          console.error("사용자 정보 조회 실패:", error);
         }
       },
     }),

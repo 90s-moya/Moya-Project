@@ -4,7 +4,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 // Axios 인스턴스 생성
 const instance = axios.create({
   baseURL: import.meta.env.VITE_API_URL, // 개발용 API 요청 공통 URL
-  timeout: 5000,
+  timeout: 10000,
   withCredentials: true,
 });
 
@@ -24,23 +24,23 @@ instance.interceptors.request.use(
 );
 
 // 응답 인터셉터
-instance.interceptors.response.use(
-  (response) => {
-    if (response.status === 200) return response;
-    if (response.status === 404) {
-      return Promise.reject("404: 페이지 없음 " + response.request);
-    }
-    return response;
-  },
-  async (error) => {
-    if (error.response?.status === 401) {
-      const { logout } = useAuthStore.getState();
-      logout();
+// instance.interceptors.response.use(
+//   (response) => {
+//     if (response.status === 200) return response;
+//     if (response.status === 404) {
+//       return Promise.reject("404: 페이지 없음 " + response.request);
+//     }
+//     return response;
+//   },
+//   async (error) => {
+//     if (error.response?.status === 401) {
+//       const { logout } = useAuthStore.getState();
+//       logout();
 
-      return Promise.reject({ error: "로그인이 필요한 서비스입니다." });
-    }
-    return Promise.reject(error);
-  }
-);
+//       return Promise.reject({ error: "로그인이 필요한 서비s스입니다." });
+//     }
+//     return Promise.reject(error);
+//   }
+// );
 
 export default instance;
