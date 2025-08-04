@@ -9,113 +9,16 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const studyData: Record<string, StudyRoom[]> = {
-  featured: [
-    {
-      id: 101,
-      title: "LG CNS 보안 기술 직무 실습반",
-      leader: "정해인",
-      date: "2025-07-30 14:00",
-      participants: "4/6",
-    },
-  ],
-  deadline: [
-    {
-      id: 1,
-      title: "SK 그룹 보안 솔루션 운영자 면스 모집",
-      leader: "김지원",
-      date: "2025-07-28 18:00",
-      participants: "4/6",
-    },
-    {
-      id: 2,
-      title: "카카오 AI 백엔드 면접 스터디",
-      leader: "홍길동",
-      date: "2025-08-01 10:00",
-      participants: "4/6",
-    },
-    {
-      id: 3,
-      title: "삼성 SDS 프론트엔드 실무 준비반",
-      leader: "이지은",
-      date: "2025-08-05 14:30",
-      participants: "4/6",
-    },
-    {
-      id: 7,
-      title: "스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 9,
-      title: " 엔지니어 스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 10,
-      title: " DevOps 엔지니어 스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 11,
-      title: "팡 DevOps 엔지니어 스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-  ],
-  recent: [
-    {
-      id: 4,
-      title: "네이버 클라우드 아키텍처 집중반",
-      leader: "박지훈",
-      date: "2025-08-03 11:00",
-      participants: "4/6",
-    },
-    {
-      id: 5,
-      title: "라인 AI 리서치 면접 모의반",
-      leader: "최유리",
-      date: "2025-08-07 09:00",
-      participants: "4/6",
-    },
-    {
-      id: 6,
-      title: "쿠팡 DevOps 엔지니어 스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 12,
-      title: "AI 리서치 면접 모의반",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 13,
-      title: "쿠팡 AI 리서치 면접 모의반",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 14,
-      title: "쿠팡 DevOps AI 리서치 면접 모의반",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-  ],
+  featured: [],
+  deadline: [],
+  recent: [],
 };
 
 export default function StudyListPage() {
+  const [rooms, setRooms] = useState<StudyRoom[]>([]); // 스터디 룸
+
+  const navigate = useNavigate();
+
   const [activeTab, setActiveTab] = useState<"deadline" | "recent">("deadline");
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(6);
@@ -124,32 +27,31 @@ export default function StudyListPage() {
   const hasMore = visibleCount < studyData[activeTab].length;
 
   useEffect(() => {
-    const accessToken = localStorage.getItem("auth");
-    console.log(accessToken);
+    selectRooms();
+  }, []);
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (accessToken) {
-      headers["Authorization"] = `Bearer ${accessToken}`;
+  const selectRooms = async () => {
+    const authStorage = localStorage.getItem("auth-storage");
+    let token = "";
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      token = parsed.state.token;
+      console.log(token); // → 바로 JWT 토큰 값만 나옴!
     }
 
-    const selectRoom = async () => {
-      await axios
-        .get(`${import.meta.env.VITE_API_URL}/api/v1/room`, {
-          headers,
-        })
-        .then((res) => {
-          console.log("방 전체 조회 API 요청 결과", res);
-        })
-        .catch((error) => {
-          alert("실패");
-        });
-    };
-
-    selectRoom();
-  }, []);
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/v1/room`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      console.log("✅ 데이터:", res.data); // 이건 배열 형태로 출력돼야 함
+      console.log("check");
+    } catch (err) {
+      console.error("❌ 에러 발생", err);
+    }
+  };
 
   const visibleFeatured = studyData.featured.slice(
     carouselIndex,
@@ -165,8 +67,6 @@ export default function StudyListPage() {
       setCarouselIndex(carouselIndex + 1);
     }
   };
-
-  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-white">
@@ -230,7 +130,7 @@ export default function StudyListPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 px-6">
             {visibleFeatured.map((study) => (
-              <StudyCard key={study.id} {...study} />
+              <StudyCard key={study.room_id} {...study} />
             ))}
           </div>
         </div>
@@ -279,7 +179,7 @@ export default function StudyListPage() {
               </p>
             ) : (
               visibleStudies.map((study) => (
-                <StudyCard key={study.id} {...study} />
+                <StudyCard key={study.room_id} {...study} />
               ))
             )}
           </div>
