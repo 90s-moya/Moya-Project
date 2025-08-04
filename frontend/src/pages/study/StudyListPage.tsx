@@ -68,7 +68,10 @@ export default function StudyListPage() {
   const hasMore = visibleCount < sortedRooms.length;
 
   // 캐로셀에 쓰이는 rooms
-  const carouselRooms = rooms.slice(carouselIndex, carouselIndex + 3);
+  const carouselRooms = deadlineSortedRooms.slice(
+    carouselIndex,
+    carouselIndex + 3
+  );
 
   // 캐로셀 이전 버튼 클릭 시 호출되는 함수
   const handlePrev = () => {
@@ -76,11 +79,11 @@ export default function StudyListPage() {
   };
 
   // 캐로셀 다음 버튼 클릭 시 호출되는 함수
-  // const handleNext = () => {
-  //   if (carouselIndex + 3 < studyData.featured.length) {
-  //     setCarouselIndex(carouselIndex + 1);
-  //   }
-  // };
+  const handleNext = () => {
+    if (carouselIndex + 3 < deadlineSortedRooms.length) {
+      setCarouselIndex(carouselIndex + 1);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -133,11 +136,11 @@ export default function StudyListPage() {
             <ChevronLeft className="w-6 h-6 text-[#6f727c]" />
           </Button>
           <Button
-            // onClick={handleNext}
+            onClick={handleNext}
             variant="ghost"
             size="icon"
             className="absolute -right-6 top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-md hover:bg-gray-100"
-            disabled={carouselIndex + 3 >= recentSortedRooms.length}
+            disabled={carouselIndex + 3 >= deadlineSortedRooms.length}
           >
             <ChevronRight className="w-6 h-6 text-[#2b7fff]" />
           </Button>
