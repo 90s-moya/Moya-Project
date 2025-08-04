@@ -65,7 +65,7 @@ public class JwtUsernamePasswordAuthenticationFilter extends UsernamePasswordAut
         UUID userId = customUserDetails.getUser().getId();
         TutorialStatus tutorialStatus=customUserDetails.getUser().getTutorialStatus();
 
-        String token = jwtUtil.createJwt(userId,tutorialStatus, 60 * 60 * 1000L);
+        String token = jwtUtil.createJwt(userId,tutorialStatus, 604800000L);
 
         Map<String, Object> responseBody = new HashMap<>();
         responseBody.put("message", "로그인에 성공했습니다.");

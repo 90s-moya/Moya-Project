@@ -89,8 +89,8 @@ public class SecurityConfig {
                 .requestMatchers(
                         "v1/auth/*",
                     "/evaluate",
-                    "/api/v1/otp",
-                    "/api/v1/otp/check",
+                    "/v1/otp",
+                    "/v1/otp/check",
                     "/v1/auth/login",
                     "/v1/auth/signup",
                     "/v1/user/find-username",
