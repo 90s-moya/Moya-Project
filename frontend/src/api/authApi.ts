@@ -4,14 +4,6 @@ import api from "@/api/index";
 const BASE_URL = "/v1/auth";
 
 const AuthApi = {
-  // 로그인 요청
-  login(loginData: {
-    email: string;
-    password: string;
-  }) {
-    return api.post(`${BASE_URL}/login`, loginData);
-  },
-
   // 회원가입 요청
   signUp(userData: {
     email: string;
@@ -29,10 +21,7 @@ const AuthApi = {
   },
 
   // 이메일 OTP 발송
-  sendOtp(otpData: {
-    email: string;
-    type: "SIGNUP" | "password-reset";
-  }) {
+  sendOtp(otpData: { email: string; type: "SIGNUP" | "password-reset" }) {
     return api.post(`${BASE_URL}/send-otp`, otpData);
   },
 
