@@ -15,7 +15,7 @@ export default function StudyCard({
 
   return (
     <div
-      // onClick={() => navigate(`/study/detail/${room_id}`)}
+      onClick={() => navigate(`/study/detail/${id}`)}
       className="group bg-[#fafafc] border border-[#dedee4] rounded-lg p-6 h-full flex flex-col justify-between min-h-[260px] text-[18px] cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1"
     >
       <div>

@@ -64,11 +64,17 @@ export default function StudyListPage() {
   const sortedRooms =
     activeTab === "recent" ? recentSortedRooms : deadlineSortedRooms;
 
-  const visibleStudies = sortedRooms.slice(0, visibleCount);
+  // 실제로 보여지는 room의 개수 (더보기 버튼 있음)
+  const visibleRooms = sortedRooms.slice(0, visibleCount);
+
+  // 더보기 버튼 관련 변수
   const hasMore = visibleCount < sortedRooms.length;
 
   // 캐로셀에 쓰이는 rooms
-  const carouselRooms = rooms.slice(carouselIndex, carouselIndex + 3);
+  const carouselRooms = deadlineSortedRooms.slice(
+    carouselIndex,
+    carouselIndex + 3
+  );
 
   // 캐로셀 이전 버튼 클릭 시 호출되는 함수
   const handlePrev = () => {
@@ -76,11 +82,11 @@ export default function StudyListPage() {
   };
 
   // 캐로셀 다음 버튼 클릭 시 호출되는 함수
-  // const handleNext = () => {
-  //   if (carouselIndex + 3 < studyData.featured.length) {
-  //     setCarouselIndex(carouselIndex + 1);
-  //   }
-  // };
+  const handleNext = () => {
+    if (carouselIndex + 3 < deadlineSortedRooms.length) {
+      setCarouselIndex(carouselIndex + 1);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -133,18 +139,18 @@ export default function StudyListPage() {
             <ChevronLeft className="w-6 h-6 text-[#6f727c]" />
           </Button>
           <Button
-            // onClick={handleNext}
+            onClick={handleNext}
             variant="ghost"
             size="icon"
             className="absolute -right-6 top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-md hover:bg-gray-100"
-            disabled={carouselIndex + 3 >= recentSortedRooms.length}
+            disabled={carouselIndex + 3 >= deadlineSortedRooms.length}
           >
             <ChevronRight className="w-6 h-6 text-[#2b7fff]" />
           </Button>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 px-6">
-            {carouselRooms.map((study) => (
-              <StudyCard key={study.id} {...study} />
+            {carouselRooms.map((room) => (
+              <StudyCard key={room.id} {...room} />
             ))}
           </div>
         </div>
@@ -187,14 +193,12 @@ export default function StudyListPage() {
 
           {/* Cards Section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-[16px]">
-            {visibleStudies.length === 0 ? (
+            {visibleRooms.length === 0 ? (
               <p className="text-[#6f727c] col-span-full text-center">
                 해당 조건의 면접 스터디가 없습니다.
               </p>
             ) : (
-              visibleStudies.map((study) => (
-                <StudyCard key={study.id} {...study} />
-              ))
+              visibleRooms.map((room) => <StudyCard key={room.id} {...room} />)
             )}
           </div>
 
