@@ -17,7 +17,7 @@ public class Docs extends BaseEntity {
     @Column(name="docs_id" ,columnDefinition = "BINARY(16)", updatable = false, nullable = false)
     private UUID id;
     private UUID userId;
-    @Enumerated
+    @Enumerated(EnumType.STRING)
     private DocsStatus docsStatus;
     @Column(name="file_url")
     private String fileUrl;

@@ -1,6 +1,8 @@
 package com.moya.interfaces.api.room;
 
+import com.moya.service.room.RoomDocsService;
 import com.moya.service.room.command.RoomDetailCommand;
+import com.moya.service.room.command.RoomDocsInfoCommand;
 import com.moya.service.room.command.RoomInfoCommand;
 import com.moya.service.room.RoomService;
 import com.moya.support.security.auth.CustomUserDetails;
@@ -18,6 +20,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RoomController {
     private final RoomService roomService;
+    private final RoomDocsService roomDocsService;
     // 면접 스터디 전체 방 조회
     @GetMapping()
     public List<RoomInfoCommand> getAllRooms() {
@@ -56,5 +59,11 @@ public class RoomController {
         return roomService.getMyRooms(user.getUserId()).stream()
                 .map(RoomInfoCommand::from)
                 .toList();
+    }
+
+    // 면접 스터디 방 서류 조회
+    @GetMapping("/{roomId}/docs")
+    public ResponseEntity<List<RoomDocsInfoCommand>> getRoomDocs(@PathVariable UUID roomId) {
+        return ResponseEntity.ok(roomDocsService.getRoomDocs(roomId));
     }
 }
