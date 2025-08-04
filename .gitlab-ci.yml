@@ -68,3 +68,31 @@ deploy-be-prod:
     - be-main
     - master
 
+# FE - 빌드
+build-fe:
+  stage: build
+  script:
+    - cd frontend
+    - echo "VITE_API_URL=$API_URL" > .env
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist
+  tags:
+    - ec2
+  only:
+    - fe-main
+    - master
+
+# FE - 배포
+deploy-fe:
+  stage: deploy
+  script:
+    - sudo rm -rf /var/www/html/*
+    - sudo cp -r frontend/dist/* /var/www/html/
+  tags:
+    - ec2
+  only:
+    - fe-main
+    - master
