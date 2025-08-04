@@ -3,6 +3,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import AuthApi from '@/api/authApi';
 import UserApi from '@/api/userApi';
 import { useNavigate } from 'react-router-dom';
+import { Link } from "react-router-dom";
+
 
 interface FormData {
   nickname: string;
@@ -96,14 +98,34 @@ const SignupDetail: React.FC = () => {
     } catch (error: any) {
       console.error('이메일 중복 확인 에러:', error);
       console.error('에러 응답:', error.response);
+      
+      let errorMessage = '이메일 중복 확인에 실패했습니다.';
+      
+      if (error.response) {
+        if (error.response.status === 409) {
+          // 409 Conflict: 이미 가입된 이메일
+          errorMessage = typeof error.response.data === 'string' 
+            ? error.response.data 
+            : error.response.data?.message || '이미 사용 중인 이메일입니다.';
+        } else if (error.response.status === 401) {
+          // 401 Unauthorized: 토큰 문제
+          errorMessage = '인증 오류가 발생했습니다.';
+        } else {
+          // 기타 에러
+          errorMessage = error.response.data?.message || errorMessage;
+        }
+      }
+      
       setMessages(prev => ({
         ...prev,
-        email: { error: '이메일 중복 확인에 실패했습니다.', success: '' }
+        email: { error: errorMessage, success: '' }
       }));
+      setIsEmailDuplicateChecked(false);
     }
   };
 
   const handleEmailVerification = async () => {
+    console.log("@@@@@@@@@@@@@@@@")
     if (!isEmailDuplicateChecked) {
       setMessages(prev => ({
         ...prev,
@@ -200,13 +222,31 @@ const SignupDetail: React.FC = () => {
   const handleRandomNickname = async () => {
     try {
       const res = await UserApi.getRandomNickname();
-      setFormData(prev => ({ ...prev, nickname: res.data.nickname }));
-      setIsNicknameChecked(false); // 랜덤 닉네임 생성 후 중복 확인 필요
-      setMessages(prev => ({
-        ...prev,
-        nickname: { error: '', success: '랜덤 닉네임이 생성되었습니다. 중복 확인을 해주세요.' }
-      }));
+      console.log('랜덤 닉네임 생성 응답:', res);
+      console.log('응답 데이터:', res.data);
+      console.log('닉네임 값:', res.data.nickname);
+      
+      // API 응답에서 random_nickname 추출
+      const nickname = res.data.random_nickname;
+      
+      console.log('설정할 닉네임:', nickname);
+      
+      if (nickname) {
+        setFormData(prev => ({ ...prev, nickname: nickname }));
+        setIsNicknameChecked(false); // 랜덤 닉네임 생성 후 중복 확인 필요
+        setMessages(prev => ({
+          ...prev,
+          nickname: { error: '', success: '랜덤 닉네임이 생성되었습니다. 중복 확인을 해주세요.' }
+        }));
+      } else {
+        console.error('닉네임을 찾을 수 없습니다:', res);
+        setMessages(prev => ({
+          ...prev,
+          nickname: { error: '닉네임 데이터를 찾을 수 없습니다.', success: '' }
+        }));
+      }
     } catch (error: any) {
+      console.error('랜덤 닉네임 생성 에러:', error);
       setMessages(prev => ({
         ...prev,
         nickname: { error: '랜덤 닉네임 생성에 실패했습니다.', success: '' }
@@ -487,7 +527,7 @@ const SignupDetail: React.FC = () => {
               <div className="flex items-center justify-center gap-2 text-sm">
                 <span className="text-gray-600">이미 회원이신가요?</span>
                 <button className="text-blue-500 font-semibold hover:text-blue-600 transition-colors">
-                  로그인
+                  <Link to="/login">로그인</Link>
                 </button>
               </div>
             </div>

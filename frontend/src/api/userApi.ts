@@ -61,9 +61,7 @@ const UserApi = {
 
   // 이메일 중복 체크
   checkEmail(email: string) {
-    // 임시 목업 - 실제 API 준비되면 아래 주석 해제하고 위 return 삭제
-    return Promise.resolve({ data: { isAvailable: true } });
-    // return api.get(`${BASE_URL}/check-email?email=${encodeURIComponent(email)}`);
+    return api.post(`${BASE_URL}/check-email`, { email });
   },
 
   // 랜덤 닉네임 생성
