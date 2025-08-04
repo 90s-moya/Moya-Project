@@ -64,7 +64,10 @@ export default function StudyListPage() {
   const sortedRooms =
     activeTab === "recent" ? recentSortedRooms : deadlineSortedRooms;
 
-  const visibleStudies = sortedRooms.slice(0, visibleCount);
+  // 실제로 보여지는 room의 개수 (더보기 버튼 있음)
+  const visibleRooms = sortedRooms.slice(0, visibleCount);
+
+  // 더보기 버튼 관련 변수
   const hasMore = visibleCount < sortedRooms.length;
 
   // 캐로셀에 쓰이는 rooms
@@ -146,8 +149,8 @@ export default function StudyListPage() {
           </Button>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 px-6">
-            {carouselRooms.map((study) => (
-              <StudyCard key={study.id} {...study} />
+            {carouselRooms.map((room) => (
+              <StudyCard key={room.id} {...room} />
             ))}
           </div>
         </div>
@@ -190,14 +193,12 @@ export default function StudyListPage() {
 
           {/* Cards Section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-[16px]">
-            {visibleStudies.length === 0 ? (
+            {visibleRooms.length === 0 ? (
               <p className="text-[#6f727c] col-span-full text-center">
                 해당 조건의 면접 스터디가 없습니다.
               </p>
             ) : (
-              visibleStudies.map((study) => (
-                <StudyCard key={study.id} {...study} />
-              ))
+              visibleRooms.map((room) => <StudyCard key={room.id} {...room} />)
             )}
           </div>
 
