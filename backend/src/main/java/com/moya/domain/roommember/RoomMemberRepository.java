@@ -12,4 +12,7 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember, UUID> {
 
     @Query("SELECT COUNT(rm) FROM RoomMember rm WHERE rm.user_id.id = :user_id AND rm.is_master = true")
     int countMasterRoomsByUserId(UUID user_id);
+
+    @Query("SELECT COUNT(rm) FROM RoomMember rm where rm.room_id.id = :room_id")
+    int countByRoom(UUID room_id);
 }

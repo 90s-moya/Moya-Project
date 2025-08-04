@@ -24,9 +24,7 @@ public class RoomController {
     // 면접 스터디 전체 방 조회
     @GetMapping()
     public List<RoomInfoCommand> getAllRooms() {
-        return roomService.getAllRooms().stream()
-                .map(RoomInfoCommand::from)
-                .toList();
+        return roomService.getAllRooms();
     }
 
     // 면접 스터디 방 삭제
@@ -56,9 +54,7 @@ public class RoomController {
     // 내 면접 스터디 방 조회
     @GetMapping("/me")
     public List<RoomInfoCommand> getMyRoom(@AuthenticationPrincipal CustomUserDetails user) {
-        return roomService.getMyRooms(user.getUserId()).stream()
-                .map(RoomInfoCommand::from)
-                .toList();
+        return roomService.getMyRooms(user.getUserId());
     }
 
     // 면접 스터디 방 서류 조회
