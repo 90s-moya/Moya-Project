@@ -12,12 +12,14 @@ import com.moya.domain.user.UserRepository;
 import com.moya.interfaces.api.room.request.CreateRoomRequest;
 import com.moya.service.room.command.MasterInfo;
 import com.moya.service.room.command.RoomDetailCommand;
+import com.moya.service.room.command.RoomInfoCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,8 +31,12 @@ public class RoomService {
 
     // 면접 스터디 전체 조회
     @Transactional(readOnly = true)
-    public List<Room> getAllRooms() {
-        return roomRepository.findAll();
+    public List<RoomInfoCommand> getAllRooms() {
+        List<Room> roomInfo = roomRepository.findAll();
+        return roomInfo.stream().map(room ->{
+            int count = roomMemberRepository.countByRoom(room.getId());
+            return RoomInfoCommand.from(room, count);
+        }).toList();
     }
     // 면접 스터디 방 삭제
     @Transactional
@@ -101,7 +107,11 @@ public class RoomService {
 
     // 내가 속한 면접 스터디 조회
     @Transactional
-    public List<Room> getMyRooms(UUID user_id){
-        return roomRepository.findMyRoom(user_id);
+    public List<RoomInfoCommand> getMyRooms(UUID user_id){
+        List<Room> myRooms = roomRepository.findMyRoom(user_id);
+        return myRooms.stream().map(room->{
+            int count = roomMemberRepository.countByRoom(room.getId());
+            return RoomInfoCommand.from(room, count);
+        }).toList();
     }
 }
