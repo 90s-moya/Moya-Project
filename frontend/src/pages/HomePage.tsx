@@ -18,6 +18,7 @@ export default function HomePage() {
       <HomeIntroSection></HomeIntroSection>
       <HomeInterviewSection></HomeInterviewSection>
       <HomeStudySection></HomeStudySection>
+    
     </div>
   );
 }
