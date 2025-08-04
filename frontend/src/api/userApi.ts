@@ -35,9 +35,9 @@ const UserApi = {
  // 이메일 OTP 발송
   sendOtp(otpData: {
     email: string;
-    type: "SIGNUP" | "password-reset";
+    type: "SIGNUP";
   }) {
-    return api.post(`/api/v1/otp`, otpData);
+    return api.post(`/v1/otp`, otpData);
   },
 
 

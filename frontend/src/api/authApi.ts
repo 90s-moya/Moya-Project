@@ -28,21 +28,15 @@ const AuthApi = {
     return api.get(`${BASE_URL}/logout`);
   },
 
-  // 이메일 OTP 발송
-  sendOtp(otpData: {
-    email: string;
-    type: "SIGNUP" | "password-reset";
-  }) {
-    return api.post(`${BASE_URL}/send-otp`, otpData);
-  },
+ 
 
   // 이메일 OTP 인증
   verifyOtp(verifyData: {
     email: string;
-    type: "SIGNUP" | "password-reset";
+    type: "SIGNUP" ;
     otp: string;
   }) {
-    return api.post(`${BASE_URL}/verify-otp`, verifyData);
+    return api.post(`/v1/otp-check`, verifyData);
   },
 };
 

@@ -10,7 +10,7 @@ interface FormData {
   verificationCode: string;
   password: string;
   confirmPassword: string;
-  type: string;
+  type: 'SIGNUP';
 }
 
 const SignupDetail: React.FC = () => {
@@ -78,6 +78,7 @@ const SignupDetail: React.FC = () => {
       const res = await UserApi.checkEmail(formData.email);
       console.log('이메일 중복 확인 응답:', res);
       console.log('이메일 중복 확인 데이터:', res.data);
+      console.log(formData.type);
       
       if (res.data.isAvailable) {
         setIsEmailDuplicateChecked(true);
@@ -113,7 +114,7 @@ const SignupDetail: React.FC = () => {
 
     try {
       console.log('Sending OTP to:', formData.email);
-      await UserApi.sendOtp({ email: formData.email, type: formData.type });
+      await UserApi.sendOtp({ email: formData.email, type: 'SIGNUP' });
       setIsCodeSent(true);
       console.log(`formData.email: ${formData.email}`);
       setMessages(prev => ({
@@ -142,7 +143,7 @@ const SignupDetail: React.FC = () => {
     try {
       await AuthApi.verifyOtp({
         email: formData.email,
-        type: formData.type,
+        type: 'SIGNUP',
         otp: formData.verificationCode
       });
       setIsEmailVerified(true);

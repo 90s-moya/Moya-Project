@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useAuthStore } from "@/store/useAuthStore";
+import UserApi from "./userApi";
 
 // Axios 인스턴스 생성
 const instance = axios.create({
@@ -14,6 +15,10 @@ instance.interceptors.request.use(
     const { getToken } = useAuthStore.getState(); // 상태 가져오기
     const token = getToken();
 
+  if (token && !config.url?.includes("/otp")) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
     if (token) {
       config.headers["Authorization"] = `Bearer ${token}`;
       console.log(config.headers.Authorization);
@@ -22,6 +27,19 @@ instance.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
+// const sendOtp = async (email: string) => {
+//   try {
+//     const response = await UserApi.post("/otp", { email }, {
+//       headers: { Authorization: "" } // 토큰 제거
+//     });
+//     return response.data;
+//   } catch (error) {
+//     console.error("OTP 전송 실패:", error);
+//     throw error;
+//   }
+// };
+
 
 // 응답 인터셉터
 // instance.interceptors.response.use(
