@@ -1,7 +1,7 @@
 // src/api/authApi.ts
 import api from "@/api/index";
 
-const BASE_URL = "/api/v1/auth";
+const BASE_URL = "/v1/auth";
 
 const AuthApi = {
   // 로그인 요청
@@ -31,7 +31,7 @@ const AuthApi = {
   // 이메일 OTP 발송
   sendOtp(otpData: {
     email: string;
-    type: "signup" | "password-reset";
+    type: "SIGNUP" | "password-reset";
   }) {
     return api.post(`${BASE_URL}/send-otp`, otpData);
   },
@@ -39,7 +39,7 @@ const AuthApi = {
   // 이메일 OTP 인증
   verifyOtp(verifyData: {
     email: string;
-    type: "signup" | "password-reset";
+    type: "SIGNUP" | "password-reset";
     otp: string;
   }) {
     return api.post(`${BASE_URL}/verify-otp`, verifyData);

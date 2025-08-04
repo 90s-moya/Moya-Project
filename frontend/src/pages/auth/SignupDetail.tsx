@@ -10,6 +10,7 @@ interface FormData {
   verificationCode: string;
   password: string;
   confirmPassword: string;
+  type: string;
 }
 
 const SignupDetail: React.FC = () => {
@@ -18,7 +19,8 @@ const SignupDetail: React.FC = () => {
     email: '',
     verificationCode: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    type: 'SIGNUP'
   });
   
   const [showPassword, setShowPassword] = useState(false);
@@ -58,7 +60,7 @@ const SignupDetail: React.FC = () => {
       setMessages(prev => ({
         ...prev,
         email: { error: '', success: '' },
-        otp: { error: '', success: '' }
+        otp: { error: '', success: '' } 
       }));
     }
   };
@@ -110,12 +112,16 @@ const SignupDetail: React.FC = () => {
     }
 
     try {
-      await AuthApi.sendOtp({ email: formData.email, type: 'signup' });
+      console.log('Sending OTP to:', formData.email);
+      await UserApi.sendOtp({ email: formData.email, type: formData.type });
       setIsCodeSent(true);
+      console.log(`formData.email: ${formData.email}`);
       setMessages(prev => ({
         ...prev,
+         
         otp: { error: '', success: '인증번호가 발송되었습니다.' }
-      }));
+      })
+    );
     } catch (error: any) {
       setMessages(prev => ({
         ...prev,
@@ -136,7 +142,7 @@ const SignupDetail: React.FC = () => {
     try {
       await AuthApi.verifyOtp({
         email: formData.email,
-        type: 'signup',
+        type: formData.type,
         otp: formData.verificationCode
       });
       setIsEmailVerified(true);

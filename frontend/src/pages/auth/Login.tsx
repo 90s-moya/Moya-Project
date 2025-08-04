@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useNavigate } from "react-router-dom";
+import AuthApi from "@/api/authApi";
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -23,7 +24,7 @@ const Login: React.FC = () => {
     setErrorMsg("");
 
     try {
-      await login({ email, password });
+      await AuthApi.login({ email, password });
       console.log("로그인 성공");
       navigate("/"); // 메인 페이지로 이동
     } catch (error: any) {

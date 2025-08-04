@@ -1,7 +1,6 @@
 // src/api/userApi.ts
 import api from "@/api/index";
-
-const BASE_URL = "/api/v1/user";
+const BASE_URL = "/v1/user";
 
 const UserApi = {
   // 비밀번호 변경
@@ -31,6 +30,35 @@ const UserApi = {
     // return api.get(`${BASE_URL}/check-nickname?nickname=${encodeURIComponent(nickname)}`);
   },
 
+
+
+ // 이메일 OTP 발송
+  sendOtp(otpData: {
+    email: string;
+    type: "SIGNUP" | "password-reset";
+  }) {
+    return api.post(`/api/v1/otp`, otpData);
+  },
+
+
+  // export const sendOtp = async (email: string) => {
+  //   try {
+  //     const response = await api.post("/otp", { email });
+  //     console.log("OTP 전송 성공:", response.data);
+  //     return response.data;
+  //   } catch (error: any) {
+  //     // 401 에러 디버깅 로그
+  //     if (error.response) {
+  //       console.error("OTP 전송 실패 - 상태 코드:", error.response.status);
+  //       console.error("응답 데이터:", error.response.data);
+  //     } else {
+  //       console.error("OTP 전송 실패 - 네트워크 에러:", error.message);
+  //     }
+  //     throw error;
+  //   }
+  // },
+
+
   // 이메일 중복 체크
   checkEmail(email: string) {
     // 임시 목업 - 실제 API 준비되면 아래 주석 해제하고 위 return 삭제
@@ -40,7 +68,7 @@ const UserApi = {
 
   // 랜덤 닉네임 생성
   getRandomNickname() {
-    return api.get(`${BASE_URL}/random-nickname`);
+    return api.get(`${BASE_URL}/random`);
   },
 };
 
