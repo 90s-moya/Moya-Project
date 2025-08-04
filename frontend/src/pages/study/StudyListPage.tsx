@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, ChevronLeft, ChevronRight, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +6,7 @@ import Header from "@/components/common/Header";
 import StudyCard from "@/components/study/StudyCard";
 import type { StudyRoom } from "@/types/study";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const studyData: Record<string, StudyRoom[]> = {
   featured: [
@@ -16,48 +15,6 @@ const studyData: Record<string, StudyRoom[]> = {
       title: "LG CNS 보안 기술 직무 실습반",
       leader: "정해인",
       date: "2025-07-30 14:00",
-      participants: "4/6",
-    },
-    {
-      id: 102,
-      title: "현대모비스 자율주행 알고리즘 면접 준비",
-      leader: "이민호",
-      date: "2025-08-02 13:30",
-      participants: "4/6",
-    },
-    {
-      id: 103,
-      title: "KT 클라우드 엔지니어 기초반",
-      leader: "장원영",
-      date: "2025-08-04 16:00",
-      participants: "4/6",
-    },
-    {
-      id: 104,
-      title: "NHN 게임서버 백엔드 집중반",
-      leader: "백현",
-      date: "2025-08-06 17:00",
-      participants: "4/6",
-    },
-    {
-      id: 105,
-      title: "배달의민족 프론트엔드 팀 과제 모의반",
-      leader: "한소희",
-      date: "2025-08-08 15:30",
-      participants: "4/6",
-    },
-    {
-      id: 106,
-      title: " 모의반",
-      leader: "한소희",
-      date: "2025-08-08 15:30",
-      participants: "4/6",
-    },
-    {
-      id: 107,
-      title: "프론트엔드 팀 과제 모의반",
-      leader: "한소희",
-      date: "2025-08-08 15:30",
       participants: "4/6",
     },
   ],
@@ -165,6 +122,34 @@ export default function StudyListPage() {
 
   const visibleStudies = studyData[activeTab].slice(0, visibleCount);
   const hasMore = visibleCount < studyData[activeTab].length;
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem("auth");
+    console.log(accessToken);
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    if (accessToken) {
+      headers["Authorization"] = `Bearer ${accessToken}`;
+    }
+
+    const selectRoom = async () => {
+      await axios
+        .get(`${import.meta.env.VITE_API_URL}/api/v1/room`, {
+          headers,
+        })
+        .then((res) => {
+          console.log("방 전체 조회 API 요청 결과", res);
+        })
+        .catch((error) => {
+          alert("실패");
+        });
+    };
+
+    selectRoom();
+  }, []);
 
   const visibleFeatured = studyData.featured.slice(
     carouselIndex,
