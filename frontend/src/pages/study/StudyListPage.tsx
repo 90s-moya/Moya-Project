@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, ChevronLeft, ChevronRight, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +6,7 @@ import Header from "@/components/common/Header";
 import StudyCard from "@/components/study/StudyCard";
 import type { StudyRoom } from "@/types/study";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const studyData: Record<string, StudyRoom[]> = {
   featured: [
@@ -104,7 +103,7 @@ const studyData: Record<string, StudyRoom[]> = {
       date: "2025-08-10 15:00",
       participants: "4/6",
     },
-    {
+    {   
       id: 11,
       title: "팡 DevOps 엔지니어 스터디",
       leader: "정성훈",
@@ -170,6 +169,26 @@ export default function StudyListPage() {
     carouselIndex,
     carouselIndex + 3
   );
+
+  useEffect(() => {
+
+  selectRooms();
+}, []);
+
+  const selectRooms = async () => {
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/v1/room`, {
+        headers: {
+          Authorization: `Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VySWQiOiJjNDRhNjQzNS1hM2UzLTQ5MDgtODhmMC0zZTQ3ZTMxZjhhZjkiLCJ0dXRvcmlhbFN0YXR1cyI6IklOQ09NUExFVEUiLCJpYXQiOjE3NTQyNzE4MjksImV4cCI6MTc1NDI3NTQyOX0.LHe4JZib4uTopdhigGI2frLDLP34EKCOmzNx40hiHZY`,
+          "Content-Type": "application/json",
+        },
+      });
+      console.log("✅ 데이터:", res.data); // 이건 배열 형태로 출력돼야 함
+    } catch (err) {
+      console.error("❌ 에러 발생", err);
+    }
+  };
+
 
   const handlePrev = () => {
     setCarouselIndex((prev) => (prev > 0 ? prev - 1 : 0));

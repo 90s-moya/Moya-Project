@@ -1,4 +1,6 @@
-import { SignalMessage, SignalingClient } from "@/lib/webrct/SignalingClient";
+import type { SignalMessage } from "../webrtc/SignallingClient";
+import { SignalingClient } from "../webrtc/SignallingClient";
+
 
 export class PeerConnectionManager {
   private localStream: MediaStream | null = null;
