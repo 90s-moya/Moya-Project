@@ -151,7 +151,7 @@ export default function StudyDetailPage() {
             <Button onClick={() => navigate("/study/setup")} className="w-full bg-[#2b7fff] hover:bg-[#3758f9] text-white py-7 text-lg rounded-lg mt-5">
               참여하기
             </Button>
-            <StudyBackToList></StudyBackToList>
+            <StudyBackToList />
           </div>
         </div>
       </main>
