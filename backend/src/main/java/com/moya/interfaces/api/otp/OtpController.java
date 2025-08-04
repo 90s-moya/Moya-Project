@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -14,7 +15,7 @@ public class OtpController {
 
 	private final OtpService mailService;
 
-	@PostMapping("/api/v1/otp")
+	@PostMapping("/v1/otp")
 	public ResponseEntity<Void> otpCreate(@RequestBody OptCreateRequest request) {
 
 		mailService.otpCreate(request.toCommand());
@@ -22,7 +23,7 @@ public class OtpController {
 		return ResponseEntity.ok(null);
 	}
 
-	@PostMapping("/api/v1/otp/check")
+	@PostMapping("/v1/otp-check")
 	public ResponseEntity<Void> otpCheck(@RequestBody OtpCheckRequest request) {
 
 		mailService.checkOtp(request.toCommand());
