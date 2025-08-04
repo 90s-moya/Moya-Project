@@ -1,10 +1,58 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Header from '@/components/common/Header';
 import Sidebar from '@/components/mypage/Sidebar';
 import { useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/useAuthStore';
+import UserApi from '@/api/userApi';
+
+interface UserInfoData {
+  nickname: string;
+  email: string;
+}
 
 const UserInfo: React.FC = () => {
   const navigate = useNavigate();
+  const { isLogin } = useAuthStore();
+  const [userInfo, setUserInfo] = useState<UserInfoData>({ nickname: '', email: '' });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      if (!isLogin) {
+        navigate('/login');
+        return;
+      }
+
+      const currentState = useAuthStore.getState();
+      console.log('로그인 상태:', isLogin);
+      console.log('현재 토큰:', currentState.getToken());
+      console.log('UUID:', currentState.getUUID());
+      console.log('전체 상태:', currentState);
+
+      try {
+        const res = await UserApi.getMyInfo();
+        console.log('마이페이지 사용자 정보:', res.data);
+        setUserInfo({
+          nickname: res.data.nickname || '',
+          email: res.data.email || ''
+        });
+      } catch (error: any) {
+        console.error('사용자 정보 조회 실패:', error);
+        console.error('에러 상세:', error.response?.status, error.response?.data);
+        
+        // 토큰 만료 확인
+        if (error.response?.status === 401) {
+          console.log('401 에러 - 토큰 재확인 필요');
+          // 필요시 재로그인 또는 토큰 갱신 로직
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserInfo();
+  }, [isLogin, navigate]);
+
   const handleNicknameChange = () => {
     alert('닉네임 변경 페이지로 이동합니다.');
   };
@@ -49,7 +97,9 @@ const UserInfo: React.FC = () => {
               <div className="h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center justify-between px-4">
                 <input 
                   type="text"
+                  value={userInfo.nickname}
                   placeholder="닉네임을 입력하세요"
+                  readOnly
                   className="flex-1 text-sm font-semibold text-[#1B1C1F] leading-[1.714] bg-transparent border-none outline-none"
                 />
                 <button 
@@ -69,7 +119,9 @@ const UserInfo: React.FC = () => {
               <div className="h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center px-4">
                 <input 
                   type="email"
+                  value={userInfo.email}
                   placeholder="이메일을 입력하세요"
+                  readOnly
                   className="w-full text-sm font-semibold text-[#1B1C1F] leading-[1.714] bg-transparent border-none outline-none"
                 />
               </div>

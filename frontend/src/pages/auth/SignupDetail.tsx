@@ -82,18 +82,13 @@ const SignupDetail: React.FC = () => {
       console.log('이메일 중복 확인 데이터:', res.data);
       console.log(formData.type);
       
-      if (res.data.isAvailable) {
+      // 서버에서 직접 메시지 문자열로 응답
+      if (res.status === 200) {
         setIsEmailDuplicateChecked(true);
         setMessages(prev => ({
           ...prev,
-          email: { error: '', success: '사용 가능한 이메일입니다.' }
+          email: { error: '', success: res.data || '사용 가능한 이메일입니다.' }
         }));
-      } else {
-        setMessages(prev => ({
-          ...prev,
-          email: { error: '이미 사용 중인 이메일입니다.', success: '' }
-        }));
-        setIsEmailDuplicateChecked(false);
       }
     } catch (error: any) {
       console.error('이메일 중복 확인 에러:', error);
@@ -136,19 +131,32 @@ const SignupDetail: React.FC = () => {
 
     try {
       console.log('Sending OTP to:', formData.email);
-      await UserApi.sendOtp({ email: formData.email, type: 'SIGNUP' });
+      const res = await UserApi.sendOtp({ email: formData.email, type: 'SIGNUP' });
+      console.log('OTP 발송 응답:', res);
+      console.log('OTP 발송 데이터:', res.data);
+      
       setIsCodeSent(true);
-      console.log(`formData.email: ${formData.email}`);
       setMessages(prev => ({
         ...prev,
-         
-        otp: { error: '', success: '인증번호가 발송되었습니다.' }
-      })
-    );
+        otp: { error: '', success: res.data || '인증번호가 발송되었습니다.' }
+      }));
     } catch (error: any) {
+      console.error('OTP 발송 에러:', error);
+      console.error('에러 응답:', error.response);
+      
+      let errorMessage = '인증번호 발송에 실패했습니다.';
+      
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+      }
+      
       setMessages(prev => ({
         ...prev,
-        otp: { error: '인증번호 발송에 실패했습니다.', success: '' }
+        otp: { error: errorMessage, success: '' }
       }));
     }
   };
@@ -161,7 +169,7 @@ const SignupDetail: React.FC = () => {
       }));
       return;
     }
-
+    console.log('Verifying OTP for email:', formData.email);
     try {
       await AuthApi.verifyOtp({
         email: formData.email,
@@ -196,26 +204,31 @@ const SignupDetail: React.FC = () => {
       console.log('닉네임 중복 확인 응답:', res);
       console.log('닉네임 중복 확인 데이터:', res.data);
       
-      if (res.data.isAvailable) {
+      // 서버에서 직접 메시지 문자열로 응답
+      if (res.status === 200) {
         setIsNicknameChecked(true);
         setMessages(prev => ({
           ...prev,
-          nickname: { error: '', success: '사용 가능한 닉네임입니다.' }
+          nickname: { error: '', success: res.data || '사용 가능한 닉네임입니다.' }
         }));
-      } else {
-        setMessages(prev => ({
-          ...prev,
-          nickname: { error: '이미 사용 중인 닉네임입니다.', success: '' }
-        }));
-        setIsNicknameChecked(false);
       }
     } catch (error: any) {
       console.error('닉네임 중복 확인 에러:', error);
       console.error('에러 응답:', error.response);
+      
+      let errorMessage = '닉네임 중복 확인에 실패했습니다.';
+      
+      if (error.response?.status === 409) {
+        errorMessage = error.response?.data?.message || '이미 사용 중인 닉네임입니다.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
       setMessages(prev => ({
         ...prev,
-        nickname: { error: '닉네임 중복 확인에 실패했습니다.', success: '' }
+        nickname: { error: errorMessage, success: '' }
       }));
+      setIsNicknameChecked(false);
     }
   };
 
@@ -226,8 +239,16 @@ const SignupDetail: React.FC = () => {
       console.log('응답 데이터:', res.data);
       console.log('닉네임 값:', res.data.nickname);
       
-      // API 응답에서 random_nickname 추출
-      const nickname = res.data.random_nickname;
+      // 서버 응답 구조 확인 - res.data가 직접 닉네임 문자열일 수 있음
+      let nickname = '';
+      
+      if (typeof res.data === 'string') {
+        nickname = res.data;
+      } else if (res.data.random_nickname) {
+        nickname = res.data.random_nickname;
+      } else if (res.data.nickname) {
+        nickname = res.data.nickname;
+      }
       
       console.log('설정할 닉네임:', nickname);
       

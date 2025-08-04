@@ -12,16 +12,25 @@ const instance = axios.create({
 // 요청 인터셉터
 instance.interceptors.request.use(
   (config) => {
-    const { getToken } = useAuthStore.getState(); // 상태 가져오기
-    const token = getToken();
+    const authStorage = localStorage.getItem("auth-storage");
+    let token = "";
 
-  if (token && !config.url?.includes("/otp")) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    // 파싱해서 token만 가져오기
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      token = parsed.state.token;
+    }
+    // const { getToken } = useAuthStore.getState();
+    // const token = getToken();
 
-    if (token) {
+    console.log("요청 URL:", config.url);
+    console.log("OTP 체크:", config.url?.includes("/otp"), config.url?.includes("/v1/otp"));
+    
+    if (token && !config.url?.includes("/otp") && !config.url?.includes("/v1/otp")) {  
       config.headers["Authorization"] = `Bearer ${token}`;
-      console.log(config.headers.Authorization);
+      console.log("토큰 추가됨:", config.headers.Authorization);
+    } else {
+      console.log("토큰 제외됨 - OTP 요청");
     }
     return config;
   },
@@ -42,23 +51,21 @@ instance.interceptors.request.use(
 
 
 // 응답 인터셉터
-// instance.interceptors.response.use(
-//   (response) => {
-//     if (response.status === 200) return response;
-//     if (response.status === 404) {
-//       return Promise.reject("404: 페이지 없음 " + response.request);
-//     }
-//     return response;
-//   },
-//   async (error) => {
-//     if (error.response?.status === 401) {
-//       const { logout } = useAuthStore.getState();
-//       logout();
-
-//       return Promise.reject({ error: "로그인이 필요한 서비s스입니다." });
-//     }
-//     return Promise.reject(error);
-//   }
-// );
+instance.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    console.error("API 응답 에러:", error.response?.status, error.response?.data);
+    
+    if (error.response?.status === 401) {
+      console.error("401 Unauthorized - 토큰이 유효하지 않습니다.");
+      // 필요시 자동 로그아웃 처리
+      // const { logout } = useAuthStore.getState();
+      // logout();
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default instance;

@@ -1,27 +1,18 @@
-// src/stores/useAuthStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { jwtDecode } from "jwt-decode";
 import type { AxiosError } from "axios";
 import AuthApi from "@/api/authApi";
 import UserApi from "@/api/userApi";
+import axios from "axios";
 
-// ✅ 유저 정보 타입
+// ✅ 유저 정보 타입 (API 응답과 동일하게!)
 interface UserInfo {
-  userId: string;
-  nickname: string;
-  email: string;
-  createAt: string;
+  tutorialStatus: string;
+  UUID: string;
+  token: string;
 }
 
-// ✅ JWT payload 타입
-interface JwtPayload {
-  userId: string;
-  iat: number;
-  exp: number;
-}
-
-// ✅ Zustand 상태 타입
 interface AuthState {
   token: string;
   user: UserInfo | null;
@@ -37,18 +28,6 @@ interface AuthState {
   fetchUserInfo: () => Promise<void>;
 }
 
-// ✅ JWT 토큰 디코딩 함수
-const decodeTokenToUser = (token: string): UserInfo => {
-  const payload = jwtDecode<JwtPayload>(token);
-  return {
-    userId: payload.userId,
-    nickname: "",
-    email: "",
-    createAt: "",
-  };
-};
-
-// ✅ Zustand Store 생성
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -60,20 +39,51 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (loginInfo) => {
         try {
-          const res = await AuthApi.login(loginInfo);
+          // 👉 실제 API 응답 구조에 맞춰 타입 수정
+          type RawLoginResponse = {
+            tutorialStatus: string;
+            message: string;
+            UUID: string;
+            token: string;
+          };
+
+          const res = await axios.post<RawLoginResponse>(
+            `${import.meta.env.VITE_API_URL}/v1/auth/login`,
+            loginInfo
+          );
+          console.log("로그인 응답:", res.data);
+          
           const { token, UUID, tutorialStatus } = res.data;
 
           if (!token || typeof token !== "string") {
             throw new Error("유효한 토큰이 아닙니다.");
           }
 
-          // 로그인 성공 후 사용자 정보 조회
-          const userRes = await UserApi.getMyInfo();
-          const user = userRes.data;
+          // JWT 토큰 디코딩해서 실제 페이로드 확인
+          let decodedUUID = UUID;
+          try {
+            const decoded: any = jwtDecode(token);
+            console.log("JWT 디코딩된 페이로드:", decoded);
+            
+            // JWT에서 userId를 UUID로 사용
+            if (decoded.userId) {
+              decodedUUID = decoded.userId;
+              console.log("JWT에서 추출한 UUID:", decodedUUID);
+            }
+          } catch (decodeError) {
+            console.error("JWT 디코딩 실패:", decodeError);
+          }
+
+          // 👉 JWT에서 추출한 UUID 사용
+          const user: UserInfo = { 
+            UUID: decodedUUID, 
+            tutorialStatus, 
+            token 
+          };
 
           set({
             token,
-            UUID,
+            UUID: decodedUUID,
             tutorialStatus,
             user,
             isLogin: true,
@@ -87,12 +97,10 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
-          // 서버에 로그아웃 요청
           await AuthApi.logout();
         } catch (error) {
           console.error("로그아웃 API 요청 실패:", error);
         } finally {
-          // API 실패 여부와 관계없이 로컬 상태는 정리
           set({
             token: "",
             user: null,
@@ -103,13 +111,8 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      getToken: () => {
-        return get().token;
-      },
-
-      getUUID: () => {
-        return get().UUID;
-      },
+      getToken: () => get().token,
+      getUUID: () => get().UUID,
 
       updateUserInfo: (userUpdate) => {
         const currentUser = get().user;
@@ -125,15 +128,22 @@ export const useAuthStore = create<AuthState>()(
 
       fetchUserInfo: async () => {
         try {
+          // (만약 추가 API 정보가 있다면, 아래에 token을 다시 넣어줄 것!)
           const res = await UserApi.getMyInfo();
-          set({ user: res.data });
+          set({ user: { ...res.data, token: get().token } });
         } catch (error) {
           console.error("사용자 정보 조회 실패:", error);
         }
       },
     }),
     {
-      name: "auth-storage", // localStorage key
+      name: "auth-storage",
+      partialize: (state) => ({
+        token: state.token,
+        UUID: state.UUID,
+        tutorialStatus: state.tutorialStatus,
+        isLogin: state.isLogin,
+      }),
     }
   )
 );
