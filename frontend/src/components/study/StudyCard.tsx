@@ -1,14 +1,15 @@
 // src/components/study/StudyCard.tsx
 import { useNavigate } from "react-router-dom";
 import type { StudyRoom } from "@/types/study";
+import { formatDateTime } from "@/util/date";
 
 export default function StudyCard({
-  room_id,
-  category_id,
+  categoryName,
+  expiredAt,
+  id,
+  maxUser,
+  openAt,
   title,
-  created_at,
-  expired_at,
-  max_user,
 }: StudyRoom) {
   const navigate = useNavigate();
 
@@ -23,24 +24,27 @@ export default function StudyCard({
             {title}
           </h3>
         </div>
-        {/* <div className="min-h-[3rem]">
-          <p className="text-[#6f727c] text-base mb-2">
-            참여인원 {participants}
-          </p>
-        </div> */}
 
         <div className="space-y-2 min-h-[4.5rem]">
           <div className="flex justify-between text-base">
+            <span className="text-[#6f727c]">카테고리명</span>
+            <span className="text-[#1b1c1f] font-medium">{categoryName}</span>
+          </div>
+          <div className="flex justify-between text-base">
             <span className="text-[#6f727c]">생성일</span>
-            <span className="text-[#1b1c1f] font-medium">{created_at}</span>
+            <span className="text-[#1b1c1f] font-medium">
+              {formatDateTime(openAt)}
+            </span>
           </div>
           <div className="flex justify-between text-base">
             <span className="text-[#6f727c]">만료일</span>
-            <span className="text-[#1b1c1f] font-medium">{expired_at}</span>
+            <span className="text-[#1b1c1f] font-medium">
+              {formatDateTime(expiredAt)}
+            </span>
           </div>
           <div className="flex justify-between text-base">
             <span className="text-[#6f727c]">최대 인원 수</span>
-            <span className="text-[#1b1c1f] font-medium">{max_user}</span>
+            <span className="text-[#1b1c1f] font-medium">{maxUser}</span>
           </div>
         </div>
       </div>

@@ -8,35 +8,31 @@ import type { StudyRoom } from "@/types/study";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const studyData: Record<string, StudyRoom[]> = {
-  featured: [],
-  deadline: [],
-  recent: [],
-};
-
 export default function StudyListPage() {
   const [rooms, setRooms] = useState<StudyRoom[]>([]); // 스터디 룸
 
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"deadline" | "recent">("deadline");
+  // 캐로셀 관련 변수들
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(6);
 
-  const visibleStudies = studyData[activeTab].slice(0, visibleCount);
-  const hasMore = visibleCount < studyData[activeTab].length;
+  const [activeTab, setActiveTab] = useState<"deadline" | "recent">("deadline");
 
   useEffect(() => {
-    selectRooms();
+    requestRooms();
   }, []);
 
-  const selectRooms = async () => {
+  // API 요청 함수
+  const requestRooms = async () => {
+    // 로컬 스토리지로부터 토큰 받아오기
     const authStorage = localStorage.getItem("auth-storage");
     let token = "";
+
+    // 파싱해서 token만 가져오기
     if (authStorage) {
       const parsed = JSON.parse(authStorage);
       token = parsed.state.token;
-      console.log(token); // → 바로 JWT 토큰 값만 나옴!
     }
 
     try {
@@ -46,27 +42,45 @@ export default function StudyListPage() {
           "Content-Type": "application/json",
         },
       });
-      console.log("✅ 데이터:", res.data); // 이건 배열 형태로 출력돼야 함
-      console.log("check");
+
+      console.log("API를 통해 받은 룸 목록 : ", res.data);
+      setRooms(res.data);
     } catch (err) {
       console.error("❌ 에러 발생", err);
     }
   };
 
-  const visibleFeatured = studyData.featured.slice(
-    carouselIndex,
-    carouselIndex + 3
+  // 최신순으로 정렬된 rooms
+  const recentSortedRooms = [...rooms].sort(
+    (a, b) => new Date(b.openAt).getTime() - new Date(a.openAt).getTime()
   );
 
+  // 마감순으로 정렬된 rooms
+  const deadlineSortedRooms = [...rooms].sort(
+    (a, b) => new Date(a.expiredAt).getTime() - new Date(b.expiredAt).getTime()
+  );
+
+  // activeTab에 따라서 변하는 sortedRooms
+  const sortedRooms =
+    activeTab === "recent" ? recentSortedRooms : deadlineSortedRooms;
+
+  const visibleStudies = sortedRooms.slice(0, visibleCount);
+  const hasMore = visibleCount < sortedRooms.length;
+
+  // 캐로셀에 쓰이는 rooms
+  const carouselRooms = rooms.slice(carouselIndex, carouselIndex + 3);
+
+  // 캐로셀 이전 버튼 클릭 시 호출되는 함수
   const handlePrev = () => {
     setCarouselIndex((prev) => (prev > 0 ? prev - 1 : 0));
   };
 
-  const handleNext = () => {
-    if (carouselIndex + 3 < studyData.featured.length) {
-      setCarouselIndex(carouselIndex + 1);
-    }
-  };
+  // 캐로셀 다음 버튼 클릭 시 호출되는 함수
+  // const handleNext = () => {
+  //   if (carouselIndex + 3 < studyData.featured.length) {
+  //     setCarouselIndex(carouselIndex + 1);
+  //   }
+  // };
 
   return (
     <div className="min-h-screen bg-white">
@@ -119,29 +133,29 @@ export default function StudyListPage() {
             <ChevronLeft className="w-6 h-6 text-[#6f727c]" />
           </Button>
           <Button
-            onClick={handleNext}
+            // onClick={handleNext}
             variant="ghost"
             size="icon"
             className="absolute -right-6 top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-md hover:bg-gray-100"
-            disabled={carouselIndex + 3 >= studyData.featured.length}
+            disabled={carouselIndex + 3 >= recentSortedRooms.length}
           >
             <ChevronRight className="w-6 h-6 text-[#2b7fff]" />
           </Button>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 px-6">
-            {visibleFeatured.map((study) => (
-              <StudyCard key={study.room_id} {...study} />
+            {carouselRooms.map((study) => (
+              <StudyCard key={study.id} {...study} />
             ))}
           </div>
         </div>
 
-        {/* Study Cards Section */}
+        {/* 스터디 룸 카드  */}
         <div className="mb-20">
           <h2 className="text-2xl font-bold text-[#1b1c1f] mb-6">
             면접 스터디를 찾아보세요!
           </h2>
 
-          {/* Tabs */}
+          {/* 마감순 및 최신순 탭 */}
           <div className="flex space-x-8 mb-6 text-base">
             <button
               onClick={() => {
@@ -179,12 +193,11 @@ export default function StudyListPage() {
               </p>
             ) : (
               visibleStudies.map((study) => (
-                <StudyCard key={study.room_id} {...study} />
+                <StudyCard key={study.id} {...study} />
               ))
             )}
           </div>
 
-          {/* Load More Button */}
           {hasMore && (
             <div className="mt-10 flex justify-center">
               <Button
