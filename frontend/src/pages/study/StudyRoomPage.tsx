@@ -2,6 +2,9 @@ import CameraControlPanel from "@/components/study/CameraControlPanel";
 import MicControlPanel from "@/components/study/MicControlPanel";
 import VideoTile from "@/components/study/VideoTile";
 import { useNavigate } from "react-router-dom";
+import {useEffect, useState, useRef} from "react";
+import {SignalingClient} from "@/lib/webrtc/SignallingClient";
+import {PeerConnectionManager} from "@/lib/webrtc/PeerConnectionManager";
 
 type Participant = {
   id: string;
@@ -10,22 +13,59 @@ type Participant = {
   isLocal?: boolean;
 };
 
-const myStream: MediaStream | null = null;
-const remoteStream1: MediaStream | null = null;
-const remoteStream2: MediaStream | null = null;
-const remoteStream3: MediaStream | null = null;
-const remoteStream4: MediaStream | null = null;
-
 export default function StudyRoomPage() {
   const navigate = useNavigate();
 
-  const participants: Participant[] = [
-    { id: "me", name: "나", stream: myStream, isLocal: true },
-    { id: "a1", name: "김지원", stream: remoteStream1 },
-    { id: "a2", name: "홍길동", stream: remoteStream2 },
-    { id: "a3", name: "최진혁", stream: remoteStream3 },
-    { id: "a4", name: "최참빛", stream: remoteStream4 },
-  ];
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+ 
+  const peerManagerRef = useRef<PeerConnectionManager | null>(null);
+
+  const handleLeaveRoom = () => {
+    console.log(localStream)
+    localStream?.getTracks().forEach((track) => track.stop());
+    navigate("/study");
+  };
+
+  useEffect(()=>{
+    // TODO: 로그인 한 유저 ID 정보로 변경해야함 ㅎ
+    const myId = crypto.randomUUID();
+
+    const signaling = new SignalingClient(`wss://${import.meta.env.VITE_RTC_API_URL}/ws`, myId, async (data) => {
+      const peerManager = peerManagerRef.current;
+      if(!peerManager) return;
+
+      console.log("받은 메세지", data);
+
+      if(data.type === "join"){
+        await peerManager.createConnectionWith(data.senderId);
+        console.log("새 참여자 연결!");
+        return;
+      }
+      await peerManager.handleSignal(data);
+    });
+    const peerManager = new PeerConnectionManager(myId, signaling);
+    peerManagerRef.current = peerManager;
+
+    peerManager.onRemoteStream = (peerId, stream) => {
+        setParticipants((prev) => [
+          ...prev.filter((p) => p.id !== peerId),
+          { id: peerId, name: `참여자-${peerId.slice(0, 4)}`, stream },
+        ]);
+      };
+
+    (async ()=>{
+      const local = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+      setLocalStream(local);
+      // TODO : 사용자 정보에 맞게 보내주세요!
+      setParticipants((prev) => [
+        ...prev.filter((p) => p.id !== myId),
+        { id: myId, name: "나", stream: local, isLocal: true },
+      ]);
+      peerManager.setLocalStream(local);
+      signaling.send({type:"join", senderId:myId});
+    })();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white text-[#1b1c1f] flex flex-col">
@@ -37,11 +77,15 @@ export default function StudyRoomPage() {
       </header>
 
       {/* 참가자 비디오 그리드 */}
-      <main className="flex-1 pt-[100px] pb-24  w-full px-4">
+      <main className="flex-1 pt-[100px] pb-24 w-full px-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {participants.map((p) => (
             <div key={p.id} className="w-full aspect-video">
-              <VideoTile stream={p.stream} name={p.name} isLocal={p.isLocal} />
+              <VideoTile
+                stream={p.stream}
+                name={p.name}
+                isLocal={p.isLocal}
+              />
             </div>
           ))}
         </div>
@@ -50,10 +94,10 @@ export default function StudyRoomPage() {
       {/* 미디어 컨트롤 바 */}
       <footer className="fixed bottom-4 left-0 right-0 bg-white border-t border-[#dedee4] py-4 shadow-inner z-20">
         <div className="flex justify-center gap-10">
-          <MicControlPanel></MicControlPanel>
-          <CameraControlPanel></CameraControlPanel>
+          <MicControlPanel />
+          <CameraControlPanel />
           <button
-            onClick={() => navigate("/study")}
+            onClick={handleLeaveRoom}
             className="text-red-400 text-xl font-semibold hover:text-red-700"
           >
             📤 나가기

@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, ChevronLeft, ChevronRight, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,180 +6,81 @@ import Header from "@/components/common/Header";
 import StudyCard from "@/components/study/StudyCard";
 import type { StudyRoom } from "@/types/study";
 import { useNavigate } from "react-router-dom";
-
-const studyData: Record<string, StudyRoom[]> = {
-  featured: [
-    {
-      id: 101,
-      title: "LG CNS 보안 기술 직무 실습반",
-      leader: "정해인",
-      date: "2025-07-30 14:00",
-      participants: "4/6",
-    },
-    {
-      id: 102,
-      title: "현대모비스 자율주행 알고리즘 면접 준비",
-      leader: "이민호",
-      date: "2025-08-02 13:30",
-      participants: "4/6",
-    },
-    {
-      id: 103,
-      title: "KT 클라우드 엔지니어 기초반",
-      leader: "장원영",
-      date: "2025-08-04 16:00",
-      participants: "4/6",
-    },
-    {
-      id: 104,
-      title: "NHN 게임서버 백엔드 집중반",
-      leader: "백현",
-      date: "2025-08-06 17:00",
-      participants: "4/6",
-    },
-    {
-      id: 105,
-      title: "배달의민족 프론트엔드 팀 과제 모의반",
-      leader: "한소희",
-      date: "2025-08-08 15:30",
-      participants: "4/6",
-    },
-    {
-      id: 106,
-      title: " 모의반",
-      leader: "한소희",
-      date: "2025-08-08 15:30",
-      participants: "4/6",
-    },
-    {
-      id: 107,
-      title: "프론트엔드 팀 과제 모의반",
-      leader: "한소희",
-      date: "2025-08-08 15:30",
-      participants: "4/6",
-    },
-  ],
-  deadline: [
-    {
-      id: 1,
-      title: "SK 그룹 보안 솔루션 운영자 면스 모집",
-      leader: "김지원",
-      date: "2025-07-28 18:00",
-      participants: "4/6",
-    },
-    {
-      id: 2,
-      title: "카카오 AI 백엔드 면접 스터디",
-      leader: "홍길동",
-      date: "2025-08-01 10:00",
-      participants: "4/6",
-    },
-    {
-      id: 3,
-      title: "삼성 SDS 프론트엔드 실무 준비반",
-      leader: "이지은",
-      date: "2025-08-05 14:30",
-      participants: "4/6",
-    },
-    {
-      id: 7,
-      title: "스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 9,
-      title: " 엔지니어 스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 10,
-      title: " DevOps 엔지니어 스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 11,
-      title: "팡 DevOps 엔지니어 스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-  ],
-  recent: [
-    {
-      id: 4,
-      title: "네이버 클라우드 아키텍처 집중반",
-      leader: "박지훈",
-      date: "2025-08-03 11:00",
-      participants: "4/6",
-    },
-    {
-      id: 5,
-      title: "라인 AI 리서치 면접 모의반",
-      leader: "최유리",
-      date: "2025-08-07 09:00",
-      participants: "4/6",
-    },
-    {
-      id: 6,
-      title: "쿠팡 DevOps 엔지니어 스터디",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 12,
-      title: "AI 리서치 면접 모의반",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 13,
-      title: "쿠팡 AI 리서치 면접 모의반",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-    {
-      id: 14,
-      title: "쿠팡 DevOps AI 리서치 면접 모의반",
-      leader: "정성훈",
-      date: "2025-08-10 15:00",
-      participants: "4/6",
-    },
-  ],
-};
+import axios from "axios";
 
 export default function StudyListPage() {
-  const [activeTab, setActiveTab] = useState<"deadline" | "recent">("deadline");
+  const [rooms, setRooms] = useState<StudyRoom[]>([]); // 스터디 룸
+
+  const navigate = useNavigate();
+
+  // 캐로셀 관련 변수들
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(6);
 
-  const visibleStudies = studyData[activeTab].slice(0, visibleCount);
-  const hasMore = visibleCount < studyData[activeTab].length;
+  const [activeTab, setActiveTab] = useState<"deadline" | "recent">("deadline");
 
-  const visibleFeatured = studyData.featured.slice(
-    carouselIndex,
-    carouselIndex + 3
+  useEffect(() => {
+    requestRooms();
+  }, []);
+
+  // API 요청 함수
+  const requestRooms = async () => {
+    // 로컬 스토리지로부터 토큰 받아오기
+    const authStorage = localStorage.getItem("auth-storage");
+    let token = "";
+
+    // 파싱해서 token만 가져오기
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      token = parsed.state.token;
+    }
+
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/v1/room`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      console.log("API를 통해 받은 룸 목록 : ", res.data);
+      setRooms(res.data);
+    } catch (err) {
+      console.error("❌ 에러 발생", err);
+    }
+  };
+
+  // 최신순으로 정렬된 rooms
+  const recentSortedRooms = [...rooms].sort(
+    (a, b) => new Date(b.openAt).getTime() - new Date(a.openAt).getTime()
   );
 
+  // 마감순으로 정렬된 rooms
+  const deadlineSortedRooms = [...rooms].sort(
+    (a, b) => new Date(a.expiredAt).getTime() - new Date(b.expiredAt).getTime()
+  );
+
+  // activeTab에 따라서 변하는 sortedRooms
+  const sortedRooms =
+    activeTab === "recent" ? recentSortedRooms : deadlineSortedRooms;
+
+  const visibleStudies = sortedRooms.slice(0, visibleCount);
+  const hasMore = visibleCount < sortedRooms.length;
+
+  // 캐로셀에 쓰이는 rooms
+  const carouselRooms = rooms.slice(carouselIndex, carouselIndex + 3);
+
+  // 캐로셀 이전 버튼 클릭 시 호출되는 함수
   const handlePrev = () => {
     setCarouselIndex((prev) => (prev > 0 ? prev - 1 : 0));
   };
 
-  const handleNext = () => {
-    if (carouselIndex + 3 < studyData.featured.length) {
-      setCarouselIndex(carouselIndex + 1);
-    }
-  };
-
-  const navigate = useNavigate();
+  // 캐로셀 다음 버튼 클릭 시 호출되는 함수
+  // const handleNext = () => {
+  //   if (carouselIndex + 3 < studyData.featured.length) {
+  //     setCarouselIndex(carouselIndex + 1);
+  //   }
+  // };
 
   return (
     <div className="min-h-screen bg-white">
@@ -234,29 +133,29 @@ export default function StudyListPage() {
             <ChevronLeft className="w-6 h-6 text-[#6f727c]" />
           </Button>
           <Button
-            onClick={handleNext}
+            // onClick={handleNext}
             variant="ghost"
             size="icon"
             className="absolute -right-6 top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-md hover:bg-gray-100"
-            disabled={carouselIndex + 3 >= studyData.featured.length}
+            disabled={carouselIndex + 3 >= recentSortedRooms.length}
           >
             <ChevronRight className="w-6 h-6 text-[#2b7fff]" />
           </Button>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 px-6">
-            {visibleFeatured.map((study) => (
+            {carouselRooms.map((study) => (
               <StudyCard key={study.id} {...study} />
             ))}
           </div>
         </div>
 
-        {/* Study Cards Section */}
+        {/* 스터디 룸 카드  */}
         <div className="mb-20">
           <h2 className="text-2xl font-bold text-[#1b1c1f] mb-6">
             면접 스터디를 찾아보세요!
           </h2>
 
-          {/* Tabs */}
+          {/* 마감순 및 최신순 탭 */}
           <div className="flex space-x-8 mb-6 text-base">
             <button
               onClick={() => {
@@ -299,7 +198,6 @@ export default function StudyListPage() {
             )}
           </div>
 
-          {/* Load More Button */}
           {hasMore && (
             <div className="mt-10 flex justify-center">
               <Button

@@ -10,7 +10,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const { login } = useAuthStore();
   const navigate = useNavigate();
 
@@ -24,11 +24,16 @@ const Login: React.FC = () => {
     setErrorMsg("");
 
     try {
-      await AuthApi.login({ email, password });
+      // 👉 Zustand의 login 액션 호출!
+      await login({ email, password });
       console.log("로그인 성공");
       navigate("/"); // 메인 페이지로 이동
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || "로그인에 실패했습니다.";
+      // login 액션에서 throw된 에러 처리
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "로그인에 실패했습니다.";
       setErrorMsg(errorMessage);
     } finally {
       setIsLoading(false);
@@ -50,7 +55,7 @@ const Login: React.FC = () => {
 
         {/* Character Illustration - 하단 중앙 */}
         <div className="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-              <img src="/src/assets/images/cloud-friends.png" alt="로고" />
+          <img src="/src/assets/images/cloud-friends.png" alt="로고" />
         </div>
       </div>
 
