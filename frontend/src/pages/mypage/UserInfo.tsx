@@ -28,7 +28,7 @@ const UserInfo: React.FC = () => {
       <Header />
 
       {/* 메인 콘텐츠 */}
-      <div className="flex max-w-7xl mx-auto px-8 py-12">
+      <div className="flex max-w-7xl mx-auto px-8 py-12 pt-32">
         <Sidebar activeMenu="userinfo" onNavigate={handleSidebarNavigation} />
 
         {/* 메인 콘텐츠 영역 */}
@@ -46,12 +46,12 @@ const UserInfo: React.FC = () => {
               <label className="block text-lg font-semibold text-[#404249] mb-4 leading-[1.556]">
                 닉네임
               </label>
-              <div className="flex items-center gap-4">
-                <div className="flex-1 h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center px-4">
-                  <span className="text-sm font-semibold text-[#1B1C1F] leading-[1.714]">
-                    
-                  </span>
-                </div>
+              <div className="h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center justify-between px-4">
+                <input 
+                  type="text"
+                  placeholder="닉네임을 입력하세요"
+                  className="flex-1 text-sm font-semibold text-[#1B1C1F] leading-[1.714] bg-transparent border-none outline-none"
+                />
                 <button 
                   onClick={handleNicknameChange} 
                   className="w-24 h-8 bg-[#2B7FFF] hover:bg-[#1E6FE8] text-white rounded-md text-sm font-normal flex items-center justify-center transition-colors"
@@ -67,9 +67,11 @@ const UserInfo: React.FC = () => {
                 이메일
               </label>
               <div className="h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center px-4">
-                <span className="text-sm font-semibold text-[#1B1C1F] leading-[1.714]">
-                  
-                </span>
+                <input 
+                  type="email"
+                  placeholder="이메일을 입력하세요"
+                  className="w-full text-sm font-semibold text-[#1B1C1F] leading-[1.714] bg-transparent border-none outline-none"
+                />
               </div>
             </div>
 
@@ -78,12 +80,12 @@ const UserInfo: React.FC = () => {
               <label className="block text-lg font-semibold text-[#404249] mb-4 leading-[1.556]">
                 비밀번호
               </label>
-              <div className="flex items-center gap-4">
-                <div className="flex-1 h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center px-4">
-                  <span className="text-sm font-semibold text-[#1B1C1F] leading-[1.714]">
-                   
-                  </span>
-                </div>
+              <div className="h-12 bg-white border border-[#DEDEE4] rounded-xl flex items-center justify-between px-4">
+                <input 
+                  type="password"
+                  placeholder="비밀번호를 입력하세요"
+                  className="flex-1 text-sm font-semibold text-[#1B1C1F] leading-[1.714] bg-transparent border-none outline-none"
+                />
                 <button 
                   onClick={handlePasswordChange} 
                   className="w-24 h-8 bg-[#2B7FFF] hover:bg-[#1E6FE8] text-white rounded-md text-sm font-normal flex items-center justify-center transition-colors"
