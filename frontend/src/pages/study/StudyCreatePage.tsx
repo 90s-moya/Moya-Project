@@ -6,25 +6,55 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import StudyBackToList from "@/components/study/StudyBackToList";
+import axios from "axios";
 
-type StudyFormData = {
+type CreateFormData = {
+  categoryId: string;
   title: string;
-  leader: string;
-  category: string;
-  date: string;
-  participants: number;
-  description: string;
+  body: string;
+  maxUser: number;
+  openAt: string;
+  expiredAt: string;
 };
 
 export default function StudyCreatePage() {
-  const { register, handleSubmit, formState } = useForm<StudyFormData>();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CreateFormData>();
   const navigate = useNavigate();
 
-  const onSubmit = (data: StudyFormData) => {
-    console.log("스터디 생성 데이터:", data);
-    alert("스터디가 생성되었습니다!");
-    // 실제로는 POST API 요청 후 -> navigate(`/study/${newId}`)
-    navigate("/study");
+  // 방 생성 API 요청 함수
+  const onSubmit = async (formData: CreateFormData) => {
+    // 로컬 스토리지로부터 토큰 받아오기
+    const authStorage = localStorage.getItem("auth-storage");
+    let token = "";
+
+    // 파싱해서 token만 가져오기
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      token = parsed.state.token;
+    }
+
+    try {
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/v1/room`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("방 생성 API 요청에 대한 응답 : ", res);
+      alert("스터디가 생성되었습니다!");
+    } catch (err) {
+      console.error("스터디 생성 실패", err);
+      alert("스터디가 생성 실패...");
+    }
   };
 
   return (
@@ -33,95 +63,89 @@ export default function StudyCreatePage() {
 
       <main className="max-w-[720px] mx-auto px-4 pt-[120px] pb-20 text-[17px] leading-relaxed">
         {/* Title */}
-        <h1 className="text-4xl font-bold text-[#1b1c1f] mb-10">
+        <h1 className="text-4xl font-bold text-blue-500 mb-10">
           스터디 방 생성하기
         </h1>
 
+        {/* form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
-          {/* 제목 */}
-          <div className="space-y-2">
-            <Label htmlFor="title" className="text-3xl font-semibold">
-              스터디 제목
-            </Label>
-            <Input
-              id="title"
-              {...register("title", { required: true })}
-              placeholder="예: SK 보안 솔루션 운영자 면접 스터디"
-              className="text-xl px-7 py-7 placeholder:text-lg"
-            />
-          </div>
-
-          {/* 방장명 */}
-          <div className="space-y-2">
-            <Label htmlFor="leader" className="text-3xl font-semibold">
-              방장명
-            </Label>
-            <Input
-              id="leader"
-              {...register("leader", { required: true })}
-              placeholder="이름을 입력하세요"
-              className="text-xl px-7 py-7 placeholder:text-lg"
-            />
-          </div>
-
           {/* 카테고리 */}
           <div className="space-y-2">
-            <Label htmlFor="category" className="text-3xl font-semibold">
-              대분류
-            </Label>
+            <Label className="text-3xl font-semibold">카테고리명</Label>
             <select
-              id="category"
-              {...register("category", { required: true })}
+              {...register("categoryId", {
+                required: "카테고리명은 필수입니다.",
+              })}
               className="w-full border border-[#dedee4] rounded-lg px-7 py-7 text-"
             >
-              <option value="">카테고리를 선택하세요</option>
+              <option value="">카테고리 선택</option>
               <option value="IT">IT</option>
               <option value="금융">금융</option>
               <option value="제조">제조</option>
               <option value="의료">의료</option>
               <option value="기타">기타</option>
             </select>
+            {errors.categoryId && (
+              <p className="text-red-500">{errors.categoryId.message}</p>
+            )}
+          </div>
+          {/* title */}
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-3xl font-semibold">
+              스터디 제목
+            </Label>
+            <Input
+              id="title"
+              {...register("title", { required: "제목은 필수입니다" })}
+              placeholder="스터디방의 제목을 입력해주세요"
+              className="text-xl px-7 py-7 placeholder:text-lg"
+            />
+            {errors.title && (
+              <p className="text-red-500">{errors.title.message}</p>
+            )}
+          </div>
+
+          {/* 설명 */}
+          <div className="space-y-2">
+            <Label htmlFor="body" className="text-3xl font-semibold">
+              설명
+            </Label>
+            <Input
+              id="body"
+              {...register("body")}
+              placeholder="스터디방에 대한 설명을 입력해주세요"
+              className="text-xl px-7 py-7 placeholder:text-lg"
+            />
+            {errors.body && (
+              <p className="text-red-500">{errors.body.message}</p>
+            )}
           </div>
 
           {/* 일시 */}
           <div className="space-y-2">
-            <Label htmlFor="date" className="text-3xl font-semibold">
-              스터디 일시
+            <Label htmlFor="openAt" className="text-3xl font-semibold">
+              방 생성 일시
             </Label>
             <Input
-              id="date"
+              id="openAt"
               type="datetime-local"
-              {...register("date", { required: true })}
+              {...register("openAt", { required: true })}
               className="text-xl px-7 py-7 placeholder:text-lg"
             />
           </div>
 
           {/* 참여 인원 */}
           <div className="space-y-2">
-            <Label htmlFor="participants" className="text-3xl font-semibold">
+            <Label htmlFor="maxUser" className="text-3xl font-semibold">
               참여 인원
             </Label>
             <Input
-              id="participants"
+              id="maxUser"
               type="number"
               min={2}
               max={20}
-              {...register("participants", { required: true })}
+              {...register("maxUser", { required: true })}
               placeholder="예: 6"
-              className="text-xl px-7 py-7 placeholder:text-lg"
-            />
-          </div>
-
-          {/* 설명 */}
-          <div className="space-y-2">
-            <Label htmlFor="description" className="text-3xl font-semibold">
-              상세 설명
-            </Label>
-            <Textarea
-              id="description"
-              rows={6}
-              {...register("description", { required: true })}
-              placeholder="스터디 목적, 방식, 주의사항 등을 입력하세요."
               className="text-xl px-7 py-7 placeholder:text-lg"
             />
           </div>
@@ -132,7 +156,7 @@ export default function StudyCreatePage() {
             <Button
               type="submit"
               className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-7 rounded-lg text-lg"
-              disabled={formState.isSubmitting}
+              // disabled={formState.isSubmitting}
             >
               스터디 생성하기
             </Button>
