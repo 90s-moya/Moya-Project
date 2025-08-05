@@ -1,9 +1,11 @@
+// src/pages/mypage/Portfolio.tsx
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/common/Header';
 import Sidebar from '@/components/mypage/Sidebar';
 import FileUpload from '@/components/common/FileUpload';
 import { useNavigate } from 'react-router-dom';
 import DocsApi, { type DocItem } from '@/api/docsApi';
+import { Link } from 'react-router-dom';
 
 interface UploadedFile {
   docsId: string;
@@ -25,83 +27,121 @@ const Portfolio: React.FC = () => {
     fetchDocs();
   }, []);
 
-  const fetchDocs = async () => {
-    console.log('=== 서류 목록 조회 시작 (Portfolio) ===');
-    console.log('현재 토큰:', localStorage.getItem('auth-storage'));
-    try {
-      console.log('DocsApi.getMyDocs 호출 시작');
-      const response = await DocsApi.getMyDocs();
-      console.log('서류 조회 성공 - 전체 응답:', response);
-      console.log('서류 조회 성공 - 상태코드:', response.status);
-      console.log('서류 조회 성공 - 데이터:', response.data);
-      
-      const docs = Array.isArray(response.data) ? response.data : [response.data];
-      console.log('처리된 docs 배열:', docs);
-      
-      const files: UploadedFile[] = docs.map((doc: DocItem) => ({
+const fetchDocs = async () => {
+  console.log('=== 서류 목록 조회 시작 (Portfolio) ===');
+  try {
+    const response = await DocsApi.getMyDocs();
+    console.log('서류 조회 성공 - 데이터:', response.data);
+
+    // 서버 응답이 배열인지 확인 (GET은 배열, 예외적으로 객체일 수도 있음)
+    const docs = Array.isArray(response.data) ? response.data : [response.data];
+
+    // 변환
+    const files: UploadedFile[] = docs.map((doc: DocItem) => {
+      const fileName = (() => {
+        const filename = doc.fileUrl.split('/').pop() || 'Unknown File';
+        // UUID 접두사 제거 (e8274ebd-fd4d-44af-80c6-0fa2270bedcd_ 형태)
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/;
+        return filename.replace(uuidPattern, '');
+      })();
+      // API 인터셉터에서 이미 전체 URL로 변환됨
+      const fileUrl = doc.fileUrl;
+
+      return {
         docsId: doc.docsId,
-        fileName: doc.fileUrl.split('\\').pop() || doc.fileUrl.split('/').pop() || 'Unknown File',
-        fileSize: 0, // 서버에서 파일 크기 정보가 없음
-        uploadDate: new Date(), // 서버에서 업로드 날짜 정보가 없음
-        docsStatus: doc.docsStatus,
-        fileUrl: doc.fileUrl.startsWith('http') ? doc.fileUrl : `${import.meta.env.VITE_API_URL}${doc.fileUrl}`
-      }));
-      
-      console.log('생성된 files 배열:', files);
-      console.log('상태 업데이트 시작');
-      setUploadedFiles(files);
-      console.log('=== 서류 목록 조회 성공 완료 (Portfolio) ===');
-    } catch (error: any) {
-      console.log('=== 서류 목록 조회 실패 (Portfolio) ===');
-      console.error('조회 에러 전체 정보:', error);
-      console.error('조회 에러 타입:', error.name);
-      console.error('조회 에러 메시지:', error.message);
-      console.error('조회 HTTP 상태:', error.response?.status);
-      console.error('조회 응답 데이터:', error.response?.data);
-      console.error('조회 요청 URL:', error.config?.url);
-      console.log('=== 서류 목록 조회 실패 완료 (Portfolio) ===');
-    }
-  };
-
-  const handleFileUpload = async (file: File) => {
-    // PDF 파일만 허용
-    console.log('업로드할 파일:', file.name, file.type, file.size);
-    if (!file.type.includes('pdf')) {
-      alert('PDF 파일만 업로드 가능합니다.');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      console.log('업로드 시작 - 파일:', file);
-      console.log('업로드 시작 - status:', 'PORTFOLIO');
-      // Portfolio 페이지에서는 항상 PORTFOLIO 타입으로만 업로드
-      const response = await DocsApi.uploadDoc(file, 'PORTFOLIO');
-      console.log('파일 업로드 성공 - 전체 응답:', response);
-      console.log('파일 업로드 성공 - 응답 데이터:', response.data);
-      const newFile: UploadedFile = {
-        docsId: response.data.docsId,
-        fileName: file.name,
-        fileSize: file.size,
+        fileName,
+        fileSize: 0,
         uploadDate: new Date(),
-        docsStatus: response.data.docsStatus,
-        fileUrl: response.data.fileUrl?.startsWith('http') ? response.data.fileUrl : `${import.meta.env.VITE_API_URL}${response.data.fileUrl}`
+        docsStatus: doc.docsStatus,
+        fileUrl
       };
-      
-      console.log('새 파일 객체:', newFile);
-      
-      setUploadedFiles(prev => [...prev, newFile]);
-      alert(`${file.name} 파일이 업로드되었습니다.`);
-    } catch (error: any) {
-      console.error('파일 업로드 실패 - 전체 에러:', error);
-      console.error('파일 업로드 실패 - 응답 상태:', error.response?.status);
-      console.error('파일 업로드 실패 - 응답 데이터:', error.response?.data);
-      console.error('파일 업로드 실패 - 에러 메시지:', error.message);
-      alert('파일 업로드에 실패했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    });
+
+    setUploadedFiles(files);
+    console.log('=== 서류 목록 조회 성공 완료 (Portfolio) ===');
+  } catch (error: any) {
+    console.error('서류 목록 조회 실패:', error);
+  }
+};
+
+// const handleFileUpload = async (file: File) => {
+//   if (!file.type.includes('pdf')) {
+//     alert('PDF 파일만 업로드 가능합니다.');
+//     return;
+//   }
+
+//   setIsLoading(true);
+//   try {
+//     const response = await DocsApi.uploadDoc(file, 'PORTFOLIO');
+//     console.log('파일 업로드 성공 - 응답 데이터:', response.data);
+
+//     const fileUrl = response.data.fileUrl.startsWith('http')
+//       ? response.data.fileUrl
+//       : `${import.meta.env.VITE_API_URL}${response.data.fileUrl}`;
+
+//     const newFile: UploadedFile = {
+//       docsId: response.data.docsId,
+//       fileName: file.name,
+//       fileSize: file.size,
+//       uploadDate: new Date(),
+//       docsStatus: response.data.docsStatus,
+//       fileUrl
+//     };
+
+//     setUploadedFiles(prev => [...prev, newFile]);
+//     alert(`${file.name} 파일이 업로드되었습니다.`);
+//   } catch (error: any) {
+//     console.error('파일 업로드 실패:', error);
+//     alert('파일 업로드에 실패했습니다.');
+//   } finally {
+//     setIsLoading(false);
+//   }
+// };
+
+
+const handleFileUpload = async (file: File) => {
+  if (!file.type.includes('pdf')) {
+    alert('PDF 파일만 업로드 가능합니다.');
+    return;
+  }
+
+  setIsLoading(true);
+  try {
+    // FormData 생성 및 로그 확인
+    const formData = new FormData();
+    formData.append("status", "PORTFOLIO");
+    formData.append("file", file);
+
+    console.log("FormData 내용 확인:", [...formData.entries()]); // 여기 추가
+
+    // 업로드 요청
+    const response = await DocsApi.uploadDoc(file, "PORTFOLIO");
+    console.log('파일 업로드 성공 - 응답 데이터:', response.data);
+
+    // API 인터셉터에서 이미 전체 URL로 변환됨
+    const fileUrl = response.data.fileUrl;
+
+    const newFile: UploadedFile = {
+      docsId: response.data.docsId,
+      fileName: file.name,
+      fileSize: file.size,
+      uploadDate: new Date(),
+      docsStatus: response.data.docsStatus,
+      fileUrl
+    };
+
+    setUploadedFiles(prev => [...prev, newFile]);
+    alert(`${file.name} 파일이 업로드되었습니다.`);
+  } catch (error: any) {
+    console.error('파일 업로드 실패:', error);
+    alert('파일 업로드에 실패했습니다.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+
+//////////////
 
   const handleFileDelete = async (docsId: string) => {
     if (!confirm('정말로 이 파일을 삭제하시겠습니까?')) {
@@ -137,6 +177,7 @@ const Portfolio: React.FC = () => {
         <main className="flex-1">
           {/* 이력서/포트폴리오 탭 */}
           <div className="flex gap-8 mb-8">
+            <Link to="/mypage/resume">
             <button 
               onClick={() => setActiveTab('resume')}
               className={`text-2xl font-semibold leading-[1.4] transition-colors ${
@@ -145,6 +186,7 @@ const Portfolio: React.FC = () => {
             >
               이력서
             </button>
+            </Link>
             <button 
               onClick={() => setActiveTab('portfolio')}
               className={`text-2xl font-semibold leading-[1.4] transition-colors ${

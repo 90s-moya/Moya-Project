@@ -8,7 +8,7 @@ const AuthApi = {
   signUp(userData: {
     email: string;
     password: string;
-    password_confirm: string;
+    confirmPassword: string;
     nickname: string;
     otp: string;
   }) {

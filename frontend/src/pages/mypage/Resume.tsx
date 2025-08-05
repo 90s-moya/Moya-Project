@@ -4,6 +4,7 @@ import Sidebar from '@/components/mypage/Sidebar';
 import FileUpload from '@/components/common/FileUpload';
 import { useNavigate } from 'react-router-dom';
 import DocsApi, { type DocItem } from '@/api/docsApi';
+import { Link } from 'react-router-dom';
 
 interface UploadedFile {
   docsId: string;
@@ -27,38 +28,78 @@ const Resume: React.FC = () => {
 
   const fetchDocs = async () => {
     console.log('=== 서류 목록 조회 시작 ===');
+    console.log('요청 URL: /v1/docs/me');
     console.log('현재 토큰:', localStorage.getItem('auth-storage'));
     try {
-      console.log('DocsApi.getMyDocs 호출 시작');
       const response = await DocsApi.getMyDocs();
-      console.log('서류 조회 성공 - 전체 응답:', response);
-      console.log('서류 조회 성공 - 상태코드:', response.status);
-      console.log('서류 조회 성공 - 데이터:', response.data);
+      console.log('서류 조회 응답 - 상태코드:', response.status);
+      console.log('서류 조회 응답 - 전체 데이터:', response.data);
+      console.log('서류 조회 응답 - JSON 문자열:', JSON.stringify(response.data, null, 2));
+      console.log('서류 조회 응답 - 데이터가 배열인가:', Array.isArray(response.data));
+      console.log('서류 조회 응답 - 배열 길이:', Array.isArray(response.data) ? response.data.length : 'N/A');
       
-      const docs = Array.isArray(response.data) ? response.data : [response.data];
-      console.log('처리된 docs 배열:', docs);
+      // 배열의 첫 번째 요소 자세히 확인
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        console.log('첫 번째 요소 상세:', response.data[0]);
+        console.log('첫 번째 요소 - docsId:', response.data[0].docsId);
+        console.log('첫 번째 요소 - docsStatus:', response.data[0].docsStatus);
+        console.log('첫 번째 요소 - fileUrl:', response.data[0].fileUrl);
+      }
       
-      const files: UploadedFile[] = docs.map((doc: DocItem) => ({
-        docsId: doc.docsId,
-        fileName: doc.fileUrl.split('\\').pop() || doc.fileUrl.split('/').pop() || 'Unknown File',
-        fileSize: 0, // 서버에서 파일 크기 정보가 없음
-        uploadDate: new Date(), // 서버에서 업로드 날짜 정보가 없음
-        docsStatus: doc.docsStatus,
-        fileUrl: doc.fileUrl.startsWith('http') ? doc.fileUrl : `${import.meta.env.VITE_API_URL}${doc.fileUrl}`
-      }));
-      
-      console.log('생성된 files 배열:', files);
-      console.log('상태 업데이트 시작');
-      setUploadedFiles(files);
-      console.log('=== 서류 목록 조회 성공 완료 ===');
+      // 실제로는 배열을 반환하므로 배열 처리
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        console.log('배열 데이터 처리 시작');
+        
+        // Resume 페이지에서는 RESUME 타입만 필터링
+        const resumeDocs = response.data.filter((doc: DocItem) => doc.docsStatus === 'RESUME');
+        console.log('RESUME 타입 필터링 결과:', resumeDocs);
+        
+        if (resumeDocs.length > 0) {
+          const files: UploadedFile[] = resumeDocs.map((doc: DocItem) => {
+            console.log('처리 중인 RESUME doc:', doc);
+            // URL에서 파일명 추출
+            const urlParts = doc.fileUrl.split('/');
+            const filename = urlParts[urlParts.length - 1] || 'Unknown File';
+            // UUID 접두사 제거 (e8274ebd-fd4d-44af-80c6-0fa2270bedcd_ 형태)
+            const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/;
+            const cleanFileName = filename.replace(uuidPattern, '');
+            console.log('원본 fileUrl:', doc.fileUrl);
+            console.log('추출된 filename:', filename);
+            console.log('정리된 fileName:', cleanFileName);
+            
+            return {
+              docsId: doc.docsId,
+              fileName: cleanFileName,
+              fileSize: 0,
+              uploadDate: new Date(),
+              docsStatus: doc.docsStatus,
+              // 파일 URL 처리 - API 인터셉터에서 이미 전체 URL로 변환됨
+              fileUrl: doc.fileUrl
+            };
+          });
+          
+          console.log('변환된 RESUME files:', files);
+          setUploadedFiles(files);
+          console.log('=== RESUME 서류 목록 조회 성공 완료 ===');
+        } else {
+          setUploadedFiles([]);
+          console.log('=== RESUME 타입 서류가 없음 ===');
+        }
+      } else {
+        // 파일이 없는 경우
+        setUploadedFiles([]);
+        console.log('=== 업로드된 서류가 없음 (빈 배열 또는 데이터 없음) ===');
+      }
     } catch (error: any) {
       console.log('=== 서류 목록 조회 실패 ===');
-      console.error('조회 에러 전체 정보:', error);
-      console.error('조회 에러 타입:', error.name);
-      console.error('조회 에러 메시지:', error.message);
-      console.error('조회 HTTP 상태:', error.response?.status);
-      console.error('조회 응답 데이터:', error.response?.data);
-      console.error('조회 요청 URL:', error.config?.url);
+      if (error.response?.status === 404) {
+        // 404는 파일이 없는 정상적인 상황
+        setUploadedFiles([]);
+        console.log('파일이 존재하지 않습니다 (정상)');
+      } else {
+        console.error('조회 에러:', error);
+        setUploadedFiles([]);
+      }
       console.log('=== 서류 목록 조회 실패 완료 ===');
     }
   };
@@ -88,6 +129,17 @@ const Resume: React.FC = () => {
       console.log('업로드 타입: RESUME');
       console.log('현재 토큰:', localStorage.getItem('auth-storage'));
       
+      // FormData 생성 과정 디버깅
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('status', 'RESUME');
+      
+      console.log('FormData 생성 완료');
+      console.log('FormData entries:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
+      
       // Resume 페이지에서는 항상 RESUME 타입으로만 업로드
       console.log('DocsApi.uploadDoc 호출 시작');
       const response = await DocsApi.uploadDoc(file, 'RESUME');
@@ -103,17 +155,12 @@ const Resume: React.FC = () => {
         fileSize: file.size,
         uploadDate: new Date(),
         docsStatus: response.data.docsStatus,
-        fileUrl: response.data.fileUrl?.startsWith('http') ? response.data.fileUrl : `${import.meta.env.VITE_API_URL}${response.data.fileUrl}`
+        fileUrl: response.data.fileUrl
       };
       console.log('생성된 파일 객체:', newFile);
       
-      console.log('파일 목록 업데이트 시작');
-      setUploadedFiles(prev => {
-        console.log('이전 파일 목록:', prev);
-        const newList = [...prev, newFile];
-        console.log('새 파일 목록:', newList);
-        return newList;
-      });
+      console.log('업로드 완료 - 서류 목록 다시 조회');
+      await fetchDocs(); // 업로드 후 최신 상태로 다시 조회
       
       console.log('업로드 성공 알림 표시');
       alert(`${file.name} 파일이 업로드되었습니다.`);
@@ -183,6 +230,7 @@ const Resume: React.FC = () => {
             >
               이력서
             </button>
+            <Link  to = "/mypage/portfolio">
             <button 
               onClick={() => setActiveTab('portfolio')}
               className={`text-2xl font-semibold leading-[1.4] transition-colors ${
@@ -191,6 +239,7 @@ const Resume: React.FC = () => {
             >
               포트폴리오
             </button>
+            </ Link>
           </div>
 
           {/* 파일 업로드 영역 */}
