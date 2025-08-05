@@ -9,6 +9,8 @@ export interface SignalMessage {
 
 export class SignalingClient {
   private ws: WebSocket;
+  private isOpen = false;
+  private queue: SignalMessage[] = [];
 
   constructor(
     url: string,
@@ -16,6 +18,12 @@ export class SignalingClient {
     private onMessage: (data: SignalMessage) => void
   ) {
     this.ws = new WebSocket(url);
+    
+    this.ws.onopen = () => {
+      this.isOpen = true;
+      this.queue.forEach((msg) => this.send(msg));
+      this.queue = [];
+    };
 
     this.ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
@@ -27,6 +35,10 @@ export class SignalingClient {
   }
 
   send(msg: SignalMessage) {
-    this.ws.send(JSON.stringify(msg));
+    if (this.isOpen) {
+      this.ws.send(JSON.stringify(msg));
+    } else {
+      this.queue.push(msg);
+    }
   }
 }
