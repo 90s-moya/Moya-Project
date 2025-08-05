@@ -59,6 +59,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'io.micrometer:micrometer-registry-prometheus'
 
+	// PDF
+	implementation 'org.apache.pdfbox:pdfbox:2.0.30'
+
 }
 
 dependencyManagement {
