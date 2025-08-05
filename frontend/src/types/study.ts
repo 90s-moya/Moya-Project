@@ -7,4 +7,5 @@ export interface StudyRoom {
   maxUser: number;
   openAt: string;
   title: string;
+  joinUser: string;
 }
