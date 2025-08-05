@@ -40,6 +40,18 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	//JWT
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	implementation 'io.jsonwebtoken:jjwt-impl:0.12.6'
+	implementation 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+	//Mail
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+	//WebSocket
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
 }
 
 dependencyManagement {
