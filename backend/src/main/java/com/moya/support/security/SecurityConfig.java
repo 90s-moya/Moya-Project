@@ -99,6 +99,7 @@ public class SecurityConfig {
                     "/v1/user/random",
                     "/v1/user/check-nickname",
                     "/v1/room/*",
+                        "/ws",
                     "/css/**").permitAll()
                     .requestMatchers("v1/docs",
                             "/v1/docs/**").authenticated()
