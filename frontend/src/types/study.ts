@@ -4,7 +4,8 @@ export interface StudyRoom {
   conversation: string;
   expiredAt: string;
   id: string;
-  maxUser: number;
+  maxuser: number;
   openAt: string;
   title: string;
+  joinUser: number;
 }

@@ -7,9 +7,11 @@ export default function StudyCard({
   categoryName,
   expiredAt,
   id,
-  maxUser,
+  maxuser,
   openAt,
   title,
+  joinUser,
+  body,
 }: StudyRoom) {
   const navigate = useNavigate();
 
@@ -44,7 +46,7 @@ export default function StudyCard({
           </div>
           <div className="flex justify-between text-base">
             <span className="text-[#6f727c]">최대 인원 수</span>
-            <span className="text-[#1b1c1f] font-medium">{maxUser}</span>
+            <span className="text-[#1b1c1f] font-medium">{maxuser}</span>
           </div>
         </div>
       </div>
