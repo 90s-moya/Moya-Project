@@ -74,6 +74,7 @@ build-fe:
   script:
     - cd frontend
     - echo "VITE_API_URL=$API_URL" > .env
+    - echo "VITE_RTC_API_URL=$VITE_RTC_API_URL" >> .env
     - npm ci
     - npm run build
   artifacts:
