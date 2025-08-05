@@ -30,8 +30,11 @@ export default function StudyRoomPage() {
   useEffect(()=>{
     // TODO: 로그인 한 유저 ID 정보로 변경해야함 ㅎ
     const myId = crypto.randomUUID();
-
+    
+    // 배포용
     const signaling = new SignalingClient(`wss://${import.meta.env.VITE_RTC_API_URL}/ws`, myId, async (data) => {
+    // 테스트 용
+    //const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
       const peerManager = peerManagerRef.current;
       if(!peerManager) return;
 
@@ -57,7 +60,7 @@ export default function StudyRoomPage() {
     (async ()=>{
       const local = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
       setLocalStream(local);
-      // TODO : 사용자 정보에 맞게 보내주세요!
+      // TODO : 사용자 정보에 맞게 변경 필요함
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== myId),
         { id: myId, name: "나", stream: local, isLocal: true },
