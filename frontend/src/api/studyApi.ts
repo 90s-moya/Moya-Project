@@ -42,18 +42,24 @@ export const getMyDocs = async () => {
   return res.data;
 };
 
-// 방 입장
-export const enterRoom = async ({
+// 방 입장 전 환경 설정 페이지에서 서류 등록
+export const registerDocs = async ({
   room_id,
   resume_id,
   portfolio_id,
   coverletter_id,
 }: EnterRoomParams) => {
-  const res = await api.post(`/v1/room/${room_id}/enter`, {
+  const res = await api.post(`/v1/room/${room_id}/register`, {
     resume_id,
     portfolio_id,
     coverletter_id,
   });
 
   return res.data;
+};
+
+export const deleteRoom = async (id: string) => {
+  const res = await api.delete(`/v1/room/${id}`);
+
+  return res;
 };
