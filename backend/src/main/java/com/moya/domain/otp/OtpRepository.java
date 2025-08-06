@@ -1,0 +1,14 @@
+package com.moya.domain.otp;
+
+import java.util.Optional;
+
+public interface OtpRepository {
+	Otp save(Otp otp);
+	Optional<Otp> findByOtp(String otp);
+	Optional<Otp> findByEmailAndOtp(String email, String otp);
+
+	Optional<Otp> findByEmail(String email);
+	Optional<Otp> findById(Long id);
+
+	Optional<Otp> findByEmailAndTypeAndOtp(String email, OtpType type, String otp);
+}

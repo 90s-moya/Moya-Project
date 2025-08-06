@@ -9,21 +9,23 @@ import StudyBackToList from "@/components/study/StudyBackToList";
 import axios from "axios";
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
-import { getTokenFromLocalStorage } from "../../util/getToken";
+import { getTokenFromLocalStorage } from "@/util/getToken";
+import type { CreateFormData, Category } from "@/types/study";
+import { createRoom, getCategory } from "@/api/studyApi";
 
-type CreateFormData = {
-  category_id: string;
-  title: string;
-  body: string;
-  max_user: number;
-  open_at: string;
-  expired_at: string;
-};
+// type CreateFormData = {
+//   category_id: string;
+//   title: string;
+//   body: string;
+//   max_user: number;
+//   open_at: string;
+//   expired_at: string;
+// };
 
-type Category = {
-  categoryId: string;
-  categoryName: string;
-};
+// type Category = {
+//   categoryId: string;
+//   categoryName: string;
+// };
 
 export default function StudyCreatePage() {
   // 폼 관련 변수 및 함수들
@@ -38,40 +40,24 @@ export default function StudyCreatePage() {
 
   const navigate = useNavigate();
 
-  // 카테고리 API 요청 함수
+  // 마운트 시 카테고리 API 요청
   useEffect(() => {
     const requestCategory = async () => {
-      const token = getTokenFromLocalStorage();
-
       try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/v1/category`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        // console.log(
-        //   "카테고리 API 호출에 대한 응답은 다음과 같습니다.",
-        //   res.data
-        // );
-        setCategory(res.data);
+        const data = await getCategory();
+        console.log("카테고리 조회 결과 : ", data);
+        setCategory(data);
       } catch (err) {
-        console.error("카테고리 API 호출 실패", err);
+        console.error("카테고리 조회 에러 발생 : ", err);
       }
     };
 
     requestCategory();
   }, []);
 
-  // 방 생성 API 요청 함수
+  // 폼 데이터 제출 함수
   const onSubmit = async (formData: CreateFormData) => {
-    const token = getTokenFromLocalStorage();
-
-    // 스터디 생성 일시
+    // 스터디 생성 일시 생성
     const open_at = dayjs().add(9, "hour").toISOString();
 
     // 사용자가 입력한 formData에 openAt 추가
@@ -83,19 +69,9 @@ export default function StudyCreatePage() {
     console.log("요청 시 사용되는 formData는 다음과 같습니다.", fullData);
 
     try {
-      console.log(token);
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/v1/room`,
-        fullData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const data = await createRoom(fullData);
 
-      // console.log("방 생성 API 요청에 대한 응답 : ", res);
+      console.log("방 생성 API 요청에 대한 응답 : ", data);
       navigate("/study");
     } catch (err) {
       console.error("스터디 생성 실패", err);
@@ -179,7 +155,7 @@ export default function StudyCreatePage() {
                 required: true,
                 setValueAs: (v) =>
                   dayjs(v).isValid()
-                    ? dayjs(v).format("YYYY-MM-DDTHH:mm:ss")
+                    ? dayjs(v).add(9, "hour").toISOString()
                     : "",
               })}
               className="text-xl px-7 py-7 placeholder:text-lg"
