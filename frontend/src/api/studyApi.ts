@@ -39,8 +39,8 @@ export const getMyDocs = async () => {
 };
 
 // 방 입장
-export const enterRoom = async (id: string) => {
-  const res = await api.post(`/v1/room/${id}/enter`);
+// export const enterRoom = async (id: string) => {
+//   const res = await api.post(`/v1/room/${id}/enter`);
 
-  return res.data;
-};
+//   return res.data;
+// };
