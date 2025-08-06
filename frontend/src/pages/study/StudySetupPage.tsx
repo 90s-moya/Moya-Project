@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Mic, Camera } from "lucide-react";
 import Header from "@/components/common/Header";
 import { useNavigate, useParams } from "react-router-dom";
-import { enterRoom, getMyDocs } from "@/api/studyApi";
+import { registerDocs, getMyDocs } from "@/api/studyApi";
 import type { MyDoc } from "@/types/study";
 
 export default function StudySetupPage() {
@@ -107,7 +107,7 @@ export default function StudySetupPage() {
     }
 
     try {
-      await enterRoom({
+      await registerDocs({
         room_id: id!,
         resume_id,
         portfolio_id,
