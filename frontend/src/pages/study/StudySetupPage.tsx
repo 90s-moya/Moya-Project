@@ -1,10 +1,14 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Camera } from "lucide-react";
 import Header from "@/components/common/Header";
 import { useNavigate, useParams } from "react-router-dom";
 import FileUploadSection from "@/components/study/FileUploadSection";
 import axios from "axios";
+import { getTokenFromLocalStorage } from "@/util/getToken";
+import { getMyDocs } from "@/api/studyApi";
+import type { docsForEnterRoom } from "@/types/study";
+import { ref } from "process";
 
 export default function StudySetupPage() {
   // 카메라 및 마이크 상태 확인용 변수
@@ -17,7 +21,9 @@ export default function StudySetupPage() {
 
   const { id } = useParams(); // 라우트의 id
 
-  // 카메라 및 오디오 시작
+  const [myDocs, setMyDocs] = useState<docsForEnterRoom | null>(null);
+
+  // 카메라 및 오디오 시작 함수
   const startStream = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -54,18 +60,47 @@ export default function StudySetupPage() {
     }
   };
 
-  // 환경 설정 완료 후 방 입장 시 실행되는 함수
-  const enterRoom = async () => {
-    // API 요청
-    // 로컬 스토리지로부터 토큰 받아오기
-    const authStorage = localStorage.getItem("auth-storage");
-    let token = "";
+  // 등록한 내 서류 불러오기
+  useEffect(() => {
+    const requestMyDocs = async () => {
+      try {
+        const data = await getMyDocs();
+        console.log("내 서류 조회 결과 : ", data);
 
-    // 파싱해서 token만 가져오기
-    if (authStorage) {
-      const parsed = JSON.parse(authStorage);
-      token = parsed.state.token;
-    }
+        const mappedDocs: docsForEnterRoom = {
+          resume_id: "",
+          portfolio_id: "",
+          coverletter_id: "",
+        };
+
+        data.forEach((doc: any) => {
+          const { docsId, docsStatus } = doc;
+          switch (docsStatus) {
+            case "RESUME":
+              mappedDocs.resume_id = docsId;
+              break;
+            case "PORTFOLIO":
+              mappedDocs.portfolio_id = docsId;
+              break;
+            case "COVER_LETTER":
+              mappedDocs.coverletter_id = docsId;
+              break;
+          }
+        });
+
+        setMyDocs(mappedDocs);
+      } catch (err) {
+        console.error("내 서류 조회 실패", err);
+      }
+    };
+
+    requestMyDocs();
+  }, []);
+
+  // 환경 설정 완료 후 방 입장 시 실행되는 함수
+  const handleEnterRoom = async () => {
+    // 로컬 스토리지로부터 토큰 받아오기
+    const token = getTokenFromLocalStorage();
 
     try {
       const res = await axios.post(`${import.meta.env.VITE_API_URL}/v1/room/${id}/enter`, {
@@ -80,6 +115,7 @@ export default function StudySetupPage() {
       console.error("❌ 에러 발생", err);
     }
 
+    // 입장 성공 시 룸으로 이동
     navigate(`/study/room/${id}`);
   };
 
@@ -87,9 +123,9 @@ export default function StudySetupPage() {
     <div className="min-h-screen bg-white">
       <Header scrollBg={false} />
 
-      <main className="max-w-[1180px] mx-auto px-4 md:px-6 pt-[80px] pb-20 text-[17px] leading-relaxed">
+      <main className="max-w-[1180px] mx-auto px-4 md:px-6 pt-[120px] pb-20 text-[17px] leading-relaxed">
         {/* 타이틀 */}
-        <h1 className="text-3xl font-bold text-center mb-12">면접스터디를 위한 환경을 설정해 주세요</h1>
+        <h1 className="text-3xl font-bold text-center mb-12">면접스터디를 위해 환경을 설정해 주세요</h1>
 
         {/* 콘텐츠 영역 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start mb-16">
@@ -140,7 +176,7 @@ export default function StudySetupPage() {
               카메라 및 마이크 시작
             </Button>
             <Button
-              onClick={() => navigate("/study/room")}
+              onClick={handleEnterRoom}
               disabled={!isCameraOn || !isMicOn}
               className={`px-8 py-6 text-lg ${isCameraOn && isMicOn ? "bg-blue-500 hover:bg-blue-600 text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
             >
