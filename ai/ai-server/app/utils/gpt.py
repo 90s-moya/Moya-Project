@@ -1,13 +1,27 @@
-import requests
-import json
+# app/utils/gpt.py
+import httpx
 import re
 from decouple import config
 
 GMS_API_KEY = config('GMS_API_KEY')
 GMS_API_URL = config('GMS_BASE_URL')
 
-def ask_gpt_if_ends(question_list: list[str], answer_list: list[str]) -> str:
-    prompt = "다음 각 답변에서 화자가 발화를 마무리하고 있는지와 질문과 같은 맥락으로 이야기하고 있는지 평가해 주세요. 각 쌍마다 코멘트도 작성해 주세요.\n\n"
+
+async def ask_gpt_if_ends_async(question_list: list[str], answer_list: list[str]) -> str:
+    """
+    GPT API 호출 (비동기 httpx 사용)
+    """
+    prompt = """
+    당신은 면접 지원자를 평가한 경력이 10년 차 되는 면접관입니다.
+    다음은 면접 지원자의 답변입니다.
+    답변을 평가하세요.
+    항목: is_ended, reason_end, context_matched, reason_context, speech_analysis, gpt_comment.
+    출력 형식: 질문 N: ... (기존 형식 그대로)
+    평가기준 요약:
+    - is_ended: '했습니다'체면 true, 말끝 흐림/반복이면 false
+    - context_matched: 질문 의도와 의미상 일치 여부
+    - speech_analysis: filler_word_ratio(%), speaking_speed(wpm), ending_style(+/-), verbosity(sentence_count)
+    """
 
     for i, (q, a) in enumerate(zip(question_list, answer_list), 1):
         prompt += f"질문 {i}: \"{q}\"\n답변 {i}: \"{a}\"\n\n"
@@ -21,26 +35,21 @@ def ask_gpt_if_ends(question_list: list[str], answer_list: list[str]) -> str:
 GPT 코멘트:
 """
 
-    data = {
-        "model": "gpt-4o",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0
-    }
-
-    response = requests.post(
-        GMS_API_URL,
-        headers={
-            "Authorization": f"Bearer {GMS_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        data=json.dumps(data)
-    )
-
-    if response.status_code == 200:
+    async with httpx.AsyncClient(timeout=90) as client:
+        response = await client.post(
+            GMS_API_URL,
+            headers={
+                "Authorization": f"Bearer {GMS_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "gpt-4o",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0
+            }
+        )
+        response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
-    else:
-        return f"[ERROR {response.status_code}] {response.text}"
-
 
 def parse_gpt_result(gpt_text: str):
     pattern = r"질문\s*(\d+):\s*종결 여부:\s*(True|False)\s*근거:\s*(.*?)\s*맥락 일치 여부:\s*(True|False)\s*근거:\s*(.*?)\s*GPT 코멘트:\s*(.*?)(?:\n{2,}|\Z)"
