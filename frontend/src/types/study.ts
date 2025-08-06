@@ -15,6 +15,7 @@ export type MasterInfo = {
   nickname: string;
   makeRoomCnt: number;
   createdAt: string;
+  masterId: string;
 };
 
 export type StudyRoomDetail = {

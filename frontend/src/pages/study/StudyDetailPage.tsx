@@ -14,6 +14,8 @@ export default function StudyDetailPage() {
   const [isMine, setIsMine] = useState(true); // 추후 false로 변경해야함
 
   const navigate = useNavigate();
+  // 방 삭제 시 참고할 현재 사용자의 UUID
+  const UUID = useAuthStore((state) => state.UUID);
 
   // 마운트 시 방 상세 API 요청 보내기
   useEffect(() => {
@@ -59,10 +61,12 @@ export default function StudyDetailPage() {
     }
   };
 
-  // 추후에 방 상세 조회 결과로 user_id가 넘어오면아래 주석 취소해야함.
-  // if (roomDetail?.masterInfo.user_id === useAuthStore((state) => state.UUID)){
-  // setIsMine(true);
-  // }
+  // 방 상세 조회를 통해 받은 방장 ID와 현재 사용자의 ID가 같다면 삭제 버튼 활성화
+  useEffect(() => {
+    if (roomDetail?.masterInfo.masterId === UUID) {
+      setIsMine(false);
+    }
+  }, [roomDetail, UUID]);
 
   return (
     <div className="min-h-screen bg-[#ffffff] text-[17px] leading-relaxed">
