@@ -23,9 +23,9 @@ export default function StudySetupPage() {
   // API를 통해 불러온 내 서류 정보를 저장하는 docList
   const [docList, setDocList] = useState<MyDoc[]>([]);
 
-  const resumeDoc = docList.find((doc) => doc.docsStatus === "RESUME");
-  const portfolioDoc = docList.find((doc) => doc.docsStatus === "PORTFOLIO");
-  const coverLetterDoc = docList.find(
+  const resumeDocs = docList.filter((doc) => doc.docsStatus === "RESUME");
+  const portfolioDocs = docList.filter((doc) => doc.docsStatus === "PORTFOLIO");
+  const coverLetterDocs = docList.filter(
     (doc) => doc.docsStatus === "COVER_LETTER"
   );
 
@@ -144,9 +144,21 @@ export default function StudySetupPage() {
 
           {/* 우측: 파일 업로드 */}
           <div className="space-y-6">
-            <FileUploadSection label="이력서" type="resume" />
-            <FileUploadSection label="포트폴리오" type="portfolio" />
-            <FileUploadSection label="자기소개서" type="introduction" />
+            <FileUploadSection
+              label="이력서"
+              type="resume"
+              defaultFiles={resumeDocs}
+            />
+            <FileUploadSection
+              label="포트폴리오"
+              type="portfolio"
+              defaultFiles={portfolioDocs}
+            />
+            <FileUploadSection
+              label="자기소개서"
+              type="introduction"
+              defaultFiles={coverLetterDocs}
+            />
           </div>
         </div>
 

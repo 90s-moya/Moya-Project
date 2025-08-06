@@ -1,16 +1,22 @@
 import { useFileStore } from "@/store/useFileStore";
+import type { MyDoc } from "@/types/study";
 import { Plus } from "lucide-react";
 import { useRef } from "react";
 
 interface FileUploadProps {
   label: string;
   type: "resume" | "introduction" | "portfolio";
+  defaultFiles?: MyDoc[];
 }
 
-export default function FileUploadSection({ label, type }: FileUploadProps) {
-  const file = useFileStore((state) => state[type]);
+export default function FileUploadSection({
+  label,
+  type,
+  defaultFiles,
+}: FileUploadProps) {
+  // const file = useFileStore((state) => state[type]);
   const setFile = useFileStore((state) => state.setFile);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // const inputRef = useRef<HTMLInputElement>(null);
 
   // 파일 선택 함수
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -23,13 +29,17 @@ export default function FileUploadSection({ label, type }: FileUploadProps) {
         return;
       }
 
-      setFile(type, selectedFile); // zustand에 저장
+      // setFile(type, selectedFile); // zustand에 저장
     }
   };
 
   return (
     <div>
-      <input
+      <label htmlFor="doc-type">이력서 선택</label>
+      <select name="" id="doc-type">
+        {/* {defaultFiles?.map((file))} */}
+      </select>
+      {/* <input
         ref={inputRef}
         type="file"
         accept=".pdf,.doc,.docx"
@@ -54,7 +64,7 @@ export default function FileUploadSection({ label, type }: FileUploadProps) {
             삭제
           </button>
         </div>
-      )}
+      )} */}
     </div>
   );
 }
