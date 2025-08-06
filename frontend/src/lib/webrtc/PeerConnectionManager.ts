@@ -65,6 +65,43 @@ export class PeerConnectionManager {
   }
 
   /**
+   * 전체 연결 해제
+   */
+  public closeAllConnections() {
+  for (const pc of this.connections.values()) {
+      pc.close();
+    }
+    this.connections.clear();
+  }
+
+  removeConnection(peerId:string){
+    const pc = this.connections.get(peerId);
+    if(pc){
+      pc.close();
+      this.connections.delete(peerId);
+      this.remoteStreams.delete(peerId);
+    }
+  }
+
+  /**
+   * 카메라 제거
+   */
+  public removeLocalTracks() {
+  for (const pc of this.connections.values()) {
+    pc.getSenders().forEach((sender) => {
+      try {
+        pc.removeTrack(sender); // 연결에서도 제거
+        sender.track?.stop(); // 트랙 강제 중지
+        console.log("트랙 제거 성공!!");
+      } catch (e) {
+        console.warn("트랙 제거 실패", e);
+      }
+    });
+  }
+}
+
+
+  /**
    * RTCPeerConnection 생성 및 트랙/이벤트 바인딩
    */
   private async createConnection(peerId: string, initiator: boolean) {
