@@ -26,7 +26,16 @@ public class SignalingHandler extends TextWebSocketHandler {
         String senderId = data.getString("senderId");
 
         if (type.equals("join")) {
+            if(clients.containsKey(senderId)){
+                WebSocketSession s = clients.get(senderId);
+                if(s != null && s.isOpen() && !s.getId().equals(session.getId())){
+                    s.close();
+                    System.out.println("중복 세션 종료 "+s.getId());
+                }
+            }
             clients.put(senderId, session);
+            System.out.println("참가 "+senderId);
+            System.out.println("현재 접속자: "+clients.keySet());
 
             // 기존 참가자 목록 전송
             JSONArray existingIds = new JSONArray();
@@ -52,7 +61,21 @@ public class SignalingHandler extends TextWebSocketHandler {
                 }
             }
 
-        } else {
+        } else if(type.equals("leave")) {
+            WebSocketSession s = clients.remove(senderId);
+            System.out.println("퇴장 :" + senderId);
+
+            JSONObject leaveMsg = new JSONObject();
+            leaveMsg.put("type", "leave");
+            leaveMsg.put("senderId", senderId);
+
+            for (WebSocketSession targetSession : clients.values()) {
+                if (targetSession.isOpen()) {
+                    targetSession.sendMessage(new TextMessage(leaveMsg.toString()));
+                }
+            }
+        }
+        else {
             // offer / answer / ice 전송
             if (data.has("targetId")) {
                 String targetId = data.getString("targetId");
