@@ -1,5 +1,6 @@
 // src/api/userApi.ts
 import api from "@/api/index";
+import axios from "axios";
 const BASE_URL = "/v1/user";
 
 const UserApi = {
@@ -20,14 +21,14 @@ const UserApi = {
 
   // 내 정보 조회
   getMyInfo() {
-    return api.get(`${BASE_URL}/info`);
+    return api.get(`${BASE_URL}/me`);
   },
 
   // 닉네임 중복 체크
   checkNickname(nickname: string) {
-    // 임시 목업 - 실제 API 준비되면 아래 주석 해제하고 위 return 삭제
-    return Promise.resolve({ data: { isAvailable: true } });
-    // return api.get(`${BASE_URL}/check-nickname?nickname=${encodeURIComponent(nickname)}`);
+    return api.get(`${BASE_URL}/check-nickname`, {
+      params: { nickname }
+    });
   },
 
 
@@ -37,7 +38,14 @@ const UserApi = {
     email: string;
     type: "SIGNUP";
   }) {
-    return api.post(`/v1/otp`, otpData);
+    // OTP 전용 axios 인스턴스 (토큰 없이)
+    const otpApi = axios.create({
+      baseURL: import.meta.env.VITE_API_URL,
+      timeout: 10000,
+      withCredentials: true,
+    });
+    
+    return otpApi.post(`/v1/otp`, otpData);
   },
 
 
@@ -61,9 +69,7 @@ const UserApi = {
 
   // 이메일 중복 체크
   checkEmail(email: string) {
-    // 임시 목업 - 실제 API 준비되면 아래 주석 해제하고 위 return 삭제
-    return Promise.resolve({ data: { isAvailable: true } });
-    // return api.get(`${BASE_URL}/check-email?email=${encodeURIComponent(email)}`);
+    return api.post(`${BASE_URL}/check-email`,{email});
   },
 
   // 랜덤 닉네임 생성

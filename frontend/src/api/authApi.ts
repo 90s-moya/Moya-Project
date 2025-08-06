@@ -8,22 +8,15 @@ const AuthApi = {
   signUp(userData: {
     email: string;
     password: string;
-    password_confirm: string;
+    confirmPassword: string;
     nickname: string;
     otp: string;
   }) {
     return api.post(`${BASE_URL}/signup`, userData);
   },
-
-  // 로그아웃 요청
-  logout() {
-    return api.get(`${BASE_URL}/logout`);
-  },
-
- 
   // 이메일 OTP 발송
-  sendOtp(otpData: { email: string; type: "SIGNUP" | "password-reset" }) {
-    return api.post(`${BASE_URL}/send-otp`, otpData);
+  sendOtp(otpData: { email: string; type: "SIGNUP" }) {
+    return api.post(`/v1/otp`, otpData);
   },
 
   // 이메일 OTP 인증

@@ -3,6 +3,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import AuthApi from '@/api/authApi';
 import UserApi from '@/api/userApi';
 import { useNavigate } from 'react-router-dom';
+import { Link } from "react-router-dom";
+
 
 interface FormData {
   nickname: string;
@@ -80,31 +82,47 @@ const SignupDetail: React.FC = () => {
       console.log('이메일 중복 확인 데이터:', res.data);
       console.log(formData.type);
       
-      if (res.data.isAvailable) {
+      // 서버에서 직접 메시지 문자열로 응답
+      if (res.status === 200) {
         setIsEmailDuplicateChecked(true);
         setMessages(prev => ({
           ...prev,
-          email: { error: '', success: '사용 가능한 이메일입니다.' }
+          email: { error: '', success: res.data || '사용 가능한 이메일입니다.' }
         }));
-      } else {
-        setMessages(prev => ({
-          ...prev,
-          email: { error: '이미 사용 중인 이메일입니다.', success: '' }
-        }));
-        setIsEmailDuplicateChecked(false);
       }
     } catch (error: any) {
       console.error('이메일 중복 확인 에러:', error);
       console.error('에러 응답:', error.response);
+      
+      let errorMessage = '이메일 중복 확인에 실패했습니다.';
+      
+      if (error.response) {
+        if (error.response.status === 409) {
+          // 409 Conflict: 이미 가입된 이메일
+          errorMessage = typeof error.response.data === 'string' 
+            ? error.response.data 
+            : error.response.data?.message || '이미 사용 중인 이메일입니다.';
+        } else if (error.response.status === 401) {
+          // 401 Unauthorized: 토큰 문제
+          errorMessage = '인증 오류가 발생했습니다.';
+        } else {
+          // 기타 에러
+          errorMessage = error.response.data?.message || errorMessage;
+        }
+      }
+      
       setMessages(prev => ({
         ...prev,
-        email: { error: '이메일 중복 확인에 실패했습니다.', success: '' }
+        email: { error: errorMessage, success: '' }
       }));
+      setIsEmailDuplicateChecked(false);
     }
   };
 
   const handleEmailVerification = async () => {
+    console.log('=== OTP 발송 시작 ===');
     if (!isEmailDuplicateChecked) {
+      console.log('이메일 중복 확인 안됨');
       setMessages(prev => ({
         ...prev,
         otp: { error: '먼저 이메일 중복 확인을 해주세요.', success: '' }
@@ -112,51 +130,101 @@ const SignupDetail: React.FC = () => {
       return;
     }
 
+    console.log('OTP 발송 데이터:', { email: formData.email, type: 'SIGNUP' });
+    console.log('현재 토큰:', localStorage.getItem('auth-storage'));
+
     try {
-      console.log('Sending OTP to:', formData.email);
-      await UserApi.sendOtp({ email: formData.email, type: 'SIGNUP' });
+      console.log('UserApi.sendOtp 호출 시작');
+      const res = await UserApi.sendOtp({ email: formData.email, type: 'SIGNUP' });
+      console.log('OTP 발송 성공 - 전체 응답:', res);
+      console.log('OTP 발송 성공 - 상태코드:', res.status);
+      console.log('OTP 발송 성공 - 데이터:', res.data);
+      
       setIsCodeSent(true);
-      console.log(`formData.email: ${formData.email}`);
       setMessages(prev => ({
         ...prev,
-         
-        otp: { error: '', success: '인증번호가 발송되었습니다.' }
-      })
-    );
-    } catch (error: any) {
-      setMessages(prev => ({
-        ...prev,
-        otp: { error: '인증번호 발송에 실패했습니다.', success: '' }
+        otp: { error: '', success: res.data || '인증번호가 발송되었습니다.' }
       }));
+      console.log('=== OTP 발송 성공 완료 ===');
+    } catch (error: any) {
+      console.log('=== OTP 발송 실패 ===');
+      console.error('OTP 발송 에러 전체 정보:', error);
+      console.error('OTP 발송 에러 타입:', error.name);
+      console.error('OTP 발송 에러 메시지:', error.message);
+      console.error('OTP 발송 HTTP 상태:', error.response?.status);
+      console.error('OTP 발송 응답 데이터:', error.response?.data);
+      console.error('OTP 발송 요청 URL:', error.config?.url);
+      console.error('OTP 발송 요청 헤더:', error.config?.headers);
+      
+      let errorMessage = '인증번호 발송에 실패했습니다.';
+      
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        } else if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+      }
+      
+      setMessages(prev => ({
+        ...prev,
+        otp: { error: errorMessage, success: '' }
+      }));
+      console.log('=== OTP 발송 실패 완료 ===');
     }
   };
   
   const handleCodeVerification = async () => {
+    console.log('=== OTP 인증 시작 ===');
     if (!formData.verificationCode) {
+      console.log('인증번호 입력 안됨');
       setMessages(prev => ({
         ...prev,
         otp: { error: '인증번호를 입력해주세요.', success: '' }
       }));
       return;
     }
-
+    
+    console.log('OTP 인증 데이터:', {
+      email: formData.email,
+      type: 'SIGNUP',
+      otp: formData.verificationCode
+    });
+    console.log('현재 토큰:', localStorage.getItem('auth-storage'));
+    
     try {
-      await AuthApi.verifyOtp({
+      console.log('AuthApi.verifyOtp 호출 시작');
+      const response = await AuthApi.verifyOtp({
         email: formData.email,
         type: 'SIGNUP',
         otp: formData.verificationCode
       });
+      console.log('OTP 인증 성공 - 전체 응답:', response);
+      console.log('OTP 인증 성공 - 상태코드:', response.status);
+      console.log('OTP 인증 성공 - 데이터:', response.data);
+      
       setIsEmailVerified(true);
       setMessages(prev => ({
         ...prev,
         otp: { error: '', success: '이메일 인증이 완료되었습니다.' }
       }));
+      console.log('=== OTP 인증 성공 완료 ===');
     } catch (error: any) {
+      console.log('=== OTP 인증 실패 ===');
+      console.error('OTP 인증 에러 전체 정보:', error);
+      console.error('OTP 인증 에러 타입:', error.name);
+      console.error('OTP 인증 에러 메시지:', error.message);
+      console.error('OTP 인증 HTTP 상태:', error.response?.status);
+      console.error('OTP 인증 응답 데이터:', error.response?.data);
+      console.error('OTP 인증 요청 URL:', error.config?.url);
+      console.error('OTP 인증 요청 헤더:', error.config?.headers);
+      
       const errorMessage = error.response?.data?.message || '인증번호가 올바르지 않습니다.';
       setMessages(prev => ({
         ...prev,
         otp: { error: errorMessage, success: '' }
       }));
+      console.log('=== OTP 인증 실패 완료 ===');
     }
   };
 
@@ -174,39 +242,70 @@ const SignupDetail: React.FC = () => {
       console.log('닉네임 중복 확인 응답:', res);
       console.log('닉네임 중복 확인 데이터:', res.data);
       
-      if (res.data.isAvailable) {
+      // 서버에서 직접 메시지 문자열로 응답
+      if (res.status === 200) {
         setIsNicknameChecked(true);
         setMessages(prev => ({
           ...prev,
-          nickname: { error: '', success: '사용 가능한 닉네임입니다.' }
+          nickname: { error: '', success: res.data || '사용 가능한 닉네임입니다.' }
         }));
-      } else {
-        setMessages(prev => ({
-          ...prev,
-          nickname: { error: '이미 사용 중인 닉네임입니다.', success: '' }
-        }));
-        setIsNicknameChecked(false);
       }
     } catch (error: any) {
       console.error('닉네임 중복 확인 에러:', error);
       console.error('에러 응답:', error.response);
+      
+      let errorMessage = '닉네임 중복 확인에 실패했습니다.';
+      
+      if (error.response?.status === 409) {
+        errorMessage = error.response?.data?.message || '이미 사용 중인 닉네임입니다.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
       setMessages(prev => ({
         ...prev,
-        nickname: { error: '닉네임 중복 확인에 실패했습니다.', success: '' }
+        nickname: { error: errorMessage, success: '' }
       }));
+      setIsNicknameChecked(false);
     }
   };
 
   const handleRandomNickname = async () => {
     try {
       const res = await UserApi.getRandomNickname();
-      setFormData(prev => ({ ...prev, nickname: res.data.nickname }));
-      setIsNicknameChecked(false); // 랜덤 닉네임 생성 후 중복 확인 필요
-      setMessages(prev => ({
-        ...prev,
-        nickname: { error: '', success: '랜덤 닉네임이 생성되었습니다. 중복 확인을 해주세요.' }
-      }));
+      console.log('랜덤 닉네임 생성 응답:', res);
+      console.log('응답 데이터:', res.data);
+      console.log('닉네임 값:', res.data.nickname);
+      
+      // 서버 응답 구조 확인 - res.data가 직접 닉네임 문자열일 수 있음
+      let nickname = '';
+      
+      if (typeof res.data === 'string') {
+        nickname = res.data;
+      } else if (res.data.random_nickname) {
+        nickname = res.data.random_nickname;
+      } else if (res.data.nickname) {
+        nickname = res.data.nickname;
+      }
+      
+      console.log('설정할 닉네임:', nickname);
+      
+      if (nickname) {
+        setFormData(prev => ({ ...prev, nickname: nickname }));
+        setIsNicknameChecked(false); // 랜덤 닉네임 생성 후 중복 확인 필요
+        setMessages(prev => ({
+          ...prev,
+          nickname: { error: '', success: '랜덤 닉네임이 생성되었습니다. 중복 확인을 해주세요.' }
+        }));
+      } else {
+        console.error('닉네임을 찾을 수 없습니다:', res);
+        setMessages(prev => ({
+          ...prev,
+          nickname: { error: '닉네임 데이터를 찾을 수 없습니다.', success: '' }
+        }));
+      }
     } catch (error: any) {
+      console.error('랜덤 닉네임 생성 에러:', error);
       setMessages(prev => ({
         ...prev,
         nickname: { error: '랜덤 닉네임 생성에 실패했습니다.', success: '' }
@@ -227,7 +326,7 @@ const SignupDetail: React.FC = () => {
       const signupData = {
         email: formData.email,
         password: formData.password,
-        password_confirm: formData.confirmPassword,
+        confirmPassword: formData.confirmPassword,
         nickname: formData.nickname,
         otp: formData.verificationCode
       };
@@ -239,9 +338,9 @@ const SignupDetail: React.FC = () => {
       }));
       console.log('회원가입 성공:', res.data);
       
-      // 3초 후 로그인 페이지로 이동
+      // 3초 후 성공 페이지로 이동
       setTimeout(() => {
-        navigate('/login');
+        navigate('/succeeded', { state: { nickname: formData.nickname } });
       }, 3000);
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || '회원가입에 실패했습니다.';
@@ -428,9 +527,7 @@ const SignupDetail: React.FC = () => {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  8자 이상, 영문/숫자/특수문자 조합
-                </p>
+
 
                 
                 {/* Confirm password */}
@@ -487,7 +584,7 @@ const SignupDetail: React.FC = () => {
               <div className="flex items-center justify-center gap-2 text-sm">
                 <span className="text-gray-600">이미 회원이신가요?</span>
                 <button className="text-blue-500 font-semibold hover:text-blue-600 transition-colors">
-                  로그인
+                  <Link to="/login">로그인</Link>
                 </button>
               </div>
             </div>
