@@ -4,7 +4,7 @@ import StudyBackToList from "@/components/study/StudyBackToList";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { formatDateTime } from "@/util/date";
-import { getRoomDetail } from "@/api/studyApi";
+import { deleteRoom, getRoomDetail } from "@/api/studyApi";
 import type { StudyRoomDetail } from "@/types/study";
 
 export default function StudyDetailPage() {
@@ -34,6 +34,28 @@ export default function StudyDetailPage() {
     requestRoomDetail(id);
   }, [id]);
 
+  // 방 삭제하는 함수
+  const handleDeleteRoom = async () => {
+    if (!id) {
+      return;
+    }
+
+    // 삭제하기 전의 확인 대화창
+    const confirmed = window.confirm("정말 이 방을 삭제하시겠습니까?");
+
+    if (!confirmed) return;
+
+    try {
+      const data = await deleteRoom(id);
+
+      console.log("방 삭제 완료!", data);
+      // 방 목록 페이지로 이동
+      navigate(`/study`);
+    } catch (err) {
+      console.error("방 삭제 에러 발생", err);
+      alert("방 삭제에 실패하였습니다.");
+    }
+  };
   return (
     <div className="min-h-screen bg-[#ffffff] text-[17px] leading-relaxed">
       {/* 헤더 */}
@@ -154,6 +176,14 @@ export default function StudyDetailPage() {
               참여하기
             </Button>
             <StudyBackToList />
+            <div className="flex justify-end">
+              <Button
+                onClick={handleDeleteRoom}
+                className="w-30 bg-red-500 hover:bg-red-700 text-white py-7 text-lg rounded-lg mt-5"
+              >
+                방 삭제하기
+              </Button>
+            </div>
           </div>
         </div>
       </main>
