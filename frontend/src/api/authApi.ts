@@ -14,9 +14,6 @@ const AuthApi = {
   }) {
     return api.post(`${BASE_URL}/signup`, userData);
   },
-
-
-
   // 이메일 OTP 발송
   sendOtp(otpData: { email: string; type: "SIGNUP" }) {
     return api.post(`/v1/otp`, otpData);
