@@ -41,6 +41,9 @@ public class RoomService {
     // 면접 스터디 방 삭제
     @Transactional
     public void deleteRoom(UUID room_id) {
+        Room room = roomRepository.findById(room_id).orElseThrow(() -> new RuntimeException("존재하지 않는 방입니다."));
+        // 면접 스터디 멤버 삭제
+        roomMemberRepository.deleteRoomMember(room_id);
         roomRepository.deleteById(room_id);
     }
     // 면접 스터디 방 상세 조회
@@ -62,6 +65,7 @@ public class RoomService {
                 .nickname(masterUser.getNickname())
                 .makeRoomCnt(makeRoomCnt)
                 .createdAt(masterUser.getCreatedAt())
+                .masterId(masterUser.getId())
                 .build();
 
         return RoomDetailCommand.builder()
