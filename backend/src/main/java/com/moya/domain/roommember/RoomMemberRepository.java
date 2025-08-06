@@ -1,6 +1,7 @@
 package com.moya.domain.roommember;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -15,4 +16,8 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember, UUID> {
 
     @Query("SELECT COUNT(rm) FROM RoomMember rm where rm.room_id.id = :room_id")
     int countByRoom(UUID room_id);
+
+    @Modifying
+    @Query("DELETE FROM RoomMember rm where rm.room_id.id = :room_id")
+    void deleteRoomMember(UUID room_id);
 }
