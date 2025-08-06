@@ -87,7 +87,7 @@ public class RoomService {
                 .maxUser(createRoomRequest.getMax_user())
                 .title(createRoomRequest.getTitle())
                 .body(createRoomRequest.getBody())
-                .expiredAt(createRoomRequest.getExpire_at())
+                .expiredAt(createRoomRequest.getExpired_at())
                 .openAt(createRoomRequest.getOpen_at())
                 .build();
         Room makedRoom = roomRepository.save(room);
