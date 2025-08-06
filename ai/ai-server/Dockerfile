@@ -13,8 +13,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-RUN cat requirements.txt && pip install --upgrade pip && pip install -r requirements.txt
-# RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
@@ -25,6 +24,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
+COPY --from=builder /usr/local /usr/local
 COPY --from=builder /app /app
 
 EXPOSE 8000
