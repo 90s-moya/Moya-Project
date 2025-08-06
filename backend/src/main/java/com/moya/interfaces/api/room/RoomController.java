@@ -46,6 +46,7 @@ public class RoomController {
     // 면접 스터디 방 생성
     @PostMapping()
     public UUID createRoom(@RequestBody CreateRoomRequest createRoomRequest, @AuthenticationPrincipal CustomUserDetails user) {
+        System.out.println("================================="+createRoomRequest.getOpen_at());
         // 방 만들고
         UUID roomId = roomService.createRoom(createRoomRequest, user.getUserId());
         return roomId;
