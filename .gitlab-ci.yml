@@ -29,7 +29,7 @@ deploy-be-dev:
     - docker stop be-dev || true
     - docker rm be-dev || true
     - >
-      docker run -d --name be-dev -p 8081:8080
+      docker run -d --name be-dev --network monitoring -p 8081:8080
       -v /srv/moya/files-dev:/files-dev
       -e FILE_PATH=/files-dev
       -e DB_URL="$DB_URL_DEV"
@@ -52,7 +52,7 @@ deploy-be-prod:
     - docker stop be-main || true
     - docker rm be-main || true
     - >
-      docker run -d --name be-main -p 8080:8080
+      docker run -d --name be-main --network monitoring -p 8080:8080
       -v /srv/moya/files:/files
       -e FILE_PATH=/files
       -e DB_URL="$DB_URL_PROD"
