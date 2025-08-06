@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Menu } from "lucide-react";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface HeaderProps {
   scrollBg?: boolean;
@@ -11,6 +12,9 @@ interface HeaderProps {
 export default function Header({ scrollBg = false }: HeaderProps) {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { isLogin, logout } = useAuthStore();
+
+  console.log("Header - isLogin:", isLogin);
 
   useEffect(() => {
     if (!scrollBg) return;
@@ -68,15 +72,26 @@ export default function Header({ scrollBg = false }: HeaderProps) {
 
         {/* 데스크탑 로그인/회원가입 */}
         <div className="hidden md:flex items-center space-x-4">
-          <Link
-            to="/login"
-            className="text-gray-700 hover:text-[#2b7fff] text-lg font-medium"
-          >
-            로그인
-          </Link>
-          <Button className="bg-[#2b7fff] hover:bg-blue-600 text-white text-lg px-6 py-2 rounded-lg">
-            <Link to="/signup/detail">회원가입</Link>
-          </Button>
+          {isLogin ? (
+            <button
+              onClick={logout}
+              className="text-gray-700 hover:text-[#2b7fff] text-lg font-medium"
+            >
+              로그아웃
+            </button>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="text-gray-700 hover:text-[#2b7fff] text-lg font-medium"
+              >
+                로그인
+              </Link>
+              <Button className="bg-[#2b7fff] hover:bg-blue-600 text-white text-lg px-6 py-2 rounded-lg">
+                <Link to="/signup/detail">회원가입</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -98,12 +113,23 @@ export default function Header({ scrollBg = false }: HeaderProps) {
             </Link>
           </nav>
           <div className="pt-4 flex flex-col gap-2">
-            <Link to="/login" className="text-gray-700 text-lg font-medium">
-              로그인
-            </Link>
-            <Button className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white text-lg py-2">
-              <Link to="">회원가입</Link>
-            </Button>
+            {isLogin ? (
+              <button
+                onClick={logout}
+                className="text-gray-700 text-lg font-medium text-left"
+              >
+                로그아웃
+              </button>
+            ) : (
+              <>
+                <Link to="/login" className="text-gray-700 text-lg font-medium">
+                  로그인
+                </Link>
+                <Button className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white text-lg py-2">
+                  <Link to="/signup/detail">회원가입</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}

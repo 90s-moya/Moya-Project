@@ -1,5 +1,7 @@
 import React from 'react';
 import { Mail } from 'lucide-react';
+import { Link } from "react-router-dom";
+
 
 const Signup: React.FC = () => {
   return (
@@ -16,14 +18,9 @@ const Signup: React.FC = () => {
         
         {/* Character Illustration - 하단 중앙 */}
         <div className="absolute bottom-1/4 left-1/2 transform -translate-x-1/2 translate-y-1/2">
-          <div className="w-80 h-80 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20">
-            <div className="text-center text-white">
-              <div className="text-6xl mb-4">🤖</div>
-              <p className="text-lg font-medium opacity-90">MOYA 캐릭터</p>
-              <p className="text-sm opacity-70">이미지를 여기에 넣으세요</p>
-            </div>
-          </div>
+          <img src="/src/assets/images/cloud-friends.png" alt="로고" />
         </div>
+       
       </div>
 
       {/* Right Side - Signup Form (폼 영역) */}
@@ -43,29 +40,15 @@ const Signup: React.FC = () => {
             {/* Email Signup Button */}
             <button className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-colors duration-200 shadow-lg hover:shadow-xl text-lg">
               <Mail className="w-6 h-6" />
-              <span>이메일로 가입하기</span>
+              <Link to='/signup/detail' > 이메일로 가입하기 </Link>
             </button>
 
-            {/* 이미 회원인 경우
-            <div className=" space-y-2">
-              <p className="text-gray-600 text-sm">이미 회원이신가요?
-              <div className="flex items-center space-x-4 text-sm">
-                <button className="text-blue-500 font-semibold hover:text-blue-600 transition-colors">
-                  로그인
-                </button>
-                <div className="w-px h-4 bg-gray-300"></div>
-                <button className="text-blue-500 font-semibold hover:text-blue-600 transition-colors">
-                  회원정보 찾기
-                </button>
-              </div>
-              </p>
-            </div>   */}
-            {/* 이미 회원인 경우 */}
+     
             <div className="flex items-center justify-between text-sm text-gray-600">
               <span>이미 회원이신가요?</span>
               <div className="flex items-center space-x-4">
                 <button className="text-blue-500 font-semibold hover:text-blue-600 transition-colors">
-                  로그인
+                  <Link to = '/login'>로그인</Link>
                 </button>
                 <div className="w-px h-4 bg-gray-300"></div>
                 <button className="text-blue-500 font-semibold hover:text-blue-600 transition-colors">
