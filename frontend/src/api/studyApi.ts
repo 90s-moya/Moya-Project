@@ -53,6 +53,7 @@ export const enterRoom = async ({
     resume_id,
     portfolio_id,
     coverletter_id,
+    room_id,
   });
 
   return res.data;
