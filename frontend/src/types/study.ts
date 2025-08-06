@@ -50,3 +50,10 @@ export type MyDoc = {
   fileUrl: string;
   userId: string;
 };
+
+export type EnterRoomParams = {
+  room_id: string;
+  resume_id: string;
+  portfolio_id: string;
+  coverletter_id: string;
+};
