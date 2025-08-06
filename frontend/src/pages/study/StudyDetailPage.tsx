@@ -6,10 +6,12 @@ import { useEffect, useState } from "react";
 import { formatDateTime } from "@/util/date";
 import { deleteRoom, getRoomDetail } from "@/api/studyApi";
 import type { StudyRoomDetail } from "@/types/study";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function StudyDetailPage() {
   const { id } = useParams();
   const [roomDetail, setRoomDetail] = useState<StudyRoomDetail>();
+  const [isMine, setIsMine] = useState(true); // 추후 false로 변경해야함
 
   const navigate = useNavigate();
 
@@ -56,6 +58,12 @@ export default function StudyDetailPage() {
       alert("방 삭제에 실패하였습니다.");
     }
   };
+
+  // 추후에 방 상세 조회 결과로 user_id가 넘어오면아래 주석 취소해야함.
+  // if (roomDetail?.masterInfo.user_id === useAuthStore((state) => state.UUID)){
+  // setIsMine(true);
+  // }
+
   return (
     <div className="min-h-screen bg-[#ffffff] text-[17px] leading-relaxed">
       {/* 헤더 */}
@@ -178,6 +186,7 @@ export default function StudyDetailPage() {
             <StudyBackToList />
             <div className="flex justify-end">
               <Button
+                disabled={!isMine}
                 onClick={handleDeleteRoom}
                 className="w-30 bg-red-500 hover:bg-red-700 text-white py-7 text-lg rounded-lg mt-5"
               >
