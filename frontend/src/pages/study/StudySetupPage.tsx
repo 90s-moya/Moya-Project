@@ -29,6 +29,13 @@ export default function StudySetupPage() {
     (doc) => doc.docsStatus === "COVER_LETTER"
   );
 
+  // Select 태그로 선택된 문서들
+  const [selectedDocs, setSelectedDocs] = useState({
+    resume_Id: "",
+    portfolio_id: "",
+    coverletter_id: "",
+  });
+
   // 카메라 및 오디오 시작 함수
   const startStream = async () => {
     try {
@@ -82,7 +89,11 @@ export default function StudySetupPage() {
     requestMyDocs();
   }, []);
 
-  // 환경 설정 완료 후 방 입장 시 실행되는 함수
+  const handleChangeDocs = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+  };
+
+  // 환경 설정 완료 후 방 입장 시 실행되는g 함수
   const handleEnterRoom = async () => {
     // 로컬 스토리지로부터 토큰 받아오기
     const token = getTokenFromLocalStorage();
@@ -142,23 +153,32 @@ export default function StudySetupPage() {
             )}
           </div>
 
-          {/* 우측: 파일 업로드 */}
+          {/* 문서 파일 선택 */}
           <div className="space-y-6">
-            <FileUploadSection
-              label="이력서"
-              type="resume"
-              defaultFiles={resumeDocs}
-            />
-            <FileUploadSection
-              label="포트폴리오"
-              type="portfolio"
-              defaultFiles={portfolioDocs}
-            />
-            <FileUploadSection
-              label="자기소개서"
-              type="introduction"
-              defaultFiles={coverLetterDocs}
-            />
+            <div>
+              <label htmlFor="doc-type">이력서</label>
+              <select name="" id="doc-type">
+                {resumeDocs?.map((file) => (
+                  <option value={file.docsId}>{file.fileUrl}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="doc-type">자기소개서</label>
+              <select name="" id="doc-type">
+                {coverLetterDocs?.map((file) => (
+                  <option value={file.docsId}>{file.fileUrl}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="doc-type">포트폴리오</label>
+              <select name="" id="doc-type">
+                {portfolioDocs?.map((file) => (
+                  <option value={file.docsId}>{file.fileUrl}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
