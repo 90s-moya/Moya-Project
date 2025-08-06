@@ -85,7 +85,9 @@ export default function StudyCreatePage() {
 
       <main className="max-w-[720px] mx-auto px-4 pt-[120px] pb-20 text-[17px] leading-relaxed">
         {/* Title */}
-        <h1 className="text-4xl font-bold text-blue-500 mb-10">스터디 방 생성하기</h1>
+        <h1 className="text-4xl font-bold text-blue-500 mb-10">
+          스터디 방 생성하기
+        </h1>
 
         {/* form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
@@ -105,15 +107,24 @@ export default function StudyCreatePage() {
                 </option>
               ))}
             </select>
-            {errors.category_id && <p className="text-red-500">{errors.category_id.message}</p>}
+            {errors.category_id && (
+              <p className="text-red-500">{errors.category_id.message}</p>
+            )}
           </div>
           {/* title */}
           <div className="space-y-2">
             <Label htmlFor="title" className="text-3xl font-semibold">
               스터디 제목
             </Label>
-            <Input id="title" {...register("title", { required: "제목은 필수입니다" })} placeholder="스터디방의 제목을 입력해주세요" className="text-xl px-7 py-7 placeholder:text-lg" />
-            {errors.title && <p className="text-red-500">{errors.title.message}</p>}
+            <Input
+              id="title"
+              {...register("title", { required: "제목은 필수입니다" })}
+              placeholder="스터디방의 제목을 입력해주세요"
+              className="text-xl px-7 py-7 placeholder:text-lg"
+            />
+            {errors.title && (
+              <p className="text-red-500">{errors.title.message}</p>
+            )}
           </div>
 
           {/* 설명 */}
@@ -121,8 +132,15 @@ export default function StudyCreatePage() {
             <Label htmlFor="body" className="text-3xl font-semibold">
               설명
             </Label>
-            <Textarea id="body" {...register("body")} placeholder="스터디방에 대한 설명을 입력해주세요" className="text-xl px-7 py-7 placeholder:text-lg" />
-            {errors.body && <p className="text-red-500">{errors.body.message}</p>}
+            <Textarea
+              id="body"
+              {...register("body")}
+              placeholder="스터디방에 대한 설명을 입력해주세요"
+              className="text-xl px-7 py-7 placeholder:text-lg"
+            />
+            {errors.body && (
+              <p className="text-red-500">{errors.body.message}</p>
+            )}
           </div>
 
           {/* 스터디 마감 일시 */}
@@ -135,11 +153,16 @@ export default function StudyCreatePage() {
               type="datetime-local"
               {...register("expired_at", {
                 required: true,
-                setValueAs: (v) => (dayjs(v).isValid() ? dayjs(v).add(9, "hour").toISOString() : ""),
+                setValueAs: (v) =>
+                  dayjs(v).isValid()
+                    ? dayjs(v).add(9, "hour").toISOString()
+                    : "",
               })}
               className="text-xl px-7 py-7 placeholder:text-lg"
             />
-            {errors.expired_at && <p className="text-red-500">{errors.expired_at.message}</p>}
+            {errors.expired_at && (
+              <p className="text-red-500">{errors.expired_at.message}</p>
+            )}
           </div>
 
           {/* 최대 참여 인원 수 */}
@@ -159,13 +182,19 @@ export default function StudyCreatePage() {
               placeholder="숫자만 입력해주세요"
               className="text-xl px-7 py-7 placeholder:text-lg"
             />
-            {errors.max_user && <p className="text-red-500">{errors.max_user.message}</p>}
+            {errors.max_user && (
+              <p className="text-red-500">{errors.max_user.message}</p>
+            )}
           </div>
 
           {/* 제출 버튼 */}
           <div className="flex justify-between items-center pt-4">
             <StudyBackToList />
-            <Button type="submit" className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-7 rounded-lg text-lg" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-7 rounded-lg text-lg"
+              disabled={isSubmitting}
+            >
               스터디 생성하기
             </Button>
           </div>

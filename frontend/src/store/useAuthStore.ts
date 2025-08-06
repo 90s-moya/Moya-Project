@@ -39,7 +39,7 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (loginInfo) => {
         try {
-          // 👉 응답 타입을 정확히 맞추기 위해 명시적으로 타입 지정
+          // 👉 실제 API 응답 구조에 맞춰 타입 수정
           type RawLoginResponse = {
             tutorialStatus: string;
             message: string;
@@ -49,22 +49,41 @@ export const useAuthStore = create<AuthState>()(
 
           const res = await axios.post<RawLoginResponse>(
             `${import.meta.env.VITE_API_URL}/v1/auth/login`,
-            loginInfo // 오타 user → loginInfo
+            loginInfo
           );
-          console.log(res.data);
-          console.log("check===============================");
+          console.log("로그인 응답:", res.data);
+          
           const { token, UUID, tutorialStatus } = res.data;
 
           if (!token || typeof token !== "string") {
             throw new Error("유효한 토큰이 아닙니다.");
           }
 
-          // 👉 user 객체는 API 응답을 기반으로 직접 구성
-          const user: UserInfo = { UUID, tutorialStatus, token };
+          // JWT 토큰 디코딩해서 실제 페이로드 확인
+          let decodedUUID = UUID;
+          try {
+            const decoded: any = jwtDecode(token);
+            console.log("JWT 디코딩된 페이로드:", decoded);
+            
+            // JWT에서 userId를 UUID로 사용
+            if (decoded.userId) {
+              decodedUUID = decoded.userId;
+              console.log("JWT에서 추출한 UUID:", decodedUUID);
+            }
+          } catch (decodeError) {
+            console.error("JWT 디코딩 실패:", decodeError);
+          }
+
+          // 👉 JWT에서 추출한 UUID 사용
+          const user: UserInfo = { 
+            UUID: decodedUUID, 
+            tutorialStatus, 
+            token 
+          };
 
           set({
             token,
-            UUID,
+            UUID: decodedUUID,
             tutorialStatus,
             user,
             isLogin: true,
@@ -119,6 +138,12 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "auth-storage",
+      partialize: (state) => ({
+        token: state.token,
+        UUID: state.UUID,
+        tutorialStatus: state.tutorialStatus,
+        isLogin: state.isLogin,
+      }),
     }
   )
 );

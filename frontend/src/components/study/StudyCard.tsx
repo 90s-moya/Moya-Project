@@ -3,7 +3,15 @@ import { useNavigate } from "react-router-dom";
 import type { StudyRoom } from "@/types/study";
 import { formatDateTime } from "@/util/date";
 
-export default function StudyCard({ categoryName, expiredAt, id, maxUser, openAt, title, joinUser }: StudyRoom) {
+export default function StudyCard({
+  categoryName,
+  expiredAt,
+  id,
+  maxUser,
+  openAt,
+  title,
+  joinUser,
+}: StudyRoom) {
   const navigate = useNavigate();
 
   return (
@@ -13,7 +21,9 @@ export default function StudyCard({ categoryName, expiredAt, id, maxUser, openAt
     >
       <div>
         <div className="min-h-[5.5rem] mb-4">
-          <h3 className="font-semibold text-2xl leading-snug text-[#1b1c1f] group-hover:text-[#2b7fff] transition-colors duration-200">{title}</h3>
+          <h3 className="font-semibold text-2xl leading-snug text-[#1b1c1f] group-hover:text-[#2b7fff] transition-colors duration-200">
+            {title}
+          </h3>
         </div>
 
         <div className="space-y-2 min-h-[4.5rem]">
@@ -29,11 +39,15 @@ export default function StudyCard({ categoryName, expiredAt, id, maxUser, openAt
           </div>
           <div className="flex justify-between text-base">
             <span className="text-[#6f727c]">생성일</span>
-            <span className="text-[#1b1c1f] font-medium">{formatDateTime(openAt)}</span>
+            <span className="text-[#1b1c1f] font-medium">
+              {formatDateTime(openAt)}
+            </span>
           </div>
           <div className="flex justify-between text-base">
             <span className="text-[#6f727c]">만료일</span>
-            <span className="text-[#1b1c1f] font-medium">{formatDateTime(expiredAt)}</span>
+            <span className="text-[#1b1c1f] font-medium">
+              {formatDateTime(expiredAt)}
+            </span>
           </div>
         </div>
       </div>
