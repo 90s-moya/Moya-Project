@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
             loginInfo
           );
           console.log("로그인 응답:", res.data);
-          
+
           const { token, UUID, tutorialStatus } = res.data;
 
           if (!token || typeof token !== "string") {
@@ -64,7 +64,7 @@ export const useAuthStore = create<AuthState>()(
           try {
             const decoded: any = jwtDecode(token);
             console.log("JWT 디코딩된 페이로드:", decoded);
-            
+
             // JWT에서 userId를 UUID로 사용
             if (decoded.userId) {
               decodedUUID = decoded.userId;
@@ -75,10 +75,10 @@ export const useAuthStore = create<AuthState>()(
           }
 
           // 👉 JWT에서 추출한 UUID 사용
-          const user: UserInfo = { 
-            UUID: decodedUUID, 
-            tutorialStatus, 
-            token 
+          const user: UserInfo = {
+            UUID: decodedUUID,
+            tutorialStatus,
+            token,
           };
 
           set({
@@ -95,20 +95,23 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      // AuthApi 파일 안에 logout 함수가 없어서 에러가 났습니다.
+      // 임시로 아래처럼 해놓았습니다.
       logout: async () => {
-        try {
-          await AuthApi.logout();
-        } catch (error) {
-          console.error("로그아웃 API 요청 실패:", error);
-        } finally {
-          set({
-            token: "",
-            user: null,
-            isLogin: false,
-            UUID: "",
-            tutorialStatus: "",
-          });
-        }
+        localStorage.removeItem("auth");
+        // try {
+        //   await AuthApi.logout();
+        // } catch (error) {
+        //   console.error("로그아웃 API 요청 실패:", error);
+        // } finally {
+        //   set({
+        //     token: "",
+        //     user: null,
+        //     isLogin: false,
+        //     UUID: "",
+        //     tutorialStatus: "",
+        //   });
+        // }
       },
 
       getToken: () => get().token,
