@@ -3,17 +3,21 @@ import whisper
 import tempfile
 import os
 
-# whisper 모델 초기화 (최초 1회 로딩)
+# Whisper 모델 초기화 (서버 시작 시 1회 로드)
 model = whisper.load_model("medium")
 
-def transcribe_audio(file_obj) -> str:
+def save_uploadfile_to_temp(upload_file) -> str:
+    """
+    FastAPI UploadFile을 임시 wav 파일로 저장 후 경로 반환
+    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-        contents = file_obj.file.read()  # 한 번에 전체 읽기
-        tmp_file.write(contents)         # 전체 쓰기
-        tmp_file_path = tmp_file.name
+        contents = upload_file.file.read()
+        tmp_file.write(contents)
+        return tmp_file.name
 
-    try:
-        result = model.transcribe(tmp_file_path)
-        return result["text"]
-    finally:
-        os.remove(tmp_file_path)
+def transcribe_audio_from_path(file_path: str) -> str:
+    """
+    Whisper STT: 파일 경로 기반 추론
+    """
+    result = model.transcribe(file_path)
+    return result["text"]
