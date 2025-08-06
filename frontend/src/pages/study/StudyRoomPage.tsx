@@ -2,9 +2,9 @@ import CameraControlPanel from "@/components/study/CameraControlPanel";
 import MicControlPanel from "@/components/study/MicControlPanel";
 import VideoTile from "@/components/study/VideoTile";
 import { useNavigate } from "react-router-dom";
-import {useEffect, useState, useRef} from "react";
-import {SignalingClient} from "@/lib/webrtc/SignallingClient";
-import {PeerConnectionManager} from "@/lib/webrtc/PeerConnectionManager";
+import { useEffect, useState, useRef } from "react";
+import { SignalingClient } from "@/lib/webrtc/SignallingClient";
+import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
 
 type Participant = {
   id: string;
@@ -18,47 +18,54 @@ export default function StudyRoomPage() {
 
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
- 
+
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
 
   const handleLeaveRoom = () => {
-    console.log(localStream)
+    console.log(localStream);
     localStream?.getTracks().forEach((track) => track.stop());
     navigate("/study");
   };
 
-  useEffect(()=>{
+  useEffect(() => {
     // TODO: 로그인 한 유저 ID 정보로 변경해야함 ㅎ
     const myId = crypto.randomUUID();
-    
+
     // 배포용
-    const signaling = new SignalingClient(`wss://${import.meta.env.VITE_RTC_API_URL}/ws`, myId, async (data) => {
-    // 테스트 용
-    //const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
-      const peerManager = peerManagerRef.current;
-      if(!peerManager) return;
+    const signaling = new SignalingClient(
+      `wss://${import.meta.env.VITE_RTC_API_URL}/ws`,
+      myId,
+      async (data) => {
+        // 테스트 용
+        //const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
+        const peerManager = peerManagerRef.current;
+        if (!peerManager) return;
 
-      console.log("받은 메세지", data);
+        console.log("받은 메세지", data);
 
-      if(data.type === "join"){
-        await peerManager.createConnectionWith(data.senderId);
-        console.log("새 참여자 연결!");
-        return;
+        if (data.type === "join") {
+          await peerManager.createConnectionWith(data.senderId);
+          console.log("새 참여자 연결!");
+          return;
+        }
+        await peerManager.handleSignal(data);
       }
-      await peerManager.handleSignal(data);
-    });
+    );
     const peerManager = new PeerConnectionManager(myId, signaling);
     peerManagerRef.current = peerManager;
 
     peerManager.onRemoteStream = (peerId, stream) => {
-        setParticipants((prev) => [
-          ...prev.filter((p) => p.id !== peerId),
-          { id: peerId, name: `참여자-${peerId.slice(0, 4)}`, stream },
-        ]);
-      };
+      setParticipants((prev) => [
+        ...prev.filter((p) => p.id !== peerId),
+        { id: peerId, name: `참여자-${peerId.slice(0, 4)}`, stream },
+      ]);
+    };
 
-    (async ()=>{
-      const local = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    (async () => {
+      const local = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
       setLocalStream(local);
       // TODO : 사용자 정보에 맞게 변경 필요함
       setParticipants((prev) => [
@@ -66,7 +73,7 @@ export default function StudyRoomPage() {
         { id: myId, name: "나", stream: local, isLocal: true },
       ]);
       peerManager.setLocalStream(local);
-      signaling.send({type:"join", senderId:myId});
+      signaling.send({ type: "join", senderId: myId });
     })();
   }, []);
 
@@ -84,11 +91,7 @@ export default function StudyRoomPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {participants.map((p) => (
             <div key={p.id} className="w-full aspect-video">
-              <VideoTile
-                stream={p.stream}
-                name={p.name}
-                isLocal={p.isLocal}
-              />
+              <VideoTile stream={p.stream} name={p.name} isLocal={p.isLocal} />
             </div>
           ))}
         </div>
