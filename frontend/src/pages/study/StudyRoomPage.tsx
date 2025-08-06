@@ -18,24 +18,51 @@ export default function StudyRoomPage() {
 
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
- 
+  const myIdRef = useRef<string>("");
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
-
+  const signalingRef = useRef<SignalingClient | null>(null);
   const handleLeaveRoom = () => {
-    console.log(localStream)
-    localStream?.getTracks().forEach((track) => track.stop());
-    navigate("/study");
+    console.log("disconnection video",localStream)
+    
+    // peer제거
+    peerManagerRef.current?.removeLocalTracks();
+    // stream 중지
+    if(localStream){
+      localStream.getTracks().forEach((track)=>{
+        track.stop();
+      });
+    }
+    // srcObject 해제
+    document.querySelectorAll("video").forEach((video)=>{
+      (video as HTMLVideoElement).srcObject = null;
+    });
+
+    setLocalStream(null);
+      setParticipants((prev) => prev.filter((p) => p.id !== myIdRef.current));
+    // webrtc 연결 종료
+    peerManagerRef.current?.closeAllConnections?.();
+    // websocket 메시지 전송
+    signalingRef.current?.send({
+      type:"leave",
+      senderId:myIdRef.current
+    });
+
+    //websocket 종료
+    signalingRef.current?.close();
+    navigate("/study"); 
   };
 
   useEffect(()=>{
-    // TODO: 로그인 한 유저 ID 정보로 변경해야함 ㅎ
-    const myId = crypto.randomUUID();
-    
+    if(signalingRef.current) return;
+    const userInfo = localStorage.getItem('auth-storage');
+    const parsed = JSON.parse(userInfo!);
+    const myId = parsed.state.UUID;
+    myIdRef.current = myId;
+
     // 배포용
     //const signaling = new SignalingClient(`wss://${import.meta.env.VITE_RTC_API_URL}/ws`, myId, async (data) => {
     // 테스트 용
     const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
-      console.log("배포 서버 확인 ", `wss://${import.meta.env.VITE_RTC_API_URL}/ws`);
       const peerManager = peerManagerRef.current;
       if(!peerManager) return;
 
@@ -46,11 +73,27 @@ export default function StudyRoomPage() {
         console.log("새 참여자 연결!");
         return;
       }
+      if(data.type === "leave"){
+        setParticipants((prev)=> prev.filter((p) => {
+            if (p.id === data.senderId && p.stream) {
+              p.stream.getTracks().forEach((track) => track.stop());
+            }
+            return p.id !== data.senderId;
+        }));
+
+        peerManager.removeConnection(data.senderId);
+        console.log("퇴장함~", data.senderId);
+        return;
+      }
       await peerManager.handleSignal(data);
     });
+
+    signalingRef.current = signaling;
     const peerManager = new PeerConnectionManager(myId, signaling);
     peerManagerRef.current = peerManager;
 
+
+    // TODO : 참여자 이름도 닉네임으로 변경해주세염
     peerManager.onRemoteStream = (peerId, stream) => {
         setParticipants((prev) => [
           ...prev.filter((p) => p.id !== peerId),
@@ -61,7 +104,7 @@ export default function StudyRoomPage() {
     (async ()=>{
       const local = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
       setLocalStream(local);
-      // TODO : 사용자 정보에 맞게 변경 필요함
+      // TODO : 사용자 정보에 맞게 변경해주세염ㅎ
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== myId),
         { id: myId, name: "나", stream: local, isLocal: true },
@@ -100,6 +143,7 @@ export default function StudyRoomPage() {
         <div className="flex justify-center gap-10">
           <MicControlPanel />
           <CameraControlPanel />
+
           <button
             onClick={handleLeaveRoom}
             className="text-red-400 text-xl font-semibold hover:text-red-700"

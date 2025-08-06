@@ -16,7 +16,7 @@ export default function VideoTile({
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
-    }
+    }else if(videoRef.current) videoRef.current.srcObject = null;
   }, [stream]);
 
   return (
