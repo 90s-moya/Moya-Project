@@ -16,8 +16,19 @@ export default function VideoTile({
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
-    }else if(videoRef.current) videoRef.current.srcObject = null;
+    } else if (videoRef.current) videoRef.current.srcObject = null;
   }, [stream]);
+
+  // 서류 아이콘 클릭 시 실행되는 함수
+  const handleClickDocs = () => {
+    console.log("서류 아이콘 클릭 됨.");
+
+    // api 요청 보내서 서류 받아오기
+
+    // 받아온 서류의 docsStatus에 따라 usestate로 선언된 변수에 담기
+
+    // 그런데 비디오 타일마다 사용자의 user id를 알아야하는데 어떻게 알지..?
+  };
 
   return (
     <div className="relative rounded-lg w-full h-full bg-gray-400 overflow-hidden">
@@ -35,15 +46,24 @@ export default function VideoTile({
         {name}
       </div>
 
-      {/* 오른쪽 상단 아이콘 3개 */}
+      {/* 오른쪽 상단 서류 아이콘 3개 */}
       <div className="absolute top-2 right-2 flex flex-col items-center gap-2 text-black">
-        <div className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer">
+        <div
+          onClick={handleClickDocs}
+          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
+        >
           📄
         </div>
-        <div className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer">
+        <div
+          onClick={handleClickDocs}
+          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
+        >
           📝
         </div>
-        <div className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer">
+        <div
+          onClick={handleClickDocs}
+          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
+        >
           📁
         </div>
       </div>
