@@ -8,10 +8,18 @@ from app.models import EvaluationSession, QuestionAnswerPair
 from app.schemas import EvaluationSessionRead
 from app.utils.stt import save_uploadfile_to_temp, transcribe_audio_from_path
 from app.utils.gpt import ask_gpt_if_ends_async, parse_gpt_result
+from pydantic import BaseModel
 import asyncio
 import time
 from concurrent.futures import ProcessPoolExecutor
 import os
+from app.utils.gpt import generate_initial_question
+from app.schemas import QuestionAnswerPairCreate
+
+
+class PromptStartRequest(BaseModel):
+    userId: UUID
+    text: str
 
 router = APIRouter()
 
@@ -27,7 +35,54 @@ async def transcribe_audio_async(file_obj: UploadFile) -> str:
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+@router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
+async def make_question(payload: PromptStartRequest, db: Session = Depends(get_db)):
+    try:
+        userId = payload.userId
+        text = payload.text
 
+        # 1. GPT 호출로 첫 질문 생성
+        gpt_start = time.time()
+        question_text = await generate_initial_question(text)  # 비동기 호출
+        gpt_end = time.time()
+        print(f"[⏱ GPT 호출 시간] {gpt_end - gpt_start:.2f}초")
+
+        if not question_text:
+            raise HTTPException(status_code=500, detail="GPT 질문 생성 실패")
+
+        # 2. EvaluationSession 생성
+        session = EvaluationSession(
+            user_id=userId,
+            summary=None,
+            created_at=datetime.utcnow()
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+
+        # 3. 첫 QuestionAnswerPair 생성
+        qa_data = QuestionAnswerPairCreate(
+            session_id=session.id,
+            order=1,
+            question=question_text,
+            answer="",
+            is_ended=False,
+            reason_end="",
+            context_matched=False,
+            reason_context=""
+        )
+        qa = QuestionAnswerPair(**qa_data.model_dump())
+        db.add(qa)
+        db.commit()
+        db.refresh(qa)
+
+        # 4. 세션 객체에 QA 리스트 포함
+        session.qa_pairs = [qa]
+        return session
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @router.post("/v1/prompt-stt/", response_model=EvaluationSessionRead)
 async def evaluate_single_pair(
     userId: UUID = Form(...),

@@ -1,4 +1,3 @@
-# app/utils/gpt.py
 import httpx
 import re
 from decouple import config
@@ -6,10 +5,9 @@ from decouple import config
 GMS_API_KEY = config('GMS_API_KEY')
 GMS_API_URL = config('GMS_BASE_URL')
 
-
 async def ask_gpt_if_ends_async(question_list: list[str], answer_list: list[str]) -> str:
     """
-    GPT API 호출 (비동기 httpx 사용)
+    GPT API 호출 (비동기 httpx 사용) - 답변 평가
     """
     prompt = """
     당신은 면접 지원자를 평가한 경력이 10년 차 되는 면접관입니다.
@@ -65,3 +63,28 @@ def parse_gpt_result(gpt_text: str):
             "gpt_comment": m[5].strip()
         })
     return parsed
+
+async def generate_initial_question(text: str) -> str:
+    """
+    PDF/자소서 텍스트를 받아 첫 번째 면접 질문 생성
+    """
+    prompt = f"""
+    다음 자기소개서를 분석하고 면접 질문 3개를 만들어주고 첫 번째 질문을 던져줘.
+    자기소개서:
+    {text}
+    """
+    async with httpx.AsyncClient(timeout=90) as client:
+        response = await client.post(
+            GMS_API_URL,
+            headers={
+                "Authorization": f"Bearer {GMS_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0
+            }
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"].strip()

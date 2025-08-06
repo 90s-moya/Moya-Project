@@ -14,6 +14,7 @@ class EvaluationSession(Base):
     summary = Column(Text, nullable=True)
 
     qa_pairs = relationship("QuestionAnswerPair", back_populates="session", cascade="all, delete")
+    original_text = Column(Text, nullable=False) 
 
 
 class QuestionAnswerPair(Base):
