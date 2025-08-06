@@ -30,9 +30,14 @@ deploy-be-dev:
     - docker rm be-dev || true
     - >
       docker run -d --name be-dev -p 8081:8080
+      -v /srv/moya/files-dev:/files-dev
+      -e FILE_PATH=/files-dev
       -e DB_URL="$DB_URL_DEV"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
+      -e JWT_SECRET="$JWT_SECRET"
+      -e MAIL_USERNAME="$MAIL_USERNAME"
+      -e MAIL_PASSWORD="$MAIL_PASSWORD"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
@@ -48,9 +53,14 @@ deploy-be-prod:
     - docker rm be-main || true
     - >
       docker run -d --name be-main -p 8080:8080
+      -v /srv/moya/files:/files
+      -e FILE_PATH=/files
       -e DB_URL="$DB_URL_PROD"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
+      -e JWT_SECRET="$JWT_SECRET"
+      -e MAIL_USERNAME="$MAIL_USERNAME"
+      -e MAIL_PASSWORD="$MAIL_PASSWORD"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
@@ -58,3 +68,32 @@ deploy-be-prod:
     - be-main
     - master
 
+# FE - 빌드
+build-fe:
+  stage: build
+  script:
+    - cd frontend
+    - echo "VITE_API_URL=$API_URL" > .env
+    - echo "VITE_RTC_API_URL=$VITE_RTC_API_URL" >> .env
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist
+  tags:
+    - ec2
+  only:
+    - fe-main
+    - master
+
+# FE - 배포
+deploy-fe:
+  stage: deploy
+  script:
+    - sudo rm -rf /var/www/html/*
+    - sudo cp -r frontend/dist/* /var/www/html/
+  tags:
+    - ec2
+  only:
+    - fe-main
+    - master

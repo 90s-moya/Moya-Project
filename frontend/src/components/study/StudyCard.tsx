@@ -10,6 +10,7 @@ export default function StudyCard({
   maxUser,
   openAt,
   title,
+  joinUser,
 }: StudyRoom) {
   const navigate = useNavigate();
 
@@ -27,6 +28,12 @@ export default function StudyCard({
 
         <div className="space-y-2 min-h-[4.5rem]">
           <div className="flex justify-between text-base">
+            <span className="text-[#6f727c]">참여 중인 인원 수</span>
+            <span className="text-[#1b1c1f] font-medium">
+              {joinUser}/{maxUser}
+            </span>
+          </div>
+          <div className="flex justify-between text-base">
             <span className="text-[#6f727c]">카테고리명</span>
             <span className="text-[#1b1c1f] font-medium">{categoryName}</span>
           </div>
@@ -41,10 +48,6 @@ export default function StudyCard({
             <span className="text-[#1b1c1f] font-medium">
               {formatDateTime(expiredAt)}
             </span>
-          </div>
-          <div className="flex justify-between text-base">
-            <span className="text-[#6f727c]">최대 인원 수</span>
-            <span className="text-[#1b1c1f] font-medium">{maxUser}</span>
           </div>
         </div>
       </div>

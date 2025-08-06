@@ -7,6 +7,7 @@ import StudyCard from "@/components/study/StudyCard";
 import type { StudyRoom } from "@/types/study";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { getRoomList } from "@/api/studyApi";
 
 export default function StudyListPage() {
   const [rooms, setRooms] = useState<StudyRoom[]>([]); // 스터디 룸
@@ -20,35 +21,18 @@ export default function StudyListPage() {
   const [activeTab, setActiveTab] = useState<"deadline" | "recent">("deadline");
 
   useEffect(() => {
+    const requestRooms = async () => {
+      try {
+        const data = await getRoomList();
+        console.log("룸 전체 조회 결과 : ", data);
+        setRooms(data);
+      } catch (err) {
+        console.error("에러 발생", err);
+      }
+    };
+
     requestRooms();
   }, []);
-
-  // API 요청 함수
-  const requestRooms = async () => {
-    // 로컬 스토리지로부터 토큰 받아오기
-    const authStorage = localStorage.getItem("auth-storage");
-    let token = "";
-
-    // 파싱해서 token만 가져오기
-    if (authStorage) {
-      const parsed = JSON.parse(authStorage);
-      token = parsed.state.token;
-    }
-
-    try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/v1/room`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      console.log("API를 통해 받은 룸 목록 : ", res.data);
-      setRooms(res.data);
-    } catch (err) {
-      console.error("❌ 에러 발생", err);
-    }
-  };
 
   // 최신순으로 정렬된 rooms
   const recentSortedRooms = [...rooms].sort(

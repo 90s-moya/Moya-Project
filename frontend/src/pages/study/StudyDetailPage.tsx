@@ -3,27 +3,9 @@ import Header from "@/components/common/Header";
 import StudyBackToList from "@/components/study/StudyBackToList";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { formatDateTime } from "@/util/date";
-
-// 방장 정보 인터페이스
-interface MasterInfo {
-  nickname: string;
-  makeRoomCnt: number;
-  createdAt: string;
-}
-
-// 룸 상세 정보 인터페이스
-interface StudyRoomDetail {
-  body: string;
-  categoryName: string;
-  expiredAt: string;
-  joinUsers: string[];
-  masterInfo: MasterInfo;
-  maxUser: number;
-  openAt: string;
-  title: string;
-}
+import { getRoomDetail } from "@/api/studyApi";
+import type { StudyRoomDetail } from "@/types/study";
 
 export default function StudyDetailPage() {
   const { id } = useParams();
@@ -38,38 +20,19 @@ export default function StudyDetailPage() {
       return;
     }
 
+    const requestRoomDetail = async (id: string) => {
+      try {
+        const data = await getRoomDetail(id);
+        console.log("방 상세 조회 결과 : ", data);
+
+        setRoomDetail(data);
+      } catch (err) {
+        console.log("방 상세 조회 에러 발생 : ", err);
+      }
+    };
+
     requestRoomDetail(id);
   }, [id]);
-
-  // API 요청 함수
-  const requestRoomDetail = async (id: string) => {
-    // 로컬 스토리지로부터 토큰 받아오기
-    const authStorage = localStorage.getItem("auth-storage");
-    let token = "";
-
-    // 파싱해서 token만 가져오기
-    if (authStorage) {
-      const parsed = JSON.parse(authStorage);
-      token = parsed.state.token;
-    }
-
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/v1/room/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      console.log("API를 통해 받은 룸 상세 정보 : ", res.data);
-      setRoomDetail(res.data);
-    } catch (err) {
-      console.error("❌ 에러 발생", err);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#ffffff] text-[17px] leading-relaxed">
@@ -84,12 +47,6 @@ export default function StudyDetailPage() {
               방 제목 : {roomDetail?.title}
             </h2>
           </div>
-          <Button
-            onClick={() => navigate("/study/setup")}
-            className="bg-[#2b7fff] hover:bg-[#2b7fff]/90 text-white px-6 py-5 rounded-lg text-lg font-semibold"
-          >
-            참여하기
-          </Button>
         </div>
 
         {/* Content Grid */}
@@ -191,7 +148,7 @@ export default function StudyDetailPage() {
               </div>
             </div>
             <Button
-              onClick={() => navigate("/study/setup")}
+              onClick={() => navigate(`/study/setup/${id}`)}
               className="w-full bg-[#2b7fff] hover:bg-[#3758f9] text-white py-7 text-lg rounded-lg mt-5"
             >
               참여하기

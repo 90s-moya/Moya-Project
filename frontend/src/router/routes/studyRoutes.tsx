@@ -20,7 +20,7 @@ const studyRoutes: RouteObject[] = [
     element: <StudyDetailPage />,
   },
   {
-    path: "study/setup",
+    path: "study/setup/:id",
     element: <StudySetupPage />,
   },
   {
