@@ -19,5 +19,5 @@ public class CreateRoomRequest {
     private String title;
     private String body;
     private LocalDateTime open_at;
-    private LocalDateTime expire_at;
+    private LocalDateTime expired_at;
 }
