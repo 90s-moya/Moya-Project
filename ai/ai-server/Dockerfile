@@ -17,6 +17,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
+# -----------------------
+
 FROM python:3.10-slim AS runner
 
 WORKDIR /app
@@ -24,11 +26,11 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /usr/local /usr/local
 COPY --from=builder /app /app
 
 EXPOSE 8000
 
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-
