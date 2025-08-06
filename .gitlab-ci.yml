@@ -72,7 +72,7 @@ deploy-be-prod:
 build-ai:
   stage: build
   script:
-    - docker build -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai-server
+    - docker build -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai/ai-server
     - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
   tags:
     - ec2
