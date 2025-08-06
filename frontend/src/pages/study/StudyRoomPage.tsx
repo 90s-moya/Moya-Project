@@ -32,9 +32,10 @@ export default function StudyRoomPage() {
     const myId = crypto.randomUUID();
     
     // 배포용
-    const signaling = new SignalingClient(`wss://${import.meta.env.VITE_RTC_API_URL}/ws`, myId, async (data) => {
+    //const signaling = new SignalingClient(`wss://${import.meta.env.VITE_RTC_API_URL}/ws`, myId, async (data) => {
     // 테스트 용
-    //const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
+    const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
+      console.log("배포 서버 확인 ", `wss://${import.meta.env.VITE_RTC_API_URL}/ws`);
       const peerManager = peerManagerRef.current;
       if(!peerManager) return;
 

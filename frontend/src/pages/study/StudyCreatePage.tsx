@@ -6,25 +6,101 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import StudyBackToList from "@/components/study/StudyBackToList";
+import axios from "axios";
+import { useEffect, useState } from "react";
+import dayjs from "dayjs";
+import { getTokenFromLocalStorage } from "../../util/getToken";
 
-type StudyFormData = {
+type CreateFormData = {
+  category_id: string;
   title: string;
-  leader: string;
-  category: string;
-  date: string;
-  participants: number;
-  description: string;
+  body: string;
+  max_user: number;
+  open_at: string;
+  expired_at: string;
+};
+
+type Category = {
+  categoryId: string;
+  categoryName: string;
 };
 
 export default function StudyCreatePage() {
-  const { register, handleSubmit, formState } = useForm<StudyFormData>();
+  // 폼 관련 변수 및 함수들
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<CreateFormData>();
+
+  //
+  const [category, setCategory] = useState<Category[]>([]);
+
   const navigate = useNavigate();
 
-  const onSubmit = (data: StudyFormData) => {
-    console.log("스터디 생성 데이터:", data);
-    alert("스터디가 생성되었습니다!");
-    // 실제로는 POST API 요청 후 -> navigate(`/study/${newId}`)
-    navigate("/study");
+  // 카테고리 API 요청 함수
+  useEffect(() => {
+    const requestCategory = async () => {
+      const token = getTokenFromLocalStorage();
+
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL}/v1/category`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        // console.log(
+        //   "카테고리 API 호출에 대한 응답은 다음과 같습니다.",
+        //   res.data
+        // );
+        setCategory(res.data);
+      } catch (err) {
+        console.error("카테고리 API 호출 실패", err);
+      }
+    };
+
+    requestCategory();
+  }, []);
+
+  // 방 생성 API 요청 함수
+  const onSubmit = async (formData: CreateFormData) => {
+    const token = getTokenFromLocalStorage();
+
+    // 스터디 생성 일시
+    const open_at = dayjs().add(9, "hour").toISOString();
+
+    // 사용자가 입력한 formData에 openAt 추가
+    const fullData: CreateFormData = {
+      ...formData,
+      open_at,
+    };
+
+    console.log("요청 시 사용되는 formData는 다음과 같습니다.", fullData);
+
+    try {
+      console.log(token);
+      const res = await axios.post(
+        `${import.meta.env.VITE_API_URL}/v1/room`,
+        fullData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // console.log("방 생성 API 요청에 대한 응답 : ", res);
+      navigate("/study");
+    } catch (err) {
+      console.error("스터디 생성 실패", err);
+      alert("스터디가 생성 실패...");
+    }
   };
 
   return (
@@ -33,97 +109,106 @@ export default function StudyCreatePage() {
 
       <main className="max-w-[720px] mx-auto px-4 pt-[120px] pb-20 text-[17px] leading-relaxed">
         {/* Title */}
-        <h1 className="text-4xl font-bold text-[#1b1c1f] mb-10">
+        <h1 className="text-4xl font-bold text-blue-500 mb-10">
           스터디 방 생성하기
         </h1>
 
+        {/* form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-10">
-          {/* 제목 */}
+          {/* 카테고리 */}
+          <div className="space-y-2">
+            <Label className="text-3xl font-semibold">카테고리명</Label>
+            <select
+              {...register("category_id", {
+                required: "카테고리명은 필수입니다.",
+              })}
+              className="w-full border border-[#dedee4] rounded-lg px-7 py-7 text-"
+            >
+              <option value="">카테고리 선택</option>
+              {category.map((c) => (
+                <option key={c.categoryId} value={c.categoryId}>
+                  {c.categoryName}
+                </option>
+              ))}
+            </select>
+            {errors.category_id && (
+              <p className="text-red-500">{errors.category_id.message}</p>
+            )}
+          </div>
+          {/* title */}
           <div className="space-y-2">
             <Label htmlFor="title" className="text-3xl font-semibold">
               스터디 제목
             </Label>
             <Input
               id="title"
-              {...register("title", { required: true })}
-              placeholder="예: SK 보안 솔루션 운영자 면접 스터디"
+              {...register("title", { required: "제목은 필수입니다" })}
+              placeholder="스터디방의 제목을 입력해주세요"
               className="text-xl px-7 py-7 placeholder:text-lg"
             />
-          </div>
-
-          {/* 방장명 */}
-          <div className="space-y-2">
-            <Label htmlFor="leader" className="text-3xl font-semibold">
-              방장명
-            </Label>
-            <Input
-              id="leader"
-              {...register("leader", { required: true })}
-              placeholder="이름을 입력하세요"
-              className="text-xl px-7 py-7 placeholder:text-lg"
-            />
-          </div>
-
-          {/* 카테고리 */}
-          <div className="space-y-2">
-            <Label htmlFor="category" className="text-3xl font-semibold">
-              대분류
-            </Label>
-            <select
-              id="category"
-              {...register("category", { required: true })}
-              className="w-full border border-[#dedee4] rounded-lg px-7 py-7 text-"
-            >
-              <option value="">카테고리를 선택하세요</option>
-              <option value="IT">IT</option>
-              <option value="금융">금융</option>
-              <option value="제조">제조</option>
-              <option value="의료">의료</option>
-              <option value="기타">기타</option>
-            </select>
-          </div>
-
-          {/* 일시 */}
-          <div className="space-y-2">
-            <Label htmlFor="date" className="text-3xl font-semibold">
-              스터디 일시
-            </Label>
-            <Input
-              id="date"
-              type="datetime-local"
-              {...register("date", { required: true })}
-              className="text-xl px-7 py-7 placeholder:text-lg"
-            />
-          </div>
-
-          {/* 참여 인원 */}
-          <div className="space-y-2">
-            <Label htmlFor="participants" className="text-3xl font-semibold">
-              참여 인원
-            </Label>
-            <Input
-              id="participants"
-              type="number"
-              min={2}
-              max={20}
-              {...register("participants", { required: true })}
-              placeholder="예: 6"
-              className="text-xl px-7 py-7 placeholder:text-lg"
-            />
+            {errors.title && (
+              <p className="text-red-500">{errors.title.message}</p>
+            )}
           </div>
 
           {/* 설명 */}
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-3xl font-semibold">
-              상세 설명
+            <Label htmlFor="body" className="text-3xl font-semibold">
+              설명
             </Label>
             <Textarea
-              id="description"
-              rows={6}
-              {...register("description", { required: true })}
-              placeholder="스터디 목적, 방식, 주의사항 등을 입력하세요."
+              id="body"
+              {...register("body")}
+              placeholder="스터디방에 대한 설명을 입력해주세요"
               className="text-xl px-7 py-7 placeholder:text-lg"
             />
+            {errors.body && (
+              <p className="text-red-500">{errors.body.message}</p>
+            )}
+          </div>
+
+          {/* 스터디 마감 일시 */}
+          <div className="space-y-2">
+            <Label htmlFor="expiredAt" className="text-3xl font-semibold">
+              스터디 마감 일시
+            </Label>
+            <Input
+              id="expiredAt"
+              type="datetime-local"
+              {...register("expired_at", {
+                required: true,
+                setValueAs: (v) =>
+                  dayjs(v).isValid()
+                    ? dayjs(v).format("YYYY-MM-DDTHH:mm:ss")
+                    : "",
+              })}
+              className="text-xl px-7 py-7 placeholder:text-lg"
+            />
+            {errors.expired_at && (
+              <p className="text-red-500">{errors.expired_at.message}</p>
+            )}
+          </div>
+
+          {/* 최대 참여 인원 수 */}
+          <div className="space-y-2">
+            <Label htmlFor="maxUser" className="text-3xl font-semibold">
+              최대 참여 인원 수
+            </Label>
+            <Input
+              id="maxUser"
+              type="number"
+              min={2}
+              max={6}
+              {...register("max_user", {
+                required: "최대 참여 인원 수를 입력해주세요",
+                valueAsNumber: true,
+              })}
+              placeholder="숫자만 입력해주세요"
+              className="text-xl px-7 py-7 placeholder:text-lg"
+            />
+            {errors.max_user && (
+              <p className="text-red-500">{errors.max_user.message}</p>
+            )}
           </div>
 
           {/* 제출 버튼 */}
@@ -132,7 +217,7 @@ export default function StudyCreatePage() {
             <Button
               type="submit"
               className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-7 rounded-lg text-lg"
-              disabled={formState.isSubmitting}
+              disabled={isSubmitting}
             >
               스터디 생성하기
             </Button>
