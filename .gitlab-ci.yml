@@ -38,6 +38,7 @@ deploy-be-dev:
       -e JWT_SECRET="$JWT_SECRET"
       -e MAIL_USERNAME="$MAIL_USERNAME"
       -e MAIL_PASSWORD="$MAIL_PASSWORD"
+      -e PYTHON_PATH="$PYTHON_PATH"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
@@ -61,6 +62,7 @@ deploy-be-prod:
       -e JWT_SECRET="$JWT_SECRET"
       -e MAIL_USERNAME="$MAIL_USERNAME"
       -e MAIL_PASSWORD="$MAIL_PASSWORD"
+      -e PYTHON_PATH="$PYTHON_PATH"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
