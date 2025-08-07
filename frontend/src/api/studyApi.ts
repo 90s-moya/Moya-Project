@@ -1,7 +1,11 @@
 // 면접 스터디 관련 API
 import api from "./index";
-import type { CreateFormData, StudyRoom, StudyRoomDetail } from "@/types/study";
-import dayjs from "dayjs";
+import type {
+  CreateFormData,
+  EnterRoomParams,
+  StudyRoom,
+  StudyRoomDetail,
+} from "@/types/study";
 
 // 방 전체 조회
 export const getRoomList = async (): Promise<StudyRoom[]> => {
@@ -38,9 +42,24 @@ export const getMyDocs = async () => {
   return res.data;
 };
 
-// 방 입장
-export const enterRoom = async (id: string) => {
-  const res = await api.post(`/v1/room/${id}/enter`);
+// 방 입장 전 환경 설정 페이지에서 서류 등록
+export const registerDocs = async ({
+  room_id,
+  resume_id,
+  portfolio_id,
+  coverletter_id,
+}: EnterRoomParams) => {
+  const res = await api.post(`/v1/room/${room_id}/register`, {
+    resume_id,
+    portfolio_id,
+    coverletter_id,
+  });
 
   return res.data;
+};
+
+export const deleteRoom = async (id: string) => {
+  const res = await api.delete(`/v1/room/${id}`);
+
+  return res;
 };

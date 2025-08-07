@@ -5,6 +5,7 @@ export interface SignalMessage {
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;
+  nickname?: string;
 }
 
 export class SignalingClient {
@@ -18,8 +19,8 @@ export class SignalingClient {
     private onMessage: (data: SignalMessage) => void
   ) {
     this.ws = new WebSocket(url);
-    console.log("===========url확인====",url);
-    
+    console.log("===========url확인====", url);
+
     this.ws.onopen = () => {
       this.isOpen = true;
       this.queue.forEach((msg) => this.send(msg));
@@ -28,13 +29,13 @@ export class SignalingClient {
 
     this.ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
-        console.log("WS 수신:", msg);
+      console.log("WS 수신:", msg);
       if (msg.senderId !== this.myId) {
         this.onMessage(msg);
       }
     };
   }
-  close(){
+  close() {
     this.ws?.close();
   }
   send(msg: SignalMessage) {
