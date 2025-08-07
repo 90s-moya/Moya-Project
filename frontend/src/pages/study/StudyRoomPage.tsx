@@ -1,7 +1,7 @@
 import CameraControlPanel from "@/components/study/CameraControlPanel";
 import MicControlPanel from "@/components/study/MicControlPanel";
 import VideoTile from "@/components/study/VideoTile";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
@@ -26,6 +26,8 @@ export default function StudyRoomPage() {
 
   // 닉네임 저장용 Map
   const nicknameMapRef = useRef<Map<string, string>>(new Map());
+
+  const { room_id } = useParams();
 
   // 유저 닉네임을 불러와서 저장하는 useEffect
   useEffect(() => {
@@ -185,7 +187,13 @@ export default function StudyRoomPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {participants.map((p) => (
             <div key={p.id} className="w-full aspect-video">
-              <VideoTile stream={p.stream} name={p.name} isLocal={p.isLocal} />
+              <VideoTile
+                stream={p.stream}
+                name={p.name}
+                isLocal={p.isLocal}
+                userId={p.id}
+                roomId={room_id!}
+              />
             </div>
           ))}
         </div>
