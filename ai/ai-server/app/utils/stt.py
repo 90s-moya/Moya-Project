@@ -27,8 +27,8 @@ import tempfile
 import os
 import traceback
 
-print("[Whisper] 모델 로딩 시작: medium")
-model = whisper.load_model("medium")
+print("[Whisper] 모델 로딩 시작: base")
+model = whisper.load_model("base")
 print("[Whisper] 모델 로딩 완료")
 
 def save_uploadfile_to_temp(upload_file) -> str:
