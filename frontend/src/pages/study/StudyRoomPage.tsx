@@ -9,7 +9,7 @@ import UserApi from "@/api/userApi";
 
 type Participant = {
   id: string;
-  name: string;
+  nickname: string;
   stream: MediaStream | null;
   isLocal?: boolean;
 };
@@ -83,6 +83,7 @@ export default function StudyRoomPage() {
     if (signalingRef.current) return;
     const userInfo = localStorage.getItem("auth-storage");
     const parsed = JSON.parse(userInfo!);
+    console.log("뭐들어오냐" +userInfo);
     const myId = parsed.state.UUID;
     myIdRef.current = myId;
 
@@ -144,7 +145,7 @@ export default function StudyRoomPage() {
 
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== peerId),
-        { id: peerId, name: nickname, stream },
+        { id: peerId, nickname: nickname, stream },
       ]);
     };
 
@@ -164,10 +165,10 @@ export default function StudyRoomPage() {
       // TODO : 사용자 정보에 맞게 변경해주세염ㅎ
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== myId),
-        { id: myId, name: "나", stream: local, isLocal: true },
+        { id: myId, nickname: "나", stream: local, isLocal: true },
       ]);
       peerManager.setLocalStream(local);
-      signaling.send({ type: "join", senderId: myId, nickname });
+      signaling.send({ type: "join", senderId: myId, nickname:nickname });
     })();
   }, [nickname]);
   // ************
@@ -185,7 +186,7 @@ export default function StudyRoomPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {participants.map((p) => (
             <div key={p.id} className="w-full aspect-video">
-              <VideoTile stream={p.stream} name={p.name} isLocal={p.isLocal} />
+              <VideoTile stream={p.stream} name={p.nickname} isLocal={p.isLocal} userId={p.id} />
             </div>
           ))}
         </div>
