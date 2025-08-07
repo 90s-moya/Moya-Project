@@ -35,7 +35,7 @@ GPT 코멘트:
 
     async with httpx.AsyncClient(timeout=90) as client:
         response = await client.post(
-            GMS_API_URL,
+            f"{GMS_API_URL}/chat/completions",
             headers={
                 "Authorization": f"Bearer {GMS_API_KEY}",
                 "Content-Type": "application/json"

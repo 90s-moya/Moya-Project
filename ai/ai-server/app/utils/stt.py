@@ -1,62 +1,49 @@
-# # app/utils/stt.py
-# import whisper
-# import tempfile
-# import os
-
-# # Whisper 모델 초기화 (서버 시작 시 1회 로드)
-# model = whisper.load_model("medium")
-
-# def save_uploadfile_to_temp(upload_file) -> str:
-#     """
-#     FastAPI UploadFile을 임시 wav 파일로 저장 후 경로 반환
-#     """
-#     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-#         contents = upload_file.file.read()
-#         tmp_file.write(contents)
-#         return tmp_file.name
-
-# def transcribe_audio_from_path(file_path: str) -> str:
-#     """
-#     Whisper STT: 파일 경로 기반 추론
-#     """
-#     result = model.transcribe(file_path)
-#     return result["text"]
-
-import whisper
 import tempfile
 import os
-import traceback
+import httpx
+from decouple import config
+from fastapi import UploadFile
+import asyncio
 
-print("[Whisper] 모델 로딩 시작: base")
-model = whisper.load_model("base")
-print("[Whisper] 모델 로딩 완료")
+GMS_API_KEY = config('GMS_API_KEY')
+GMS_API_URL = config('GMS_BASE_URL')
 
-def save_uploadfile_to_temp(upload_file) -> str:
+
+async def transcribe_audio_async(upload_file: UploadFile) -> str:
     """
-    FastAPI UploadFile을 임시 wav 파일로 저장 후 경로 반환
+    Whisper STT: GMS API 호출 기반 비동기 추론
     """
+    # 파일 내용 읽기
+    contents = await upload_file.read()
+
+    # 임시 파일로 저장 (디버깅 또는 오류 대응용, 원치 않으면 제거 가능)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+        tmp_file.write(contents)
+        temp_path = tmp_file.name
+
+    print(f"[Whisper] UploadFile 저장 완료: {temp_path}")
+
     try:
-        print("[Whisper] UploadFile → temp 저장 시작")
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            contents = upload_file.file.read()
-            tmp_file.write(contents)
-            print(f"[Whisper] UploadFile 저장 완료: {tmp_file.name}")
-            return tmp_file.name
-    except Exception as e:
-        print(f"[Whisper] 파일 저장 오류: {e}")
-        traceback.print_exc()
-        raise
+        async with httpx.AsyncClient(timeout=120) as client:
+            files = {
+                "file": (upload_file.filename, contents, upload_file.content_type or "audio/wav"),
+                "model": (None, "whisper-1")
+            }
+            response = await client.post(
+                f"{GMS_API_URL.rstrip('/')}/audio/transcriptions",
+                headers={
+                    "Authorization": f"Bearer {GMS_API_KEY}",
+                },
+                files=files
+            )
+            response.raise_for_status()
+            return response.json()["text"]
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
-def transcribe_audio_from_path(file_path: str) -> str:
-    """
-    Whisper STT: 파일 경로 기반 추론
-    """
-    try:
-        print(f"[Whisper] STT 추론 시작: {file_path}")
-        result = model.transcribe(file_path)
-        print("[Whisper] STT 추론 완료")
-        return result["text"]
-    except Exception as e:
-        print(f"[Whisper] STT 추론 중 오류: {e}")
-        traceback.print_exc()
-        raise
+
+def save_uploadfile_to_temp(upload_file: UploadFile) -> str:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+        tmp.write(upload_file.file.read())
+        return tmp.name

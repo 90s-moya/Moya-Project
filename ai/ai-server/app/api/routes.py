@@ -6,68 +6,19 @@ from datetime import datetime
 from app.database import get_db
 from app.models import EvaluationSession, QuestionAnswerPair
 from app.schemas import EvaluationSessionRead
-from app.utils.stt import save_uploadfile_to_temp, transcribe_audio_from_path
 from app.utils.gpt import ask_gpt_if_ends_async, parse_gpt_result
 from pydantic import BaseModel
-import asyncio
 import time
-from concurrent.futures import ProcessPoolExecutor
 import os
 from app.utils.gpt import generate_initial_question
 from app.schemas import QuestionAnswerPairCreate
-
+from app.utils.stt import transcribe_audio_async
 
 class PromptStartRequest(BaseModel):
     userId: UUID
     text: str
 
 router = APIRouter()
-
-# CPU 병렬 처리를 위한 프로세스 풀 생성 (코어 수 자동 감지)
-process_pool = ProcessPoolExecutor()
-
-# # Whisper 비동기 래퍼 (프로세스 풀 사용)
-# async def transcribe_audio_async(file_obj: UploadFile) -> str:
-#     loop = asyncio.get_event_loop()
-#     temp_path = save_uploadfile_to_temp(file_obj)
-#     try:
-#         return await loop.run_in_executor(process_pool, transcribe_audio_from_path, temp_path)
-#     finally:
-#         if os.path.exists(temp_path):
-#             os.remove(temp_path)
-
-async def transcribe_audio_async(file_obj: UploadFile) -> str:
-    print("[STT] transcribe_audio_async 진입")
-
-    try:
-        print("[STT] 임시 파일 저장 시작")
-        temp_path = save_uploadfile_to_temp(file_obj)
-        print(f"[STT] 임시 파일 저장 완료: {temp_path}")
-    except Exception as e:
-        print(f"[❌ STT] 파일 저장 중 오류: {e}")
-        traceback.print_exc()
-        raise
-
-    try:
-        print("[STT] Whisper 추론 (비동기 run_in_executor) 시작")
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(process_pool, transcribe_audio_from_path, temp_path)
-        print("[STT] Whisper 추론 완료")
-        return result
-    except Exception as e:
-        print(f"[❌ STT] Whisper 추론 실패: {e}")
-        traceback.print_exc()
-        raise
-    finally:
-        print("[STT] 임시 파일 삭제 시도")
-        try:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-                print("[STT] 임시 파일 삭제 완료")
-            else:
-                print("[STT] 임시 파일이 존재하지 않음")
-        except Exception as e:
-            print(f"[❌ STT] 임시 파일 삭제 실패: {e}")
 
 
 @router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
@@ -118,55 +69,6 @@ async def make_question(payload: PromptStartRequest, db: Session = Depends(get_d
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-# @router.post("/v1/prompt-stt/", response_model=EvaluationSessionRead)
-# async def evaluate_single_pair(
-#     userId: UUID = Form(...),
-#     question: str = Form(...),
-#     answer: UploadFile = Form(...),
-#     db: Session = Depends(get_db)
-# ):
-#     try:
-#         # STT 처리
-#         stt_start = time.time()
-#         answer_text = await transcribe_audio_async(answer)
-#         stt_end = time.time()
-#         print(f"[⏱ STT 처리 시간] {stt_end - stt_start:.2f}초")
-
-#         # GPT 분석
-#         gpt_start = time.time()
-#         gpt_text = await ask_gpt_if_ends_async([question], [answer_text])
-#         gpt_end = time.time()
-#         print(f"[⏱ GPT 호출 시간] {gpt_end - gpt_start:.2f}초")
-
-#         parsed_result = parse_gpt_result(gpt_text)
-#         if not parsed_result:
-#             raise HTTPException(status_code=500, detail="GPT 응답 파싱 실패")
-
-#         result = parsed_result[0]
-
-#         # DB 저장
-#         session = EvaluationSession(user_id=userId)
-#         db.add(session)
-#         db.flush()
-#         qa = QuestionAnswerPair(
-#             session_id=session.id,
-#             order=1,
-#             question=question,
-#             answer=answer_text,
-#             is_ended=result["is_ended"],
-#             reason_end=result["reason_end"],
-#             context_matched=result["context_matched"],
-#             reason_context=result["reason_context"],
-#             gpt_comment=result["gpt_comment"]
-#         )
-#         db.add(qa)
-#         db.commit()
-#         db.refresh(session)
-#         return session
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/v1/prompt-stt/", response_model=EvaluationSessionRead)
 async def evaluate_single_pair(
     userId: UUID = Form(...),
@@ -175,45 +77,28 @@ async def evaluate_single_pair(
     db: Session = Depends(get_db)
 ):
     try:
-        # 1. STT 처리 시작
+        # STT 처리
         stt_start = time.time()
-        print("[1] STT 처리 시작")
-
-        # 1-1. Whisper 모델로 오디오 → 텍스트 변환
         answer_text = await transcribe_audio_async(answer)
-
         stt_end = time.time()
-        print(f"[2] STT 완료 - 처리 시간: {stt_end - stt_start:.2f}초")
-        print(f"[텍스트 변환 결과] {answer_text}")
+        print(f"[⏱ STT 처리 시간] {stt_end - stt_start:.2f}초")
 
-        # 2. GPT 호출 시작
+        # GPT 분석
         gpt_start = time.time()
-        print("[3] GPT 분석 시작")
-
-        # 2-1. GPT API를 통해 질문-답변 평가
         gpt_text = await ask_gpt_if_ends_async([question], [answer_text])
-
         gpt_end = time.time()
-        print(f"[4] GPT 응답 완료 - 호출 시간: {gpt_end - gpt_start:.2f}초")
-        print(f"[GPT 응답] {gpt_text}")
+        print(f"[⏱ GPT 호출 시간] {gpt_end - gpt_start:.2f}초")
 
-        # 3. GPT 응답 파싱
-        print("[5] GPT 응답 파싱 시작")
         parsed_result = parse_gpt_result(gpt_text)
-
         if not parsed_result:
-            print("[오류] GPT 응답 파싱 실패")
             raise HTTPException(status_code=500, detail="GPT 응답 파싱 실패")
 
         result = parsed_result[0]
-        print(f"[6] GPT 파싱 결과: {result}")
 
-        # 4. DB 저장
-        print("[7] DB 저장 시작")
+        # DB 저장
         session = EvaluationSession(user_id=userId)
         db.add(session)
         db.flush()
-
         qa = QuestionAnswerPair(
             session_id=session.id,
             order=1,
@@ -228,17 +113,10 @@ async def evaluate_single_pair(
         db.add(qa)
         db.commit()
         db.refresh(session)
-        print("[8] DB 저장 완료")
-
-        # 5. 최종 응답 리턴
-        total_time = time.time() - stt_start
-        print(f"[9] 전체 처리 시간: {total_time:.2f}초")
         return session
 
     except Exception as e:
-        print(f"[오류 발생] {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/prompt-start", response_model=EvaluationSessionRead)
 async def evaluate_audio_pair(
