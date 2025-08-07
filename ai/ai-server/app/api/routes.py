@@ -35,6 +35,8 @@ async def transcribe_audio_async(file_obj: UploadFile) -> str:
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+
 @router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
 async def make_question(payload: PromptStartRequest, db: Session = Depends(get_db)):
     try:
@@ -83,6 +85,55 @@ async def make_question(payload: PromptStartRequest, db: Session = Depends(get_d
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+# @router.post("/v1/prompt-stt/", response_model=EvaluationSessionRead)
+# async def evaluate_single_pair(
+#     userId: UUID = Form(...),
+#     question: str = Form(...),
+#     answer: UploadFile = Form(...),
+#     db: Session = Depends(get_db)
+# ):
+#     try:
+#         # STT 처리
+#         stt_start = time.time()
+#         answer_text = await transcribe_audio_async(answer)
+#         stt_end = time.time()
+#         print(f"[⏱ STT 처리 시간] {stt_end - stt_start:.2f}초")
+
+#         # GPT 분석
+#         gpt_start = time.time()
+#         gpt_text = await ask_gpt_if_ends_async([question], [answer_text])
+#         gpt_end = time.time()
+#         print(f"[⏱ GPT 호출 시간] {gpt_end - gpt_start:.2f}초")
+
+#         parsed_result = parse_gpt_result(gpt_text)
+#         if not parsed_result:
+#             raise HTTPException(status_code=500, detail="GPT 응답 파싱 실패")
+
+#         result = parsed_result[0]
+
+#         # DB 저장
+#         session = EvaluationSession(user_id=userId)
+#         db.add(session)
+#         db.flush()
+#         qa = QuestionAnswerPair(
+#             session_id=session.id,
+#             order=1,
+#             question=question,
+#             answer=answer_text,
+#             is_ended=result["is_ended"],
+#             reason_end=result["reason_end"],
+#             context_matched=result["context_matched"],
+#             reason_context=result["reason_context"],
+#             gpt_comment=result["gpt_comment"]
+#         )
+#         db.add(qa)
+#         db.commit()
+#         db.refresh(session)
+#         return session
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/v1/prompt-stt/", response_model=EvaluationSessionRead)
 async def evaluate_single_pair(
     userId: UUID = Form(...),
@@ -91,28 +142,45 @@ async def evaluate_single_pair(
     db: Session = Depends(get_db)
 ):
     try:
-        # STT 처리
+        # 1. STT 처리 시작
         stt_start = time.time()
+        print("[1] STT 처리 시작")
+
+        # 1-1. Whisper 모델로 오디오 → 텍스트 변환
         answer_text = await transcribe_audio_async(answer)
+
         stt_end = time.time()
-        print(f"[⏱ STT 처리 시간] {stt_end - stt_start:.2f}초")
+        print(f"[2] STT 완료 - 처리 시간: {stt_end - stt_start:.2f}초")
+        print(f"[텍스트 변환 결과] {answer_text}")
 
-        # GPT 분석
+        # 2. GPT 호출 시작
         gpt_start = time.time()
-        gpt_text = await ask_gpt_if_ends_async([question], [answer_text])
-        gpt_end = time.time()
-        print(f"[⏱ GPT 호출 시간] {gpt_end - gpt_start:.2f}초")
+        print("[3] GPT 분석 시작")
 
+        # 2-1. GPT API를 통해 질문-답변 평가
+        gpt_text = await ask_gpt_if_ends_async([question], [answer_text])
+
+        gpt_end = time.time()
+        print(f"[4] GPT 응답 완료 - 호출 시간: {gpt_end - gpt_start:.2f}초")
+        print(f"[GPT 응답] {gpt_text}")
+
+        # 3. GPT 응답 파싱
+        print("[5] GPT 응답 파싱 시작")
         parsed_result = parse_gpt_result(gpt_text)
+
         if not parsed_result:
+            print("[오류] GPT 응답 파싱 실패")
             raise HTTPException(status_code=500, detail="GPT 응답 파싱 실패")
 
         result = parsed_result[0]
+        print(f"[6] GPT 파싱 결과: {result}")
 
-        # DB 저장
+        # 4. DB 저장
+        print("[7] DB 저장 시작")
         session = EvaluationSession(user_id=userId)
         db.add(session)
         db.flush()
+
         qa = QuestionAnswerPair(
             session_id=session.id,
             order=1,
@@ -127,9 +195,15 @@ async def evaluate_single_pair(
         db.add(qa)
         db.commit()
         db.refresh(session)
+        print("[8] DB 저장 완료")
+
+        # 5. 최종 응답 리턴
+        total_time = time.time() - stt_start
+        print(f"[9] 전체 처리 시간: {total_time:.2f}초")
         return session
 
     except Exception as e:
+        print(f"[오류 발생] {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
