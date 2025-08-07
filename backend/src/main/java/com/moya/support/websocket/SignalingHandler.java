@@ -24,7 +24,6 @@ public class SignalingHandler extends TextWebSocketHandler {
         JSONObject data = new JSONObject(payload);
         String type = data.getString("type");
         String senderId = data.getString("senderId");
-        String nickname = data.getString("nickname");
 
         if (type.equals("join")) {
             if(clients.containsKey(senderId)){
@@ -41,22 +40,23 @@ public class SignalingHandler extends TextWebSocketHandler {
             // 기존 참가자 목록 전송
             JSONArray existingIds = new JSONArray();
             for (String id : clients.keySet()) {
+                JSONObject obj = new JSONObject();
+                obj.put("id", id);
                 if (!id.equals(senderId)) {
-                    existingIds.put(id);
+                    existingIds.put(obj);
                 }
             }
             JSONObject existingMsg = new JSONObject();
             existingMsg.put("type", "existingParticipants");
             existingMsg.put("senderId", "server");
             existingMsg.put("participants", existingIds);
-            existingMsg.put("nickname", nickname);
+
             session.sendMessage(new TextMessage(existingMsg.toString()));
 
             // 다른 참가자에게 이 참가자 입장 알리기
             JSONObject joinMsg = new JSONObject();
             joinMsg.put("type", "join");
             joinMsg.put("senderId", senderId);
-            joinMsg.put("nickname", nickname);
 
             for (Map.Entry<String, WebSocketSession> entry : clients.entrySet()) {
                 if (!entry.getKey().equals(senderId) && entry.getValue().isOpen()) {
