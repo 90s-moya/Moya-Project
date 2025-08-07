@@ -5,51 +5,65 @@ from uuid import UUID
 from datetime import datetime
 from app.database import get_db
 from app.models import EvaluationSession, QuestionAnswerPair
-from app.schemas import EvaluationSessionRead
-from app.utils.gpt import ask_gpt_if_ends_async, parse_gpt_result
+from app.schemas import EvaluationSessionRead, QuestionAnswerPairCreate
+from app.utils.gpt import (
+    ask_gpt_if_ends_async,
+    parse_gpt_result,
+    generate_initial_question,
+    generate_followup_question,
+    generate_second_followup_question
+)
+from app.utils.stt import transcribe_audio_async
 from pydantic import BaseModel
 import time
-import os
-from app.utils.gpt import generate_initial_question
-from app.schemas import QuestionAnswerPairCreate
-from app.utils.stt import transcribe_audio_async
+import asyncio
+
+router = APIRouter()
 
 class PromptStartRequest(BaseModel):
     userId: UUID
     text: str
 
-router = APIRouter()
+# === GPT 결과 → enum 매핑 함수 ===
 
+def map_end_type(result: dict) -> str:
+    reason = result["reason_end"].lower()
+    if result["is_ended"] and ("깔끔" in reason or "명확" in reason or "완결" in reason):
+        return "OUTSTANDING"
+    elif result["is_ended"]:
+        return "NORMAL"
+    else:
+        return "INADEQUATE"
 
-@router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
+def map_stop_words(result: dict) -> str:
+    reason = result.get("gpt_comment", "").lower()
+    if "추임새 거의 없음" in reason or "매우 깔끔" in reason:
+        return "OUTSTANDING"
+    elif "약간 있음" in reason or "중간 정도" in reason:
+        return "NORMAL"
+    else:
+        return "INADEQUATE"
+
+# === 질문 3개 생성 ===
+@router.post("/v1/question-init", response_model=EvaluationSessionRead)
 async def make_question(payload: PromptStartRequest, db: Session = Depends(get_db)):
     try:
         userId = payload.userId
         text = payload.text
 
-        # 1. GPT 호출로 첫 질문 생성
-        gpt_start = time.time()
-        question_text = await generate_initial_question(text)  # 비동기 호출
-        gpt_end = time.time()
-        print(f"[⏱ GPT 호출 시간] {gpt_end - gpt_start:.2f}초")
-
+        question_text = await generate_initial_question(text)
         if not question_text:
             raise HTTPException(status_code=500, detail="GPT 질문 생성 실패")
 
-        # 2. EvaluationSession 생성
-        session = EvaluationSession(
-            user_id=userId,
-            summary=None,
-            created_at=datetime.utcnow()
-        )
+        session = EvaluationSession(user_id=userId, created_at=datetime.utcnow())
         db.add(session)
         db.commit()
         db.refresh(session)
 
-        # 3. 첫 QuestionAnswerPair 생성
         qa_data = QuestionAnswerPairCreate(
             session_id=session.id,
             order=1,
+            sub_order=0,
             question=question_text,
             answer="",
             is_ended=False,
@@ -62,114 +76,76 @@ async def make_question(payload: PromptStartRequest, db: Session = Depends(get_d
         db.commit()
         db.refresh(qa)
 
-        # 4. 세션 객체에 QA 리스트 포함
         session.qa_pairs = [qa]
         return session
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-@router.post("/v1/prompt-stt/", response_model=EvaluationSessionRead)
-async def evaluate_single_pair(
-    userId: UUID = Form(...),
-    question: str = Form(...),
-    answer: UploadFile = Form(...),
+
+# === 꼬리질문 생성 & 평가 ===
+@router.post("/v1/followup-question")
+async def followup_question(
+    session_id: UUID = Form(...),
+    order: int = Form(...),
+    sub_order: int = Form(...),
+    audio: UploadFile = Form(...),
     db: Session = Depends(get_db)
 ):
     try:
-        # STT 처리
-        stt_start = time.time()
-        answer_text = await transcribe_audio_async(answer)
-        stt_end = time.time()
-        print(f"[⏱ STT 처리 시간] {stt_end - stt_start:.2f}초")
+        answer = await transcribe_audio_async(audio)
 
-        # GPT 분석
-        gpt_start = time.time()
-        gpt_text = await ask_gpt_if_ends_async([question], [answer_text])
-        gpt_end = time.time()
-        print(f"[⏱ GPT 호출 시간] {gpt_end - gpt_start:.2f}초")
+        # GPT 평가 대상: 이전 질문 (sub_order에 해당하는 질문)
+        prev_qa = db.query(QuestionAnswerPair).filter_by(
+            session_id=session_id, order=order, sub_order=sub_order
+        ).first()
+        if not prev_qa:
+            raise HTTPException(status_code=404, detail="평가 대상 질문을 찾을 수 없습니다.")
 
-        parsed_result = parse_gpt_result(gpt_text)
+        # GPT 평가
+        gpt_result_text = await ask_gpt_if_ends_async([prev_qa.question], [answer])
+        parsed_result = parse_gpt_result(gpt_result_text)
         if not parsed_result:
-            raise HTTPException(status_code=500, detail="GPT 응답 파싱 실패")
-
+            raise HTTPException(status_code=500, detail="GPT 평가 파싱 실패")
         result = parsed_result[0]
 
-        # DB 저장
-        session = EvaluationSession(user_id=userId)
-        db.add(session)
-        db.flush()
-        qa = QuestionAnswerPair(
-            session_id=session.id,
-            order=1,
-            question=question,
-            answer=answer_text,
-            is_ended=result["is_ended"],
-            reason_end=result["reason_end"],
-            context_matched=result["context_matched"],
-            reason_context=result["reason_context"],
-            gpt_comment=result["gpt_comment"]
-        )
-        db.add(qa)
-        db.commit()
-        db.refresh(session)
-        return session
+        # 이전 질문에 답변 + 평가 결과 업데이트
+        prev_qa.answer = answer
+        prev_qa.end_type = map_end_type(result)
+        prev_qa.reason_end = result["reason_end"]
+        prev_qa.context_matched = result["context_matched"]
+        prev_qa.reason_context = result["reason_context"]
+        prev_qa.gpt_comment = result["gpt_comment"]
+        prev_qa.stop_words = map_stop_words(result)
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/prompt-start", response_model=EvaluationSessionRead)
-async def evaluate_audio_pair(
-    user_id: UUID = Form(...),
-    question1: UploadFile = Form(...),
-    answer1: UploadFile = Form(...),
-    question2: UploadFile = Form(...),
-    answer2: UploadFile = Form(...),
-    question3: UploadFile = Form(...),
-    answer3: UploadFile = Form(...),
-    db: Session = Depends(get_db)
-):
-    try:
-        # STT 병렬 처리
-        stt_start = time.time()
-        q_files = [question1, question2, question3]
-        a_files = [answer1, answer2, answer3]
-
-        question_list, answer_list = await asyncio.gather(
-            asyncio.gather(*[transcribe_audio_async(f) for f in q_files]),
-            asyncio.gather(*[transcribe_audio_async(f) for f in a_files])
-        )
-        stt_end = time.time()
-        print(f"[⏱ 총 STT 처리 시간] {stt_end - stt_start:.2f}초")
-
-        # GPT 분석
-        gpt_start = time.time()
-        gpt_text = await ask_gpt_if_ends_async(question_list, answer_list)
-        gpt_end = time.time()
-        print(f"[⏱ GPT 호출 시간] {gpt_end - gpt_start:.2f}초")
-
-        evaluations = parse_gpt_result(gpt_text)
-
-        # DB 저장
-        session = EvaluationSession(user_id=user_id)
-        db.add(session)
-        db.flush()
-        for i, eva in enumerate(evaluations):
-            qa = QuestionAnswerPair(
-                session_id=session.id,
-                order=i+1,
-                question=question_list[i],
-                answer=answer_list[i],
-                is_ended=eva["is_ended"],
-                reason_end=eva["reason_end"],
-                context_matched=eva["context_matched"],
-                reason_context=eva["reason_context"],
-                gpt_comment=eva["gpt_comment"]
+        # 꼬리질문 생성
+        if sub_order == 0:
+            followup = await generate_followup_question(prev_qa.question, answer)
+        elif sub_order == 1:
+            q0 = db.query(QuestionAnswerPair).filter_by(session_id=session_id, order=order, sub_order=0).first()
+            q1 = prev_qa  # 현재 sub_order=1의 질문
+            if not q0 or not q1:
+                raise HTTPException(status_code=404, detail="이전 질문들이 존재하지 않습니다.")
+            followup = await generate_second_followup_question(
+                base_question=q0.question,
+                answer1=q0.answer,
+                followup1=q1.question,
+                answer2=answer
             )
-            db.add(qa)
+        else:
+            raise HTTPException(status_code=400, detail="지원하지 않는 sub_order입니다.")
+
+        # 새로운 꼬리질문 저장 (답변은 아직 없음)
+        db.add(QuestionAnswerPair(
+            session_id=session_id,
+            order=order,
+            sub_order=sub_order + 1,
+            question=followup,
+            answer="",
+            created_at=datetime.utcnow()
+        ))
         db.commit()
-        db.refresh(session)
-        return session
+
+        return {"question": followup}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
