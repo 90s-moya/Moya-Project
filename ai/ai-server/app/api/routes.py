@@ -45,7 +45,7 @@ def map_stop_words(result: dict) -> str:
         return "INADEQUATE"
 
 # === 질문 3개 생성 ===
-@router.post("/v1/question-init", response_model=EvaluationSessionRead)
+@router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
 async def make_question(payload: PromptStartRequest, db: Session = Depends(get_db)):
     try:
         userId = payload.userId
