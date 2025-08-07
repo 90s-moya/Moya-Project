@@ -10,10 +10,12 @@ export type StudyRoom = {
   joinUser: number;
 };
 
+// 방장 정보
 export type MasterInfo = {
   nickname: string;
   makeRoomCnt: number;
   createdAt: string;
+  masterId: string;
 };
 
 export type StudyRoomDetail = {
@@ -36,13 +38,22 @@ export type CreateFormData = {
   expired_at: string;
 };
 
+// 방 생성 시 필요한 카테고리 타입
 export type Category = {
   categoryId: string;
   categoryName: string;
 };
 
-// 방 입장 시 필요한 type
-export type docsForEnterRoom = {
+// 방 입장 시 필요한 docs 타입
+export type MyDoc = {
+  docsId: string;
+  docsStatus: "RESUME" | "PORTFOLIO" | "COVER_LETTER";
+  fileUrl: string;
+  userId: string;
+};
+
+export type EnterRoomParams = {
+  room_id: string;
   resume_id: string;
   portfolio_id: string;
   coverletter_id: string;
