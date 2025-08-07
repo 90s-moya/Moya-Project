@@ -91,7 +91,7 @@ async def generate_initial_question(text: str) -> str:
 
     async with httpx.AsyncClient(timeout=90) as client:
         response = await client.post(
-            GMS_API_URL,
+            f"{GMS_API_URL}/chat/completions",
             headers={
                 "Authorization": f"Bearer {GMS_API_KEY}",
                 "Content-Type": "application/json"
@@ -138,7 +138,7 @@ async def generate_followup_question(base_question: str, answer: str) -> str:
 
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
-            GMS_API_URL,
+            f"{GMS_API_URL}/chat/completions",
             headers={
                 "Authorization": f"Bearer {GMS_API_KEY}",
                 "Content-Type": "application/json"
@@ -180,7 +180,7 @@ async def generate_second_followup_question(base_question: str, answer1: str, fo
 
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
-            GMS_API_URL,
+            f"{GMS_API_URL}/chat/completions",
             headers={
                 "Authorization": f"Bearer {GMS_API_KEY}",
                 "Content-Type": "application/json"

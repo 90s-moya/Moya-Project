@@ -7,7 +7,7 @@ from datetime import datetime
 # Q&A pair (기본 구조)
 class QuestionAnswerPairBase(BaseModel):
     order: int
-    suborder: int
+    sub_order: int
     question: str
     answer: Optional[str] = ""
     is_ended: Optional[bool] = False

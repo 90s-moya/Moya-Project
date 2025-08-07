@@ -26,7 +26,7 @@ class QuestionAnswerPair(Base):
     session_id = Column(String(36), ForeignKey("evaluation_session.id"), nullable=False)
 
     order = Column(Integer, nullable=False)
-    suborder = Column(Integer, nullable=False)
+    sub_order = Column(Integer, nullable=False)
     question = Column(Text, nullable=False)
 
     answer = Column(Text, nullable=True)
