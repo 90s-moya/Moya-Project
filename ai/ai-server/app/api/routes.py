@@ -26,15 +26,48 @@ router = APIRouter()
 # CPU 병렬 처리를 위한 프로세스 풀 생성 (코어 수 자동 감지)
 process_pool = ProcessPoolExecutor()
 
-# Whisper 비동기 래퍼 (프로세스 풀 사용)
+# # Whisper 비동기 래퍼 (프로세스 풀 사용)
+# async def transcribe_audio_async(file_obj: UploadFile) -> str:
+#     loop = asyncio.get_event_loop()
+#     temp_path = save_uploadfile_to_temp(file_obj)
+#     try:
+#         return await loop.run_in_executor(process_pool, transcribe_audio_from_path, temp_path)
+#     finally:
+#         if os.path.exists(temp_path):
+#             os.remove(temp_path)
+
 async def transcribe_audio_async(file_obj: UploadFile) -> str:
-    loop = asyncio.get_event_loop()
-    temp_path = save_uploadfile_to_temp(file_obj)
+    print("[STT] transcribe_audio_async 진입")
+
     try:
-        return await loop.run_in_executor(process_pool, transcribe_audio_from_path, temp_path)
+        print("[STT] 임시 파일 저장 시작")
+        temp_path = save_uploadfile_to_temp(file_obj)
+        print(f"[STT] 임시 파일 저장 완료: {temp_path}")
+    except Exception as e:
+        print(f"[❌ STT] 파일 저장 중 오류: {e}")
+        traceback.print_exc()
+        raise
+
+    try:
+        print("[STT] Whisper 추론 (비동기 run_in_executor) 시작")
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(process_pool, transcribe_audio_from_path, temp_path)
+        print("[STT] Whisper 추론 완료")
+        return result
+    except Exception as e:
+        print(f"[❌ STT] Whisper 추론 실패: {e}")
+        traceback.print_exc()
+        raise
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        print("[STT] 임시 파일 삭제 시도")
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                print("[STT] 임시 파일 삭제 완료")
+            else:
+                print("[STT] 임시 파일이 존재하지 않음")
+        except Exception as e:
+            print(f"[❌ STT] 임시 파일 삭제 실패: {e}")
 
 
 @router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
