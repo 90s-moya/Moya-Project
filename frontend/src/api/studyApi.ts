@@ -1,6 +1,7 @@
 // 면접 스터디 관련 API
 import api from "./index";
 import type {
+  createFeedbackParams,
   CreateFormData,
   EnterRoomParams,
   StudyRoom,
@@ -58,8 +59,26 @@ export const registerDocs = async ({
   return res.data;
 };
 
+// 방 삭제
 export const deleteRoom = async (id: string) => {
   const res = await api.delete(`/v1/room/${id}`);
 
   return res;
+};
+
+// 피드백 보내기
+export const createFeedback = async ({
+  room_id,
+  receiver_id,
+  type,
+  message,
+}: createFeedbackParams) => {
+  const res = await api.post(`/v1/feedback`, {
+    room_id,
+    receiver_id,
+    type,
+    message,
+  });
+
+  return res.data;
 };

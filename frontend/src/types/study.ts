@@ -52,9 +52,18 @@ export type MyDoc = {
   userId: string;
 };
 
+// 방 입장 시 필요한 파라미터 타입
 export type EnterRoomParams = {
   room_id: string;
   resume_id: string;
   portfolio_id: string;
   coverletter_id: string;
+};
+
+// 피드백 보내기 시 필요한 타입
+export type createFeedbackParams = {
+  room_id: string;
+  receiver_id: string;
+  type: "SMILE" | "SAD";
+  message: string;
 };

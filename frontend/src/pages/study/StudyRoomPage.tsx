@@ -1,7 +1,7 @@
 import CameraControlPanel from "@/components/study/CameraControlPanel";
 import MicControlPanel from "@/components/study/MicControlPanel";
 import VideoTile from "@/components/study/VideoTile";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
@@ -22,11 +22,12 @@ export default function StudyRoomPage() {
   const myIdRef = useRef<string>("");
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
   const signalingRef = useRef<SignalingClient | null>(null);
-  // ************
   const [nickname, setNickname] = useState("");
 
   // 닉네임 저장용 Map
   const nicknameMapRef = useRef<Map<string, string>>(new Map());
+
+  const { room_id } = useParams();
 
   // 유저 닉네임을 불러와서 저장하는 useEffect
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function StudyRoomPage() {
       try {
         const res = await UserApi.getMyInfo();
 
-        // console.log("getMyInfo의 결과입니다.", res.data.nickname);
+        console.log("getMyInfo의 결과입니다.", res.data.nickname);
         setNickname(res.data.nickname);
       } catch (err) {
         alert("getMyInfo 에러 발생");
@@ -42,7 +43,7 @@ export default function StudyRoomPage() {
     };
     requestMyInfo();
   }, []);
-  // ************
+
   const handleLeaveRoom = () => {
     console.log("disconnection video", localStream);
 
@@ -79,9 +80,7 @@ export default function StudyRoomPage() {
   };
 
   useEffect(() => {
-    // ************
     if (!nickname) return;
-    // ************
 
     if (signalingRef.current) return;
     const userInfo = localStorage.getItem("auth-storage");
@@ -102,14 +101,13 @@ export default function StudyRoomPage() {
         const peerManager = peerManagerRef.current;
         if (!peerManager) return;
 
-        console.log("받은 메세지", data);
+        console.log("다른 사용자로부터 받은 메세지", data);
 
         if (data.type === "join") {
           // 닉네임 저장
           if (data.nickname) {
             nicknameMapRef.current.set(data.senderId, data.nickname);
           }
-          //
           await peerManager.createConnectionWith(data.senderId);
 
           console.log("새 참여자 연결!");
@@ -136,9 +134,13 @@ export default function StudyRoomPage() {
     signalingRef.current = signaling;
     const peerManager = new PeerConnectionManager(myId, signaling);
     peerManagerRef.current = peerManager;
-    // ************
-    // TODO : 참여자 이름도 닉네임으로 변경해주세염
+
     peerManager.onRemoteStream = (peerId, stream) => {
+      console.log("nicknameMapRef 상태:", [
+        ...nicknameMapRef.current.entries(),
+      ]);
+      console.log("peerId:", peerId);
+
       const nickname =
         nicknameMapRef.current.get(peerId) ?? `참여자-${peerId.slice(0, 4)}`;
 
@@ -147,14 +149,14 @@ export default function StudyRoomPage() {
         { id: peerId, name: nickname, stream },
       ]);
     };
-    // ************
+
     // peerManager.onRemoteStream = (peerId, stream) => {
     //   setParticipants((prev) => [
     //     ...prev.filter((p) => p.id !== peerId),
     //     { id: peerId, name: `참여자-${nickname}`, stream },
     //   ]);
     // };
-    // ************
+
     (async () => {
       const local = await navigator.mediaDevices.getUserMedia({
         video: true,
@@ -185,7 +187,13 @@ export default function StudyRoomPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {participants.map((p) => (
             <div key={p.id} className="w-full aspect-video">
-              <VideoTile stream={p.stream} name={p.name} isLocal={p.isLocal} />
+              <VideoTile
+                stream={p.stream}
+                name={p.name}
+                isLocal={p.isLocal}
+                userId={p.id}
+                roomId={room_id!}
+              />
             </div>
           ))}
         </div>
