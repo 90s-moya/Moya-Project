@@ -60,9 +60,9 @@ export default function StudyRoomPage() {
     myIdRef.current = myId;
 
     // 배포용
-    //const signaling = new SignalingClient(`wss://${import.meta.env.VITE_RTC_API_URL}/ws`, myId, async (data) => {
+    const signaling = new SignalingClient(`wss://${import.meta.env.VITE_RTC_API_URL}/ws`, myId, async (data) => {
     // 테스트 용
-    const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
+    //const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
       const peerManager = peerManagerRef.current;
       if(!peerManager) return;
 
