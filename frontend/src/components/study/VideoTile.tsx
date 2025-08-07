@@ -4,14 +4,12 @@ interface VideoTileProps {
   stream: MediaStream | null;
   name: string;
   isLocal?: boolean;
-  userId: string;
 }
 
 export default function VideoTile({
   stream,
   name,
-  isLocal = false,
-  userId
+  isLocal = false
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -24,7 +22,6 @@ export default function VideoTile({
   // 서류 아이콘 클릭 시 실행되는 함수
   const handleClickDocs = () => {
     console.log("서류 아이콘 클릭 됨.");
-    console.log(userId);
     console.log(name);
 
     // api 요청 보내서 서류 받아오기
