@@ -25,7 +25,6 @@ public class RoomInfoCommand {
                 .id(room.getId())
                 .title(room.getTitle())
                 .body(room.getBody())
-                .conversation(room.getConversation())
                 .maxUser(room.getMaxUser())
                 .joinUser(joinMemberCount)
                 .expiredAt(room.getExpiredAt())
