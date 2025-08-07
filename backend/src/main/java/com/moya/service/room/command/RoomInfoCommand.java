@@ -13,7 +13,6 @@ public class RoomInfoCommand {
     private UUID id;
     private String title;
     private String body;
-    private String conversation;
     private int maxUser;
     private int joinUser;
     private LocalDateTime expiredAt;

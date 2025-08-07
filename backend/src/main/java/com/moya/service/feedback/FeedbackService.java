@@ -4,10 +4,13 @@ import com.moya.domain.feedback.Feedback;
 import com.moya.domain.feedback.FeedbackRepository;
 import com.moya.domain.room.Room;
 import com.moya.domain.room.RoomRepository;
+import com.moya.domain.roommember.RoomMember;
+import com.moya.domain.roommember.RoomMemberRepository;
 import com.moya.domain.user.User;
 import com.moya.domain.user.UserRepository;
 import com.moya.interfaces.api.feedback.request.FeedbackRequest;
 import com.moya.service.feedback.command.FeedbackInfoCommand;
+import com.moya.service.feedback.command.FeedbackResultCommand;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,20 +24,30 @@ public class FeedbackService {
     private final FeedbackRepository feedbackRepository;
     private final RoomRepository roomRepository;
     private final UserRepository userRepository;
+    private final RoomMemberRepository roomMemberRepository;
 
     // 받은 내 피드백 전체 조회
     @Transactional
-    public List<FeedbackInfoCommand> selectFeedback(UUID userId) {
-        List<Feedback> feedback = feedbackRepository.findByUserId(userId);
-
-        return feedback.stream()
+    public FeedbackResultCommand selectFeedback(UUID userId, UUID roomId) {
+        // 해당 방 feedbacklist 조회
+        List<Feedback> feedback = feedbackRepository.findByUserIdAndRoomId(userId, roomId);
+        List<FeedbackInfoCommand> feedbackList = feedback.stream()
                 .map(f -> FeedbackInfoCommand.builder()
-                        .feedbackId(f.getId())
-                        .roomId(f.getRoom().getId())
+                        .fdId(f.getId())
                         .feedbackType(f.getType())
                         .message(f.getMessage())
+                        .createdAt(f.getCreatedAt())
                         .build())
                 .toList();
+
+        // 해당 방 video Url 조회
+        RoomMember rm = roomMemberRepository.findByRoomIdAndUserId(roomId, userId);
+
+        FeedbackResultCommand feedbackResult = FeedbackResultCommand.builder()
+                .videoUrl(rm.getVideo_url())
+                .feedbackList(feedbackList)
+                .build();
+        return feedbackResult;
     }
 
     // 피드백 보내기

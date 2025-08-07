@@ -20,4 +20,7 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember, UUID> {
     @Modifying
     @Query("DELETE FROM RoomMember rm where rm.room_id.id = :room_id")
     void deleteRoomMember(UUID room_id);
+
+    @Query("SELECT rm from RoomMember rm where rm.room_id.id = :room_id and rm.user_id.id = :user_id")
+    RoomMember findByRoomIdAndUserId(UUID room_id, UUID user_id);
 }
