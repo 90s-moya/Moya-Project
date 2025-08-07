@@ -4,14 +4,18 @@ import StudyBackToList from "@/components/study/StudyBackToList";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { formatDateTime } from "@/util/date";
-import { getRoomDetail } from "@/api/studyApi";
+import { deleteRoom, getRoomDetail } from "@/api/studyApi";
 import type { StudyRoomDetail } from "@/types/study";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export default function StudyDetailPage() {
   const { id } = useParams();
   const [roomDetail, setRoomDetail] = useState<StudyRoomDetail>();
+  const [isMine, setIsMine] = useState(true); // 추후 false로 변경해야함
 
   const navigate = useNavigate();
+  // 방 삭제 시 참고할 현재 사용자의 UUID
+  const UUID = useAuthStore((state) => state.UUID);
 
   // 마운트 시 방 상세 API 요청 보내기
   useEffect(() => {
@@ -33,6 +37,36 @@ export default function StudyDetailPage() {
 
     requestRoomDetail(id);
   }, [id]);
+
+  // 방 삭제하는 함수
+  const handleDeleteRoom = async () => {
+    if (!id) {
+      return;
+    }
+
+    // 삭제하기 전의 확인 대화창
+    const confirmed = window.confirm("정말 이 방을 삭제하시겠습니까?");
+
+    if (!confirmed) return;
+
+    try {
+      const data = await deleteRoom(id);
+
+      console.log("방 삭제 완료!", data);
+      // 방 목록 페이지로 이동
+      navigate(`/study`);
+    } catch (err) {
+      console.error("방 삭제 에러 발생", err);
+      alert("방 삭제에 실패하였습니다.");
+    }
+  };
+
+  // 방 상세 조회를 통해 받은 방장 ID와 현재 사용자의 ID가 같다면 삭제 버튼 활성화
+  useEffect(() => {
+    if (roomDetail?.masterInfo.masterId === UUID) {
+      setIsMine(false);
+    }
+  }, [roomDetail, UUID]);
 
   return (
     <div className="min-h-screen bg-[#ffffff] text-[17px] leading-relaxed">
@@ -154,6 +188,15 @@ export default function StudyDetailPage() {
               참여하기
             </Button>
             <StudyBackToList />
+            <div className="flex justify-end">
+              <Button
+                disabled={!isMine}
+                onClick={handleDeleteRoom}
+                className="w-30 bg-red-500 hover:bg-red-700 text-white py-7 text-lg rounded-lg mt-5"
+              >
+                방 삭제하기
+              </Button>
+            </div>
           </div>
         </div>
       </main>
