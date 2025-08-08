@@ -1,15 +1,13 @@
 import CameraControlPanel from "@/components/study/CameraControlPanel";
 import MicControlPanel from "@/components/study/MicControlPanel";
 import VideoTile from "@/components/study/VideoTile";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
-import UserApi from "@/api/userApi";
 
 type Participant = {
   id: string;
-  name: string;
   stream: MediaStream | null;
   isLocal?: boolean;
 };
@@ -22,39 +20,35 @@ export default function StudyRoomPage() {
   const myIdRef = useRef<string>("");
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
   const signalingRef = useRef<SignalingClient | null>(null);
-  const [nickname, setNickname] = useState("");
 
-  // 닉네임 저장용 Map
-  const nicknameMapRef = useRef<Map<string, string>>(new Map());
+  const { room_id } = useParams();
 
   // 유저 닉네임을 불러와서 저장하는 useEffect
-  useEffect(() => {
-    const requestMyInfo = async () => {
-      try {
-        const res = await UserApi.getMyInfo();
+  // useEffect(() => {
+  //   const requestMyInfo = async () => {
+  //     try {
+  //       const res = await UserApi.getMyInfo();
 
-        console.log("getMyInfo의 결과입니다.", res.data.nickname);
-        setNickname(res.data.nickname);
-      } catch (err) {
-        alert("getMyInfo 에러 발생");
-      }
-    };
-    requestMyInfo();
-  }, []);
+  //        console.log("getMyInfo의 결과입니다.", res.data.nickname);
+  //        setNickname(res.data.nickname);
+  //     } catch (err) {
+  //       alert("getMyInfo 에러 발생");
+  //     }
+  //   };
+  //   requestMyInfo();
+  // }, []);
 
   const handleLeaveRoom = () => {
     console.log("disconnection video", localStream);
 
     // peer제거
     peerManagerRef.current?.removeLocalTracks();
-
     // stream 중지
     if (localStream) {
       localStream.getTracks().forEach((track) => {
         track.stop();
       });
     }
-
     // srcObject 해제
     document.querySelectorAll("video").forEach((video) => {
       (video as HTMLVideoElement).srcObject = null;
@@ -62,10 +56,8 @@ export default function StudyRoomPage() {
 
     setLocalStream(null);
     setParticipants((prev) => prev.filter((p) => p.id !== myIdRef.current));
-
     // webrtc 연결 종료
     peerManagerRef.current?.closeAllConnections?.();
-
     // websocket 메시지 전송
     signalingRef.current?.send({
       type: "leave",
@@ -78,8 +70,6 @@ export default function StudyRoomPage() {
   };
 
   useEffect(() => {
-    if (!nickname) return;
-
     if (signalingRef.current) return;
     const userInfo = localStorage.getItem("auth-storage");
     const parsed = JSON.parse(userInfo!);
@@ -92,21 +82,20 @@ export default function StudyRoomPage() {
       myId,
       async (data) => {
         // 테스트 용
-        // const signaling = new SignalingClient(
-        //   `ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`,
-        //   myId,
-        //   async (data) => {
+        //const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
         const peerManager = peerManagerRef.current;
         if (!peerManager) return;
 
-        console.log("다른 사용자로부터 받은 메세지", data);
+        console.log("받은 메세지", data);
 
+        // 새 참여자 입장 시 스트림 연결
         if (data.type === "join") {
-          // 닉네임 저장
-          if (data.nickname) {
-            nicknameMapRef.current.set(data.senderId, data.nickname);
-          }
           await peerManager.createConnectionWith(data.senderId);
+
+          // 내 스트림이 있다면 새로운 참여자에게도 전송
+          if (localStream) {
+            peerManagerRef.current?.setLocalStream(localStream);
+          }
 
           console.log("새 참여자 연결!");
           return;
@@ -133,27 +122,13 @@ export default function StudyRoomPage() {
     const peerManager = new PeerConnectionManager(myId, signaling);
     peerManagerRef.current = peerManager;
 
+    // 원격 스트림 처리
     peerManager.onRemoteStream = (peerId, stream) => {
-      console.log("nicknameMapRef 상태:", [
-        ...nicknameMapRef.current.entries(),
-      ]);
-      console.log("peerId:", peerId);
-
-      const nickname =
-        nicknameMapRef.current.get(peerId) ?? `참여자-${peerId.slice(0, 4)}`;
-
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== peerId),
-        { id: peerId, name: nickname, stream },
+        { id: peerId, stream },
       ]);
     };
-
-    // peerManager.onRemoteStream = (peerId, stream) => {
-    //   setParticipants((prev) => [
-    //     ...prev.filter((p) => p.id !== peerId),
-    //     { id: peerId, name: `참여자-${nickname}`, stream },
-    //   ]);
-    // };
 
     (async () => {
       const local = await navigator.mediaDevices.getUserMedia({
@@ -164,13 +139,13 @@ export default function StudyRoomPage() {
       // TODO : 사용자 정보에 맞게 변경해주세염ㅎ
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== myId),
-        { id: myId, name: "나", stream: local, isLocal: true },
+        { id: myId, stream: local, isLocal: true },
       ]);
       peerManager.setLocalStream(local);
-      signaling.send({ type: "join", senderId: myId, nickname });
+      signaling.send({ type: "join", senderId: myId });
     })();
-  }, [nickname]);
-  // ************
+  }, []);
+
   return (
     <div className="min-h-screen bg-white text-[#1b1c1f] flex flex-col">
       {/* 상단 헤더 */}
@@ -185,7 +160,12 @@ export default function StudyRoomPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {participants.map((p) => (
             <div key={p.id} className="w-full aspect-video">
-              <VideoTile stream={p.stream} name={p.name} isLocal={p.isLocal} />
+              <VideoTile
+                stream={p.stream}
+                isLocal={p.isLocal}
+                userId={p.id}
+                roomId={room_id!}
+              />
             </div>
           ))}
         </div>
