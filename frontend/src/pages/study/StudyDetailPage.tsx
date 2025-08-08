@@ -11,7 +11,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 export default function StudyDetailPage() {
   const { id } = useParams();
   const [roomDetail, setRoomDetail] = useState<StudyRoomDetail>();
-  const [isMine, setIsMine] = useState(true); // 추후 false로 변경해야함
+  const [isMine, setIsMine] = useState(false);
 
   const navigate = useNavigate();
   // 방 삭제 시 참고할 현재 사용자의 UUID
@@ -64,7 +64,7 @@ export default function StudyDetailPage() {
   // 방 상세 조회를 통해 받은 방장 ID와 현재 사용자의 ID가 같다면 삭제 버튼 활성화
   useEffect(() => {
     if (roomDetail?.masterInfo.masterId === UUID) {
-      setIsMine(false);
+      setIsMine(true);
     }
   }, [roomDetail, UUID]);
 
