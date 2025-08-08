@@ -4,7 +4,6 @@ import FeedbackPopup from "./FeedbackPopup";
 
 interface VideoTileProps {
   stream: MediaStream | null;
-  // name: string;
   isLocal?: boolean;
   userId: string;
   roomId: string;
@@ -12,7 +11,6 @@ interface VideoTileProps {
 
 export default function VideoTile({
   stream,
-  // name,
   isLocal = false,
   userId,
   roomId,
@@ -20,9 +18,9 @@ export default function VideoTile({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false); // 피드백 팝업 여부
   const [feedbackMessage, setFeedbackMessage] = useState(""); // 피드백 메시지
-  const [feedbackType, setFeedbackType] = useState<"SMILE" | "SAD" | null>(
-    null
-  ); // 피드백 타입
+  const [feedbackType, setFeedbackType] = useState<
+    "POSITIVE" | "NEGATIVE" | null
+  >(null); // 피드백 타입
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
@@ -45,13 +43,13 @@ export default function VideoTile({
 
   // 웃는 얼굴 버튼 눌렀을 때 호출
   const handleClickSmile = () => {
-    setFeedbackType("SMILE");
+    setFeedbackType("POSITIVE");
     setShowFeedbackPopup(true);
   };
 
   // 우는 얼굴 버튼 눌렀을 때 호출
   const handleClickSad = () => {
-    setFeedbackType("SAD");
+    setFeedbackType("NEGATIVE");
     setShowFeedbackPopup(true);
   };
 
@@ -62,12 +60,13 @@ export default function VideoTile({
     setIsSending(true);
 
     try {
-      await createFeedback({
-        room_id: roomId,
-        receiver_id: userId,
-        type: feedbackType,
+      const res = await createFeedback({
+        roomId: roomId,
+        receiverId: userId,
+        feedbackType: feedbackType,
         message: feedbackMessage,
       });
+      // console.log("피드백 보낸 결과", res);
       setShowFeedbackPopup(false);
       setFeedbackMessage("");
       setFeedbackType(null);
@@ -139,7 +138,7 @@ export default function VideoTile({
       {/* 중앙 하단 피드백 팝업 */}
       <FeedbackPopup
         show={showFeedbackPopup}
-        type={feedbackType}
+        feedbackType={feedbackType}
         message={feedbackMessage}
         onMessageChange={setFeedbackMessage}
         onSubmit={handleSubmitFeedback}
