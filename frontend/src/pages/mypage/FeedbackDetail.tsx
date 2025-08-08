@@ -42,7 +42,7 @@ const FeedbackDetail: React.FC = () => {
         {/* 상단 바: 이전으로 버튼 */}
         <div className="flex items-center pt-8 px-4 pb-2">
           <button
-            className="mr-4 py-1 rounded hover:bg-gray-100 transition-colors hover:cursor-pointer flex items-center text-gray-600"
+            className="mr-4 py-1 rounded hover:bg-gray-100 transition-colors flex items-center text-gray-600"
             onClick={() => navigate(-1)}
           >
             <svg width="20" height="20" fill="none" viewBox="0 0 20 20">
