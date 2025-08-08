@@ -92,3 +92,8 @@ export const getDocsInRoom = async (room_id: string) => {
 
   return res.data;
 };
+
+export const uploadVideo = async (formData: FormData) => {
+  const res = await api.post("/v1/room-member/upload-video", formData);
+  return res.data;
+};
