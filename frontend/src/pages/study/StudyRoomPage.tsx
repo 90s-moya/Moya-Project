@@ -20,10 +20,6 @@ export default function StudyRoomPage() {
   const myIdRef = useRef<string>("");
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
   const signalingRef = useRef<SignalingClient | null>(null);
-  // const [nickname, setNickname] = useState("");
-
-  // 닉네임 저장용 Map
-  // const nicknameMapRef = useRef<Map<string, string>>(new Map());
 
   const { room_id } = useParams();
 
@@ -74,8 +70,6 @@ export default function StudyRoomPage() {
   };
 
   useEffect(() => {
-    // if (!nickname) return;
-
     if (signalingRef.current) return;
     const userInfo = localStorage.getItem("auth-storage");
     const parsed = JSON.parse(userInfo!);
@@ -96,10 +90,6 @@ export default function StudyRoomPage() {
 
         // 새 참여자 입장 시 스트림 연결
         if (data.type === "join") {
-          // 닉네임 저장
-          // if (data.nickname) {
-          //   nicknameMapRef.current.set(data.senderId, data.nickname);
-          // }
           await peerManager.createConnectionWith(data.senderId);
 
           // 내 스트림이 있다면 새로운 참여자에게도 전송
@@ -134,9 +124,6 @@ export default function StudyRoomPage() {
 
     // 원격 스트림 처리
     peerManager.onRemoteStream = (peerId, stream) => {
-      // const nickname =
-      //   nicknameMapRef.current.get(peerId) ?? `참여자-${peerId.slice(0, 4)}`;
-
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== peerId),
         { id: peerId, stream },
@@ -175,7 +162,6 @@ export default function StudyRoomPage() {
             <div key={p.id} className="w-full aspect-video">
               <VideoTile
                 stream={p.stream}
-                // name={p.name}
                 isLocal={p.isLocal}
                 userId={p.id}
                 roomId={room_id!}
