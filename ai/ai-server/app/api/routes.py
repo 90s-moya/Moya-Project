@@ -1,5 +1,5 @@
 # app/api/routes.py
-from fastapi import APIRouter, UploadFile, Form, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, Form, HTTPException, Depends, File
 from sqlalchemy.orm import Session
 from uuid import UUID
 from datetime import datetime
@@ -17,6 +17,9 @@ from app.utils.stt import transcribe_audio_async
 from pydantic import BaseModel
 import time
 import asyncio
+from sqlalchemy import String
+
+
 
 router = APIRouter()
 
@@ -83,72 +86,138 @@ async def make_question(payload: PromptStartRequest, db: Session = Depends(get_d
         raise HTTPException(status_code=500, detail=str(e))
 
 # === 꼬리질문 생성 & 평가 ===
+import logging, traceback
+
+log = logging.getLogger(__name__)
+
 @router.post("/v1/followup-question")
 async def followup_question(
-    session_id: UUID = Form(...),
+    session_id: str = Form(...),      # 문자열로 받고 strip 후 UUID 변환
     order: int = Form(...),
-    sub_order: int = Form(...),
-    audio: UploadFile = Form(...),
+    sub_order: int = Form(...),       # 들어오지만 신뢰하지 않음(최신값 사용)
+    audio: UploadFile = File(...),    # 파일은 File(...)
     db: Session = Depends(get_db)
 ):
     try:
+        # 0) UUID 정리
+        try:
+            session_uuid = UUID(session_id.strip())
+        except Exception:
+            raise HTTPException(status_code=422, detail="session_id가 유효한 UUID가 아닙니다.")
+
+        # 0-1) 컬럼 타입에 맞춰 비교값 결정
+        session_col = QuestionAnswerPair.__table__.c.session_id
+        if isinstance(session_col.type, String):
+            session_filter_val = str(session_uuid)
+        else:
+            session_filter_val = session_uuid
+
+        # 1) 세션 내 존재하는 (order, sub_order) 덤프
+        exists = (db.query(QuestionAnswerPair.order, QuestionAnswerPair.sub_order)
+                    .filter(QuestionAnswerPair.session_id == session_filter_val)
+                    .order_by(QuestionAnswerPair.order, QuestionAnswerPair.sub_order)
+                    .all())
+        log.info(f"[followup] session={session_filter_val} exists={exists}")
+
+        # 2) 해당 order의 최신 row 가져오기(클라이언트 sub_order는 신뢰 X)
+        latest_qa = (db.query(QuestionAnswerPair)
+                       .filter(QuestionAnswerPair.session_id == session_filter_val,
+                               QuestionAnswerPair.order == order)
+                       .order_by(QuestionAnswerPair.sub_order.desc())
+                       .first())
+        if not latest_qa:
+            raise HTTPException(status_code=404, detail="해당 order의 질문을 찾을 수 없습니다.")
+
+        # 3) 파일 읽기 → STT
+        # content = await audio.read()
+        # if not content:
+        #     raise HTTPException(status_code=400, detail="업로드된 오디오가 비어있습니다.")
         answer = await transcribe_audio_async(audio)
+        # 4) GPT 평가 (원문 로깅 + 파싱 실패시 안전값 사용)
+        try:
+            gpt_text = await ask_gpt_if_ends_async([latest_qa.question], [answer])
+            log.info(f"[followup] gpt_raw={gpt_text[:500]}")
+            parsed = parse_gpt_result(gpt_text)
+            if not parsed:
+                log.warning("[followup] GPT 평가 파싱 실패, 기본값 사용")
+                parsed = [{
+                    "is_ended": False,
+                    "reason_end": "파싱 실패",
+                    "context_matched": True,
+                    "reason_context": "임시 기본값",
+                    "gpt_comment": "임시 기본값"
+                }]
+        except Exception as ge:
+            log.error(f"[followup] GPT 호출 실패: {ge}")
+            parsed = [{
+                "is_ended": False,
+                "reason_end": "GPT 호출 실패",
+                "context_matched": True,
+                "reason_context": "임시 기본값",
+                "gpt_comment": "임시 기본값"
+            }]
 
-        # GPT 평가 대상: 이전 질문 (sub_order에 해당하는 질문)
-        prev_qa = db.query(QuestionAnswerPair).filter_by(
-            session_id=session_id, order=order, sub_order=sub_order
-        ).first()
-        if not prev_qa:
-            raise HTTPException(status_code=404, detail="평가 대상 질문을 찾을 수 없습니다.")
+        res = parsed[0]
 
-        # GPT 평가
-        gpt_result_text = await ask_gpt_if_ends_async([prev_qa.question], [answer])
-        parsed_result = parse_gpt_result(gpt_result_text)
-        if not parsed_result:
-            raise HTTPException(status_code=500, detail="GPT 평가 파싱 실패")
-        result = parsed_result[0]
+        # 5) 최신 질문 row 업데이트
+        latest_qa.answer = answer
+        latest_qa.end_type = map_end_type(res)
+        latest_qa.reason_end = res.get("reason_end", "")
+        latest_qa.context_matched = res.get("context_matched", False)
+        latest_qa.reason_context = res.get("reason_context", "")
+        latest_qa.gpt_comment = res.get("gpt_comment", "")
+        latest_qa.stop_words = map_stop_words(res)
+        db.add(latest_qa)
+        db.commit()
+        db.refresh(latest_qa)
 
-        # 이전 질문에 답변 + 평가 결과 업데이트
-        prev_qa.answer = answer
-        prev_qa.end_type = map_end_type(result)
-        prev_qa.reason_end = result["reason_end"]
-        prev_qa.context_matched = result["context_matched"]
-        prev_qa.reason_context = result["reason_context"]
-        prev_qa.gpt_comment = result["gpt_comment"]
-        prev_qa.stop_words = map_stop_words(result)
-
-        # 꼬리질문 생성
-        if sub_order == 0:
-            followup = await generate_followup_question(prev_qa.question, answer)
-        elif sub_order == 1:
-            q0 = db.query(QuestionAnswerPair).filter_by(session_id=session_id, order=order, sub_order=0).first()
-            q1 = prev_qa  # 현재 sub_order=1의 질문
-            if not q0 or not q1:
-                raise HTTPException(status_code=404, detail="이전 질문들이 존재하지 않습니다.")
+        # 6) 꼬리질문 생성
+        if latest_qa.sub_order == 0:
+            followup = await generate_followup_question(latest_qa.question, answer)
+        elif latest_qa.sub_order == 1:
+            q0 = (db.query(QuestionAnswerPair)
+                    .filter_by(session_id=session_filter_val, order=order, sub_order=0)
+                    .first())
+            if not q0:
+                raise HTTPException(status_code=404, detail="첫 질문이 존재하지 않습니다.")
             followup = await generate_second_followup_question(
                 base_question=q0.question,
-                answer1=q0.answer,
-                followup1=q1.question,
+                answer1=q0.answer or "",
+                followup1=latest_qa.question,
                 answer2=answer
             )
         else:
             raise HTTPException(status_code=400, detail="지원하지 않는 sub_order입니다.")
 
-        # 새로운 꼬리질문 저장 (답변은 아직 없음)
-        db.add(QuestionAnswerPair(
-            session_id=session_id,
+        # 7) 새 row 저장(필수 필드 기본값 채움)
+        new_pair = QuestionAnswerPair(
+            session_id=session_filter_val,
             order=order,
-            sub_order=sub_order + 1,
+            sub_order=latest_qa.sub_order + 1,
             question=followup,
             answer="",
+            is_ended=False,
+            reason_end="",
+            context_matched=False,
+            reason_context="",
+            gpt_comment="",
+            end_type="",
+            stopwords="",
             created_at=datetime.utcnow()
-        ))
+        )
+        db.add(new_pair)
         db.commit()
+        db.refresh(new_pair)
 
-        return {"question": followup}
+        return {"question": followup, "next_sub_order": new_pair.sub_order}
 
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        log.error("[followup] unexpected error: %s", e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Internal error in followup_question")
+
 
 # === 오디오 기반 질문 3개 평가 ===
 @router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
