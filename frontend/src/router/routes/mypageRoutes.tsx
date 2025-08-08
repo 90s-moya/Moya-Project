@@ -6,7 +6,7 @@ import Resume from "@/pages/mypage/Resume";
 import Portfolio from "@/pages/mypage/Portfolio";
 import Result from "@/pages/mypage/Result";
 import Feedback from "@/pages/mypage/Feedback";
-import FeedbackDetail from "@/pages/mypage/feedbackDetail";
+import FeedbackDetail from "@/pages/mypage/FeedbackDetail";
 
 const mypageRoutes: RouteObject[] = [
     {path: "/mypage/userinfo", element: <UserInfo />},
