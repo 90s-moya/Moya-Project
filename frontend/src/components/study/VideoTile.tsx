@@ -4,7 +4,7 @@ import FeedbackPopup from "./FeedbackPopup";
 
 interface VideoTileProps {
   stream: MediaStream | null;
-  name: string;
+  // name: string;
   isLocal?: boolean;
   userId: string;
   roomId: string;
@@ -12,7 +12,7 @@ interface VideoTileProps {
 
 export default function VideoTile({
   stream,
-  name,
+  // name,
   isLocal = false,
   userId,
   roomId,
@@ -97,9 +97,6 @@ export default function VideoTile({
       />
 
       {/* 사용자 이름 */}
-      <div className="absolute bottom-2 left-2 bg-blue-500 bg-opacity-50 text-white text-lg px-3 py-1 rounded-full shadow">
-        {name}
-      </div>
 
       {/* 오른쪽 상단 서류 아이콘 3개 */}
       <div className="absolute top-2 right-2 flex flex-col items-center gap-2 text-black">
