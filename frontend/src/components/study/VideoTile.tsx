@@ -42,13 +42,13 @@ export default function VideoTile({
   };
 
   // 웃는 얼굴 버튼 눌렀을 때 호출
-  const handleClickSmile = () => {
+  const handleClickPositive = () => {
     setFeedbackType("POSITIVE");
     setShowFeedbackPopup(true);
   };
 
   // 우는 얼굴 버튼 눌렀을 때 호출
-  const handleClickSad = () => {
+  const handleClickNegative = () => {
     setFeedbackType("NEGATIVE");
     setShowFeedbackPopup(true);
   };
@@ -122,13 +122,13 @@ export default function VideoTile({
       {/* 오른쪽 하단 감정 피드백 */}
       <div className="absolute bottom-2 right-2 flex gap-2">
         <button
-          onClick={handleClickSmile}
+          onClick={handleClickPositive}
           className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]"
         >
           🙂
         </button>
         <button
-          onClick={handleClickSad}
+          onClick={handleClickNegative}
           className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]"
         >
           😢
