@@ -47,14 +47,12 @@ export default function StudyRoomPage() {
 
     // peer제거
     peerManagerRef.current?.removeLocalTracks();
-
     // stream 중지
     if (localStream) {
       localStream.getTracks().forEach((track) => {
         track.stop();
       });
     }
-
     // srcObject 해제
     document.querySelectorAll("video").forEach((video) => {
       (video as HTMLVideoElement).srcObject = null;
@@ -62,10 +60,8 @@ export default function StudyRoomPage() {
 
     setLocalStream(null);
     setParticipants((prev) => prev.filter((p) => p.id !== myIdRef.current));
-
     // webrtc 연결 종료
     peerManagerRef.current?.closeAllConnections?.();
-
     // websocket 메시지 전송
     signalingRef.current?.send({
       type: "leave",
@@ -92,14 +88,11 @@ export default function StudyRoomPage() {
       myId,
       async (data) => {
         // 테스트 용
-        // const signaling = new SignalingClient(
-        //   `ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`,
-        //   myId,
-        //   async (data) => {
+        //const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
         const peerManager = peerManagerRef.current;
         if (!peerManager) return;
 
-        console.log("다른 사용자로부터 받은 메세지", data);
+        console.log("받은 메세지", data);
 
         // 새 참여자 입장 시 스트림 연결
         if (data.type === "join") {

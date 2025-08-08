@@ -19,7 +19,6 @@ export class SignalingClient {
     private onMessage: (data: SignalMessage) => void
   ) {
     this.ws = new WebSocket(url);
-    console.log("===========url확인====", url);
 
     this.ws.onopen = () => {
       this.isOpen = true;
