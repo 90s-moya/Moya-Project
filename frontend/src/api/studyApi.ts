@@ -37,7 +37,7 @@ export const createRoom = async (formData: CreateFormData) => {
 };
 
 // 내 서류 리스트 조회(방 입장 시 필요)
-export const getMyDocs = async () => {
+export const getMyDocsForEnterRoom = async () => {
   const res = await api.get(`/v1/docs/me`);
 
   return res.data;
@@ -66,17 +66,17 @@ export const deleteRoom = async (id: string) => {
   return res;
 };
 
-// 피드백 보내기
+// StudyRoomPage에서 피드백 보내기
 export const createFeedback = async ({
-  room_id,
-  receiver_id,
-  type,
+  roomId,
+  receiverId,
+  feedbackType,
   message,
 }: createFeedbackParams) => {
   const res = await api.post(`/v1/feedback`, {
-    room_id,
-    receiver_id,
-    type,
+    roomId,
+    receiverId,
+    feedbackType,
     message,
   });
 
