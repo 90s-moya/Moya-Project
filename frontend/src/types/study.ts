@@ -62,8 +62,8 @@ export type EnterRoomParams = {
 
 // 피드백 보내기 시 필요한 타입
 export type createFeedbackParams = {
-  room_id: string;
-  receiver_id: string;
-  type: "SMILE" | "SAD";
+  roomId: string;
+  receiverId: string;
+  feedbackType: "POSITIVE" | "NEGATIVE";
   message: string;
 };
