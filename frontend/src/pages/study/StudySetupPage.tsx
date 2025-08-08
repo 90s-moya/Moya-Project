@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Mic, Camera } from "lucide-react";
 import Header from "@/components/common/Header";
 import { useNavigate, useParams } from "react-router-dom";
-import { registerDocs, getMyDocs } from "@/api/studyApi";
+import { registerDocs, getMyDocsForEnterRoom } from "@/api/studyApi";
 import type { MyDoc } from "@/types/study";
 
 export default function StudySetupPage() {
@@ -23,16 +23,30 @@ export default function StudySetupPage() {
   const resumeDocs = docList.filter((doc) => doc.docsStatus === "RESUME");
   const portfolioDocs = docList.filter((doc) => doc.docsStatus === "PORTFOLIO");
   const coverLetterDocs = docList.filter(
-    (doc) => doc.docsStatus === "COVER_LETTER"
+    (doc) => doc.docsStatus === "COVERLETTER"
   );
-
   // Select 태그로 선택된 문서들
   const [selectedDocs, setSelectedDocs] = useState({
-    resume_id: "",
-    portfolio_id: "",
-    coverletter_id: "빈 문자열", // 더미 값입니다.
-    // coverletter_id: "",
+    resumeId: "",
+    portfolioId: "",
+    coverletterId: "",
   });
+
+  // 등록된 내 서류 불러오기
+  useEffect(() => {
+    const requestMyDocs = async () => {
+      try {
+        const data = await getMyDocsForEnterRoom();
+        console.log("내 서류 조회 결과 : ", data);
+
+        setDocList(data);
+      } catch (err) {
+        console.error("내 서류 조회 실패", err);
+      }
+    };
+
+    requestMyDocs();
+  }, []);
 
   // 카메라 및 오디오 시작 함수
   const startStream = async () => {
@@ -71,22 +85,6 @@ export default function StudySetupPage() {
     }
   };
 
-  // 등록된 내 서류 불러오기
-  useEffect(() => {
-    const requestMyDocs = async () => {
-      try {
-        const data = await getMyDocs();
-        console.log("내 서류 조회 결과 : ", data);
-
-        setDocList(data);
-      } catch (err) {
-        console.error("내 서류 조회 실패", err);
-      }
-    };
-
-    requestMyDocs();
-  }, []);
-
   // 문서 선택 시 selectedDocs를 변경하는 핸들러
   const handleChangeDocs = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -99,22 +97,22 @@ export default function StudySetupPage() {
 
   // 환경 설정 완료 후 방 입장 시 실행되는 함수
   const handleEnterRoom = async () => {
-    const { resume_id, portfolio_id, coverletter_id } = selectedDocs;
+    const { resumeId, portfolioId, coverletterId } = selectedDocs;
 
-    if (!resume_id || !portfolio_id || !coverletter_id) {
+    if (!resumeId || !portfolioId || !coverletterId) {
       alert("모든 문서를 선택해야 방에 입장할 수 있습니다.");
       return;
     }
 
     try {
-      await registerDocs({
-        room_id: id!,
-        resume_id,
-        portfolio_id,
-        coverletter_id,
+      const data = await registerDocs({
+        roomId: id!,
+        resumeId,
+        portfolioId,
+        coverletterId,
       });
 
-      console.log("방으로 입장 성공!!");
+      console.log("방으로 입장 성공!!", data);
       navigate(`/study/room/${id}`);
     } catch (err) {
       console.error("❌ 에러 발생", err);
@@ -159,14 +157,16 @@ export default function StudySetupPage() {
 
           {/* 문서 파일 선택 */}
           <div className="space-y-6">
-            <div>
-              <label htmlFor="doc-resume_id">이력서</label>
+            <div className="space-y-2">
               <select
-                name="resume_id"
-                id="resume_id"
+                name="resumeId"
+                id="resumeId"
                 onChange={handleChangeDocs}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               >
-                <option value="">이력서를 선택하세요</option>
+                <option value="" className="text-gray-400">
+                  이력서를 선택하세요
+                </option>
                 {resumeDocs?.map((file) => (
                   <option key={file.docsId} value={file.docsId}>
                     {file.fileUrl}
@@ -174,14 +174,17 @@ export default function StudySetupPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label htmlFor="coverletter_id">자기소개서</label>
+
+            <div className="space-y-2">
               <select
-                name="coverletter_id"
-                id="coverletter_id"
+                name="coverletterId"
+                id="coverletterId"
                 onChange={handleChangeDocs}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               >
-                <option value="">자기소개서를 선택하세요</option>
+                <option value="" className="text-gray-400">
+                  자기소개서를 선택하세요
+                </option>
                 {coverLetterDocs?.map((file) => (
                   <option key={file.docsId} value={file.docsId}>
                     {file.fileUrl}
@@ -189,14 +192,17 @@ export default function StudySetupPage() {
                 ))}
               </select>
             </div>
-            <div>
-              <label htmlFor="portfolio_id">포트폴리오</label>
+
+            <div className="space-y-2">
               <select
-                name="portfolio_id"
-                id="portfolio_id"
+                name="portfolioId"
+                id="portfolioId"
                 onChange={handleChangeDocs}
+                className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
               >
-                <option value="">포트폴리오를 선택하세요</option>
+                <option value="" className="text-gray-400">
+                  포트폴리오를 선택하세요
+                </option>
                 {portfolioDocs?.map((file) => (
                   <option key={file.docsId} value={file.docsId}>
                     {file.fileUrl}

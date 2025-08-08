@@ -1,17 +1,37 @@
-import { useEffect, useRef } from "react";
+import { createFeedback } from "@/api/studyApi";
+import { useEffect, useRef, useState } from "react";
+import FeedbackPopup from "./FeedbackPopup";
+import Carousel from "../ui/Carousel";
 
 interface VideoTileProps {
   stream: MediaStream | null;
-  name: string;
   isLocal?: boolean;
+  userId: string;
+  roomId: string;
+  userDocs?: {
+    docsId: string; // docs_id → docsId로 변경
+    userId: string; // user_id → userId로 변경
+    fileUrl: string; // file_url → fileUrl로 변경
+    docsStatus: string;
+  }[];
+  onDocsClick?: (userId: string) => void; // 서류 클릭 시 부모 컴포넌트에 알림
 }
 
 export default function VideoTile({
   stream,
-  name,
-  isLocal = false
+  isLocal = false,
+  userId,
+  roomId,
+  userDocs = [],
+  onDocsClick,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackType, setFeedbackType] = useState<
+    "POSITIVE" | "NEGATIVE" | null
+  >(null);
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -22,13 +42,55 @@ export default function VideoTile({
   // 서류 아이콘 클릭 시 실행되는 함수
   const handleClickDocs = () => {
     console.log("서류 아이콘 클릭 됨.");
-    console.log(name);
+    console.log("사용자 ID:", userId);
+    console.log("사용자 서류:", userDocs);
 
-    // api 요청 보내서 서류 받아오기
+    // 부모 컴포넌트에 서류 클릭 이벤트 전달
+    if (onDocsClick) {
+      onDocsClick(userId);
+    }
+  };
 
-    // 받아온 서류의 docsStatus에 따라 usestate로 선언된 변수에 담기
+  // 웃는 얼굴 버튼 눌렀을 때 호출
+  const handleClickPositive = () => {
+    setFeedbackType("POSITIVE");
+    setShowFeedbackPopup(true);
+  };
 
-    // 그런데 비디오 타일마다 사용자의 user id를 알아야하는데 어떻게 알지..?
+  // 우는 얼굴 버튼 눌렀을 때 호출
+  const handleClickNegative = () => {
+    setFeedbackType("NEGATIVE");
+    setShowFeedbackPopup(true);
+  };
+
+  // 피드백 제출
+  const handleSubmitFeedback = async () => {
+    if (!feedbackType || feedbackMessage.trim() === "") return;
+
+    setIsSending(true);
+
+    try {
+      const res = await createFeedback({
+        roomId: roomId,
+        receiverId: userId,
+        feedbackType: feedbackType,
+        message: feedbackMessage,
+      });
+      setShowFeedbackPopup(false);
+      setFeedbackMessage("");
+      setFeedbackType(null);
+    } catch (error) {
+      console.log("피드백 전송 실패:", error);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // 팝업 닫기 (초기화)
+  const handleClosePopup = () => {
+    setShowFeedbackPopup(false);
+    setFeedbackMessage("");
+    setFeedbackType(null);
   };
 
   return (
@@ -42,42 +104,41 @@ export default function VideoTile({
         className="w-full h-full object-cover"
       />
 
-      {/* 사용자 이름 */}
-      <div className="absolute bottom-2 left-2 bg-blue-500 bg-opacity-50 text-white text-lg px-3 py-1 rounded-full shadow">
-        {name}
-      </div>
-
-      {/* 오른쪽 상단 서류 아이콘 3개 */}
-      <div className="absolute top-2 right-2 flex flex-col items-center gap-2 text-black">
+      {/* 오른쪽 상단 서류 아이콘 (1개로 변경) */}
+      <div className="absolute top-2 right-2">
         <div
           onClick={handleClickDocs}
-          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
+          className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer transition-colors"
         >
           📄
-        </div>
-        <div
-          onClick={handleClickDocs}
-          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
-        >
-          📝
-        </div>
-        <div
-          onClick={handleClickDocs}
-          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
-        >
-          📁
         </div>
       </div>
 
       {/* 오른쪽 하단 감정 피드백 */}
       <div className="absolute bottom-2 right-2 flex gap-2">
-        <button className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]">
+        <button
+          onClick={handleClickPositive}
+          className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]"
+        >
           🙂
         </button>
-        <button className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]">
+        <button
+          onClick={handleClickNegative}
+          className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]"
+        >
           😢
         </button>
       </div>
+
+      {/* 중앙 하단 피드백 팝업 */}
+      <FeedbackPopup
+        show={showFeedbackPopup}
+        feedbackType={feedbackType}
+        message={feedbackMessage}
+        onMessageChange={setFeedbackMessage}
+        onSubmit={handleSubmitFeedback}
+        onClose={handleClosePopup}
+      />
     </div>
   );
 }
