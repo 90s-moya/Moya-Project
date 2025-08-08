@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 interface FeedbackPopupProps {
   show: boolean;
-  type: "SMILE" | "SAD" | null;
+  feedbackType: "POSITIVE" | "NEGATIVE" | null;
   message: string;
   onMessageChange: (msg: string) => void;
   onSubmit: () => void;
@@ -12,7 +12,7 @@ interface FeedbackPopupProps {
 
 export default function FeedbackPopup({
   show,
-  type,
+  feedbackType,
   message,
   onMessageChange,
   onSubmit,
@@ -79,7 +79,7 @@ export default function FeedbackPopup({
     >
       <div className="flex items-center justify-between mb-5">
         <span className="text-xl font-semibold text-gray-700">
-          {type === "SMILE" ? "🙂" : "😢"} 피드백 보내기
+          {feedbackType === "POSITIVE" ? "🙂" : "😢"} 피드백 보내기
         </span>
         <button
           onClick={onClose}
