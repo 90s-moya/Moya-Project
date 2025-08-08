@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Mic, Camera } from "lucide-react";
 import Header from "@/components/common/Header";
 import { useNavigate, useParams } from "react-router-dom";
-import { registerDocs, getMyDocs } from "@/api/studyApi";
+import { registerDocs, getMyDocsForEnterRoom } from "@/api/studyApi";
 import type { MyDoc } from "@/types/study";
 
 export default function StudySetupPage() {
@@ -25,14 +25,28 @@ export default function StudySetupPage() {
   const coverLetterDocs = docList.filter(
     (doc) => doc.docsStatus === "COVER_LETTER"
   );
-
   // Select 태그로 선택된 문서들
   const [selectedDocs, setSelectedDocs] = useState({
     resume_id: "",
     portfolio_id: "",
-    coverletter_id: "빈 문자열", // 더미 값입니다.
-    // coverletter_id: "",
+    coverletter_id: "임시 coverletter_id입니다.",
   });
+
+  // 등록된 내 서류 불러오기
+  useEffect(() => {
+    const requestMyDocs = async () => {
+      try {
+        const data = await getMyDocsForEnterRoom();
+        console.log("내 서류 조회 결과 : ", data);
+
+        setDocList(data);
+      } catch (err) {
+        console.error("내 서류 조회 실패", err);
+      }
+    };
+
+    requestMyDocs();
+  }, []);
 
   // 카메라 및 오디오 시작 함수
   const startStream = async () => {
@@ -70,22 +84,6 @@ export default function StudySetupPage() {
       alert("startStream 오류");
     }
   };
-
-  // 등록된 내 서류 불러오기
-  useEffect(() => {
-    const requestMyDocs = async () => {
-      try {
-        const data = await getMyDocs();
-        console.log("내 서류 조회 결과 : ", data);
-
-        setDocList(data);
-      } catch (err) {
-        console.error("내 서류 조회 실패", err);
-      }
-    };
-
-    requestMyDocs();
-  }, []);
 
   // 문서 선택 시 selectedDocs를 변경하는 핸들러
   const handleChangeDocs = (e: React.ChangeEvent<HTMLSelectElement>) => {
