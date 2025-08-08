@@ -2,5 +2,6 @@ package com.moya.domain.docs;
 
 public enum DocsStatus {
     RESUME,
-    PORTFOLIO
+    PORTFOLIO,
+    COVERLETTER
 }
