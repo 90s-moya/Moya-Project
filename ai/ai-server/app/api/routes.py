@@ -149,3 +149,48 @@ async def followup_question(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# === 오디오 기반 질문 3개 평가 ===
+@router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
+async def make_question(payload: PromptStartRequest, db: Session = Depends(get_db)):
+    try:
+        userId = payload.userId
+        text = payload.text
+
+        question_list = await generate_initial_question(text)  # ✅ 이건 리스트여야 함
+        if not question_list or not isinstance(question_list, list):
+            raise HTTPException(status_code=500, detail="GPT 질문 생성 실패")
+
+        session = EvaluationSession(user_id=userId, created_at=datetime.utcnow())
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+
+        qa_list = []
+        for idx, q in enumerate(question_list):
+            qa = QuestionAnswerPair(
+                session_id=session.id,
+                order=1,  # 하나의 질문 세트로 묶기
+                sub_order=idx,
+                question=q,
+                answer="",
+                is_ended=False,
+                reason_end="",
+                context_matched=False,
+                reason_context="",
+                gpt_comment="",
+                end_type="",
+                stop_words="",
+                created_at=datetime.utcnow()
+            )
+            db.add(qa)
+            qa_list.append(qa)
+
+        db.commit()
+
+        session.qa_pairs = qa_list
+        return session
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
