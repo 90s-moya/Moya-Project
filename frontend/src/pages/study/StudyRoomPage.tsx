@@ -1,15 +1,24 @@
 import CameraControlPanel from "@/components/study/CameraControlPanel";
 import MicControlPanel from "@/components/study/MicControlPanel";
 import VideoTile from "@/components/study/VideoTile";
+import Carousel from "@/components/ui/Carousel";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
+import { getDocsInRoom } from "@/api/studyApi";
 
 type Participant = {
   id: string;
   stream: MediaStream | null;
   isLocal?: boolean;
+};
+
+type ParticipantsDocs = {
+  docsId: string; // docs_id → docsId로 변경
+  userId: string; // user_id → userId로 변경
+  fileUrl: string; // file_url → fileUrl로 변경
+  docsStatus: string;
 };
 
 export default function StudyRoomPage() {
@@ -23,20 +32,102 @@ export default function StudyRoomPage() {
 
   const { room_id } = useParams();
 
-  // 유저 닉네임을 불러와서 저장하는 useEffect
-  // useEffect(() => {
-  //   const requestMyInfo = async () => {
-  //     try {
-  //       const res = await UserApi.getMyInfo();
+  const [allDocs, setAllDocs] = useState<ParticipantsDocs[]>([]);
 
-  //        console.log("getMyInfo의 결과입니다.", res.data.nickname);
-  //        setNickname(res.data.nickname);
-  //     } catch (err) {
-  //       alert("getMyInfo 에러 발생");
-  //     }
-  //   };
-  //   requestMyInfo();
-  // }, []);
+  // 포커스된 비디오 타일 상태 관리
+  const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
+  const [showCarousel, setShowCarousel] = useState(false);
+
+  // 마운트 시 스터디 방 참여자들의 서류 조회
+  useEffect(() => {
+    const requestDocs = async () => {
+      try {
+        const data = await getDocsInRoom(room_id!);
+        console.log("방 참여자들의 서류 조회 성공", data);
+        setAllDocs(data);
+      } catch (error) {
+        console.error("방 참여자들의 서류 조회 실패", error);
+      }
+    };
+
+    requestDocs();
+  }, []);
+
+  // 참가자별 서류 매핑 함수
+  const getParticipantDocs = (participantId: string) => {
+    console.log("getParticipantDocs 호출됨 - participantId:", participantId);
+    console.log("allDocs:", allDocs);
+
+    // user_id → userId로 변경
+    const filteredDocs = allDocs.filter((doc) => doc.userId === participantId);
+    console.log("필터링된 서류:", filteredDocs);
+
+    return filteredDocs;
+  };
+
+  // 서류 클릭 핸들러
+  const handleDocsClick = (userId: string) => {
+    console.log("서류 클릭됨:", userId);
+    setFocusedUserId(userId);
+    setShowCarousel(true);
+  };
+
+  // 캐러셀 닫기 핸들러
+  const handleCloseCarousel = () => {
+    setShowCarousel(false);
+    setFocusedUserId(null);
+  };
+
+  // 포커스된 참가자의 서류를 캐러셀용 데이터로 변환
+  const getCarouselItems = () => {
+    if (!focusedUserId) return [];
+
+    const userDocs = getParticipantDocs(focusedUserId);
+    return userDocs.map((doc) => ({
+      id: doc.docsId, // docs_id → docsId로 변경
+      title: getDocTypeTitle(doc.docsStatus),
+      fileUrl: doc.fileUrl, // file_url → fileUrl로 변경
+      type: doc.docsStatus as "RESUME" | "COVERLETTER" | "PORTFOLIO",
+    }));
+  };
+
+  // 서류 타입별 제목 반환
+  const getDocTypeTitle = (docsStatus: string) => {
+    switch (docsStatus) {
+      case "RESUME":
+        return "이력서";
+      case "COVERLETTER":
+        return "자기소개서";
+      case "PORTFOLIO":
+        return "포트폴리오";
+      default:
+        return "서류";
+    }
+  };
+
+  // VideoTile 렌더링 함수
+  const renderVideoTile = (participant: Participant) => {
+    const userDocs = getParticipantDocs(participant.id);
+    const isFocused = focusedUserId === participant.id;
+
+    return (
+      <div
+        key={participant.id}
+        className={`w-full aspect-video transition-all duration-300 ${
+          isFocused ? "col-span-2 row-span-2" : ""
+        }`}
+      >
+        <VideoTile
+          stream={participant.stream}
+          isLocal={participant.isLocal}
+          userId={participant.id}
+          roomId={room_id!}
+          userDocs={userDocs}
+          onDocsClick={handleDocsClick}
+        />
+      </div>
+    );
+  };
 
   const handleLeaveRoom = () => {
     console.log("disconnection video", localStream);
@@ -81,8 +172,6 @@ export default function StudyRoomPage() {
       `wss://${import.meta.env.VITE_RTC_API_URL}/ws`,
       myId,
       async (data) => {
-        // 테스트 용
-        //const signaling = new SignalingClient(`ws://${import.meta.env.VITE_RTC_API_URL_TMP}/ws`, myId, async (data) => {
         const peerManager = peerManagerRef.current;
         if (!peerManager) return;
 
@@ -136,7 +225,6 @@ export default function StudyRoomPage() {
         audio: true,
       });
       setLocalStream(local);
-      // TODO : 사용자 정보에 맞게 변경해주세염ㅎ
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== myId),
         { id: myId, stream: local, isLocal: true },
@@ -155,21 +243,44 @@ export default function StudyRoomPage() {
         </h1>
       </header>
 
-      {/* 참가자 비디오 그리드 */}
-      <main className="flex-1 pt-[100px] pb-24 w-full px-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {participants.map((p) => (
-            <div key={p.id} className="w-full aspect-video">
-              <VideoTile
-                stream={p.stream}
-                isLocal={p.isLocal}
-                userId={p.id}
-                roomId={room_id!}
+      {/* 메인 콘텐츠 영역 */}
+      <div className="flex-1 pt-[100px] pb-24 w-full px-4">
+        {/* 포커스 모드일 때: 왼쪽 비디오, 오른쪽 캐러셀 */}
+        {focusedUserId ? (
+          <div className="flex gap-4 h-full">
+            {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
+            <div className="w-1/2">
+              {participants
+                .filter((p) => p.id === focusedUserId)
+                .map((participant) => (
+                  <div key={participant.id} className="w-full aspect-video">
+                    <VideoTile
+                      stream={participant.stream}
+                      isLocal={participant.isLocal}
+                      userId={participant.id}
+                      roomId={room_id!}
+                      userDocs={getParticipantDocs(participant.id)}
+                      onDocsClick={handleDocsClick}
+                    />
+                  </div>
+                ))}
+            </div>
+
+            {/* 오른쪽: 서류 캐러셀 (화면의 절반) */}
+            <div className="w-1/2 bg-gray-50 rounded-lg p-4">
+              <Carousel
+                items={getCarouselItems()}
+                onClose={handleCloseCarousel}
               />
             </div>
-          ))}
-        </div>
-      </main>
+          </div>
+        ) : (
+          /* 일반 모드: 그리드 레이아웃 */
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {participants.map(renderVideoTile)}
+          </div>
+        )}
+      </div>
 
       {/* 미디어 컨트롤 바 */}
       <footer className="fixed bottom-4 left-0 right-0 bg-white border-t border-[#dedee4] py-4 shadow-inner z-20">
