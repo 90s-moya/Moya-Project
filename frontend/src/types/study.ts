@@ -47,17 +47,17 @@ export type Category = {
 // 방 입장 시 필요한 docs 타입
 export type MyDoc = {
   docsId: string;
-  docsStatus: "RESUME" | "PORTFOLIO" | "COVER_LETTER";
+  docsStatus: "RESUME" | "PORTFOLIO" | "COVERLETTER";
   fileUrl: string;
   userId: string;
 };
 
 // 방 입장 시 필요한 파라미터 타입
 export type EnterRoomParams = {
-  room_id: string;
-  resume_id: string;
-  portfolio_id: string;
-  coverletter_id: string;
+  roomId: string;
+  resumeId: string;
+  portfolioId: string;
+  coverletterId: string;
 };
 
 // 피드백 보내기 시 필요한 타입

@@ -45,16 +45,19 @@ export const getMyDocsForEnterRoom = async () => {
 
 // 방 입장 전 환경 설정 페이지에서 서류 등록
 export const registerDocs = async ({
-  room_id,
-  resume_id,
-  portfolio_id,
-  coverletter_id,
+  roomId,
+  resumeId,
+  portfolioId,
+  coverletterId,
 }: EnterRoomParams) => {
-  const res = await api.post(`/v1/room/${room_id}/register`, {
-    resume_id,
-    portfolio_id,
-    coverletter_id,
+  const res = await api.post(`/v1/room/${roomId}/register`, {
+    resumeId,
+    portfolioId,
+    coverletterId,
   });
+
+  console.log("registerDocs 응답:", res);
+  console.log("registerDocs res.data:", res.data);
 
   return res.data;
 };
@@ -80,5 +83,17 @@ export const createFeedback = async ({
     message,
   });
 
+  return res.data;
+};
+
+// 면접 스터디 방에서 참여자들 서류 조회
+export const getDocsInRoom = async (room_id: string) => {
+  const res = await api.get(`/v1/room/${room_id}/docs`);
+
+  return res.data;
+};
+
+export const uploadVideo = async (formData: FormData) => {
+  const res = await api.post("/v1/room-member/upload-video", formData);
   return res.data;
 };
