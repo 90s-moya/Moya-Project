@@ -63,3 +63,9 @@ export const deleteRoom = async (id: string) => {
 
   return res;
 };
+
+// 면접 스터디 내 영상 비디오 업로드
+export const uploadVideo = async (formData: FormData) => {
+  const res = await api.post("/v1/room-member/upload-video", formData);
+  return res.data;
+};
