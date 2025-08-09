@@ -47,6 +47,7 @@ export default function StudyRoomPage() {
   useEffect(() => {
     const requestDocs = async () => {
       try {
+        console.log("roomId", roomId);
         const data = await getDocsInRoom(roomId!);
         console.log("방 참여자들의 서류 조회 성공", data);
         setAllDocs(data);
@@ -346,12 +347,7 @@ export default function StudyRoomPage() {
 
   return (
     <div className="min-h-screen bg-white text-[#1b1c1f] flex flex-col">
-      {/* 상단 헤더 */}
-      <header className="fixed top-0 left-0 right-0 z-10 bg-white border-b border-[#dedee4] h-[72px] flex items-center justify-center px-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-[#2b7fff]">
-          모의 면접 스터디
-        </h1>
-      </header>
+     
 
       {/* 메인 콘텐츠 영역 */}
       <div className="flex-1 pt-[100px] pb-24 w-full px-4">
@@ -396,7 +392,7 @@ export default function StudyRoomPage() {
       <footer className="fixed bottom-4 left-0 right-0 bg-white border-t border-[#dedee4] py-4 shadow-inner z-20">
         <div className="flex justify-center gap-10">
           <MicControlPanel />
-          <CameraControlPanel />
+          <CameraControlPanel stream={localStream}/>
           <button
             onClick={handleLeaveRoom}
             className="text-red-400 text-xl font-semibold hover:text-red-700"
