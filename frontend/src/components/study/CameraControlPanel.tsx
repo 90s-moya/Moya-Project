@@ -6,20 +6,19 @@ type Props = {
 }
 
 export default function CameraControlPanel({stream}: Props) {
+  const track = stream?.getVideoTracks()[0] ?? null;
 
   // 초기 상태는 현재 트랙 상태에서 결정
-  const initial = useMemo(() => stream?.getVideoTracks()[0]?.enabled ?? true,[stream]);
+  const initialEnabled = useMemo(() => track?.enabled ?? true,[track]);
 
-  const [isCameraOn, setIsCameraOn] = useState<boolean>(initial);
+  const [isCameraOn, setIsCameraOn] = useState<boolean>(initialEnabled);
 
   const toggle = () => {
+    if(!track) return;
     const next = !isCameraOn;
     setIsCameraOn(next);
 
-    const track = stream?.getVideoTracks()[0];
-    if(track) {
-      track.enabled = next;
-    }
+    track.enabled = next;
   }
  
   return (
@@ -27,6 +26,7 @@ export default function CameraControlPanel({stream}: Props) {
       {/* 카메라 토글 버튼 */}
       <button
         onClick={toggle}
+        disabled={!track}
         className="flex items-center gap-1 text-[#2b7fff] hover:text-blue-600 transition"
       >
         {isCameraOn ? 
