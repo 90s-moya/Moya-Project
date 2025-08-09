@@ -1,5 +1,5 @@
 import { Video, VideoOff } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 type Props = {
   stream: MediaStream | null; // 부모(StudyRoomPage)의 localStream을 받음
@@ -27,7 +27,7 @@ export default function CameraControlPanel({stream}: Props) {
       <button
         onClick={toggle}
         disabled={!track}
-        className="flex items-center gap-1 text-[#2b7fff] hover:text-blue-600 transition"
+        className="flex items-center gap-1 text-white hover:text-white/80 transition disabled:opacity-50"
       >
         {isCameraOn ? 
           <Video className="w-5 h-5" />
