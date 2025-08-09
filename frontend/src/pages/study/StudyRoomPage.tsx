@@ -391,7 +391,7 @@ export default function StudyRoomPage() {
       {/* 미디어 컨트롤 바 */}
       <footer className="fixed bottom-4 left-0 right-0 bg-white border-t border-[#dedee4] py-4 shadow-inner z-20">
         <div className="flex justify-center gap-10">
-          <MicControlPanel />
+          <MicControlPanel stream={localStream}/>
           <CameraControlPanel stream={localStream}/>
           <button
             onClick={handleLeaveRoom}
