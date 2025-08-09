@@ -78,6 +78,12 @@ export default function StudyRoomPage() {
   // 서류 클릭 핸들러
   const handleDocsClick = (userId: string) => {
     console.log("서류 클릭됨:", userId);
+    // 같은 유저를 다시 클릭하면 토글로 닫기
+    if (focusedUserId === userId && showCarousel) {
+      setShowCarousel(false);
+      setFocusedUserId(null);
+      return;
+    }
     setFocusedUserId(userId);
     setShowCarousel(true);
   };
@@ -368,31 +374,59 @@ export default function StudyRoomPage() {
       >
         {/* 포커스 모드일 때: 왼쪽 비디오, 오른쪽 캐러셀 */}
         {focusedUserId ? (
-          <div className="flex gap-4 h-full">
-            {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
-            <div className="w-1/2">
-              {participants
-                .filter((p) => p.id === focusedUserId)
-                .map((participant) => (
-                  <div key={participant.id} className="w-full aspect-video">
+          <div className="flex flex-col gap-3 h-full">
+            {/* 상단 썸네일 스트립 */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mt-15">
+              {participants.map((p) => (
+                <button
+                  key={`thumb-${p.id}`}
+                  onClick={() => setFocusedUserId(p.id)}
+                  className={`shrink-0 w-45 h-30 rounded-md overflow-hidden border ${
+                    p.id === focusedUserId ? "border-blue-500" : "border-gray-300"
+                  }`}
+                  title={p.isLocal ? "나" : p.id}
+                >
+                  <div className="w-full h-full bg-black/20">
                     <VideoTile
-                      stream={participant.stream}
-                      isLocal={participant.isLocal}
-                      userId={participant.id}
+                      stream={p.stream}
+                      isLocal={p.isLocal}
+                      userId={p.id}
                       roomId={roomId!}
-                      userDocs={getParticipantDocs(participant.id)}
+                      userDocs={getParticipantDocs(p.id)}
                       onDocsClick={handleDocsClick}
+                      hideOverlay
                     />
                   </div>
-                ))}
+                </button>
+              ))}
             </div>
 
-            {/* 오른쪽: 서류 캐러셀 (화면의 절반) */}
-            <div className="w-1/2 bg-gray-50 rounded-lg p-4">
-              <Carousel
-                items={getCarouselItems()}
-                onClose={handleCloseCarousel}
-              />
+            <div className="flex gap-4 h-full">
+              {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
+              <div className="w-1/2 h-[68vh]">
+                {participants
+                  .filter((p) => p.id === focusedUserId)
+                  .map((participant) => (
+                    <div key={participant.id} className="w-full h-full">
+                      <VideoTile
+                        stream={participant.stream}
+                        isLocal={participant.isLocal}
+                        userId={participant.id}
+                        roomId={roomId!}
+                        userDocs={getParticipantDocs(participant.id)}
+                        onDocsClick={handleDocsClick}
+                      />
+                    </div>
+                  ))}
+              </div>
+
+              {/* 오른쪽: 서류 캐러셀 (화면의 절반) */}
+              <div className="w-1/2 h-[68vh] bg-gray-50 rounded-lg p-4 flex flex-col">
+                <Carousel
+                  items={getCarouselItems()}
+                  onClose={handleCloseCarousel}
+                />
+              </div>
             </div>
           </div>
         ) : (
