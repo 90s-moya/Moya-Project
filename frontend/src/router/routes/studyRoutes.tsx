@@ -24,7 +24,7 @@ const studyRoutes: RouteObject[] = [
     element: <StudySetupPage />,
   },
   {
-    path: "study/room/:room_id",
+    path: "study/room/:roomId",
     element: <StudyRoomPage></StudyRoomPage>,
   },
 ];
