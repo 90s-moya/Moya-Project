@@ -24,11 +24,11 @@ export default function MicControlPanel({stream}: Props) {
 
   return (
     <div className="relative">
-    {/* 카메라 토글 버튼 */}
+    {/* 마이크 토글 버튼 */}
     <button
       onClick={toggle}
       disabled={!track}
-      className="flex items-center gap-1 text-[#2b7fff] hover:text-blue-600 transition"
+      className="flex items-center gap-1 text-white hover:text-white/80 transition disabled:opacity-50"
     >
       {isMicOn ? 
         <Mic className="w-5 h-5" />
