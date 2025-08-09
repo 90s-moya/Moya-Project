@@ -23,6 +23,8 @@ export default function FeedbackPopup({
 }: FeedbackPopupProps) {
   const [visible, setVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
+  const [exitDirection, setExitDirection] = useState<'up' | 'down'>('up');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 팝업 등장/사라짐 모션 관리
@@ -30,15 +32,20 @@ export default function FeedbackPopup({
     if (show) {
       setVisible(true);
       setIsLeaving(false);
-      setTimeout(() => {
-        textareaRef.current?.focus();
-      }, 100); // 팝업 등장 후 포커스
+      setIsEntering(true);
+      // 다음 프레임에 최종 상태로 전환하여 트랜지션 유도
+      requestAnimationFrame(() => {
+        setIsEntering(false);
+        setTimeout(() => {
+          textareaRef.current?.focus();
+        }, 100);
+      });
     } else if (visible) {
       setIsLeaving(true);
       const timer = setTimeout(() => {
         setVisible(false);
         setIsLeaving(false);
-      }, 400); // 사라지는 모션 시간
+      }, 300); // 사라지는 모션 시간 (duration-300과 일치)
       return () => clearTimeout(timer);
     }
   }, [show]);
@@ -47,10 +54,11 @@ export default function FeedbackPopup({
   useEffect(() => {
     if (!show) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      } else if (e.key === "Enter" && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
+        // 전송 시 위로 올라가는 모션
+        setExitDirection('up');
+        setIsLeaving(true);
         onSubmit();
       }
     };
@@ -63,21 +71,20 @@ export default function FeedbackPopup({
   return (
     <div
       className={`
-        fixed left-1/2
-        ${isLeaving ? "bottom-[90%]" : "bottom-[12%]"}
+        fixed left-1/2 bottom-[12%]
         z-50
         w-[480px] max-w-[98vw] min-h-[260px]
         -translate-x-1/2
         bg-white rounded-2xl shadow-2xl p-8
-        transition-all duration-400
+        transition-all duration-300 ease-out
         ${
           show && !isLeaving
-            ? "translate-y-0 opacity-100"
-            : "-translate-y-10 opacity-0"
+            ? (isEntering ? "translate-y-8 opacity-0" : "translate-y-0 opacity-100")
+            : (exitDirection === 'down' ? "translate-y-8 opacity-0" : "-translate-y-[70vh] opacity-0")
         }
         flex flex-col
       `}
-      style={{ pointerEvents: show ? "auto" : "none" }}
+      style={{ pointerEvents: show && !isLeaving ? "auto" : "none" }}
     >
       <div className="flex items-center justify-between mb-5">
         <span className="text-xl font-semibold text-gray-700 flex items-center gap-2">
@@ -89,7 +96,12 @@ export default function FeedbackPopup({
           피드백 보내기
         </span>
         <button
-          onClick={onClose}
+          onClick={() => {
+            // X로 닫을 때는 아래로 내려가는 모션
+            setExitDirection('down');
+            setIsLeaving(true);
+            setTimeout(() => onClose(), 300);
+          }}
           className="text-gray-400 hover:text-gray-600 text-2xl"
         >
           ✕
@@ -105,14 +117,24 @@ export default function FeedbackPopup({
       />
       <div className="flex gap-2 mt-6">
         <button
-          onClick={onSubmit}
+          onClick={() => {
+            // 전송 시 위로 올라가는 모션 유지 (즉시 애니메이션 시작)
+            setExitDirection('up');
+            setIsLeaving(true);
+            onSubmit();
+          }}
           className="flex-1 bg-blue-500 text-white py-3 px-3 rounded-md text-lg hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:text-gray-500"
           disabled={message.trim() === "" || isSending}
         >
           전송
         </button>
         <button
-          onClick={onClose}
+          onClick={() => {
+            // 취소 시 아래로 내려가는 모션
+            setExitDirection('down');
+            setIsLeaving(true);
+            setTimeout(() => onClose(), 300);
+          }}
           className="flex-1 bg-gray-300 text-gray-700 py-3 px-3 rounded-md text-lg hover:bg-gray-400 transition-colors"
           disabled={isSending}
         >
@@ -120,7 +142,7 @@ export default function FeedbackPopup({
         </button>
       </div>
       <div className="text-xs text-gray-400 mt-3 text-right">
-        Enter: 전송, Shift+Enter: 줄바꿈, ESC: 닫기
+        Enter: 전송, Shift+Enter: 줄바꿈
       </div>
     </div>
   );
