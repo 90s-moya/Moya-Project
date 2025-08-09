@@ -17,6 +17,7 @@ interface VideoTileProps {
     docsStatus: string;
   }[];
   onDocsClick?: (userId: string) => void; // 서류 클릭 시 부모 컴포넌트에 알림
+  hideOverlay?: boolean; // 썸네일 등 오버레이 숨김
 }
 
 export default function VideoTile({
@@ -26,6 +27,7 @@ export default function VideoTile({
   roomId,
   userDocs = [],
   onDocsClick,
+  hideOverlay = false,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
@@ -106,43 +108,49 @@ export default function VideoTile({
         className="w-full h-full object-cover"
       />
 
-      {/* 오른쪽 상단 서류 아이콘 (1개로 변경) */}
-      <div className="absolute top-2 right-2">
-        <div
-          onClick={handleClickDocs}
-          className="w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer transition-colors"
-        >
-          📄
+      {/* 오른쪽 상단 서류 아이콘 (썸네일에서는 숨김) */}
+      {!hideOverlay && (
+        <div className="absolute top-2 right-2">
+          <div
+            onClick={handleClickDocs}
+            className="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer transition-colors text-2xl"
+          >
+            📄
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* 오른쪽 하단 감정 피드백 (이미지 사용) */}
-      <div className="absolute bottom-2 right-2 flex gap-2">
-        <button
-          onClick={handleClickPositive}
-          className="rounded-full shadow hover:opacity-90 transition"
-          aria-label="긍정 피드백"
-        >
-          <img src={positiveImg} alt="positive" className="w-9 h-9 rounded-full object-cover" />
-        </button>
-        <button
-          onClick={handleClickNegative}
-          className="rounded-full shadow hover:opacity-90 transition"
-          aria-label="부정 피드백"
-        >
-          <img src={negativeImg} alt="negative" className="w-9 h-9 rounded-full object-cover" />
-        </button>
-      </div>
+      {/* 오른쪽 하단 감정 피드백 (썸네일에서는 숨김) */}
+      {!hideOverlay && (
+        <div className="absolute bottom-2 right-2 flex gap-2">
+          <button
+            onClick={handleClickPositive}
+            className="rounded-full shadow hover:opacity-90 transition"
+            aria-label="긍정 피드백"
+          >
+            <img src={positiveImg} alt="positive" className="w-12 h-12 rounded-full object-cover" />
+          </button>
+          <button
+            onClick={handleClickNegative}
+            className="rounded-full shadow hover:opacity-90 transition"
+            aria-label="부정 피드백"
+          >
+            <img src={negativeImg} alt="negative" className="w-12 h-12 rounded-full object-cover" />
+          </button>
+        </div>
+      )}
 
-      {/* 중앙 하단 피드백 팝업 */}
-      <FeedbackPopup
-        show={showFeedbackPopup}
-        feedbackType={feedbackType}
-        message={feedbackMessage}
-        onMessageChange={setFeedbackMessage}
-        onSubmit={handleSubmitFeedback}
-        onClose={handleClosePopup}
-      />
+      {/* 중앙 하단 피드백 팝업 (썸네일에서는 숨김) */}
+      {!hideOverlay && (
+        <FeedbackPopup
+          show={showFeedbackPopup}
+          feedbackType={feedbackType}
+          message={feedbackMessage}
+          onMessageChange={setFeedbackMessage}
+          onSubmit={handleSubmitFeedback}
+          onClose={handleClosePopup}
+        />
+      )}
     </div>
   );
 }
