@@ -1,5 +1,7 @@
 import { createFeedback } from "@/api/studyApi";
 import { useEffect, useRef, useState } from "react";
+import positiveImg from "@/assets/images/positive.png";
+import negativeImg from "@/assets/images/negative.png";
 import FeedbackPopup from "./FeedbackPopup";
 import Carousel from "../ui/Carousel";
 
@@ -114,19 +116,21 @@ export default function VideoTile({
         </div>
       </div>
 
-      {/* 오른쪽 하단 감정 피드백 */}
+      {/* 오른쪽 하단 감정 피드백 (이미지 사용) */}
       <div className="absolute bottom-2 right-2 flex gap-2">
         <button
           onClick={handleClickPositive}
-          className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]"
+          className="rounded-full shadow hover:opacity-90 transition"
+          aria-label="긍정 피드백"
         >
-          🙂
+          <img src={positiveImg} alt="positive" className="w-9 h-9 rounded-full object-cover" />
         </button>
         <button
           onClick={handleClickNegative}
-          className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]"
+          className="rounded-full shadow hover:opacity-90 transition"
+          aria-label="부정 피드백"
         >
-          😢
+          <img src={negativeImg} alt="negative" className="w-9 h-9 rounded-full object-cover" />
         </button>
       </div>
 

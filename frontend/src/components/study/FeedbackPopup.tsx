@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import positiveImg from "@/assets/images/positive.png";
+import negativeImg from "@/assets/images/negative.png";
 
 interface FeedbackPopupProps {
   show: boolean;
@@ -78,8 +80,13 @@ export default function FeedbackPopup({
       style={{ pointerEvents: show ? "auto" : "none" }}
     >
       <div className="flex items-center justify-between mb-5">
-        <span className="text-xl font-semibold text-gray-700">
-          {feedbackType === "POSITIVE" ? "🙂" : "😢"} 피드백 보내기
+        <span className="text-xl font-semibold text-gray-700 flex items-center gap-2">
+          <img
+            src={feedbackType === "NEGATIVE" ? negativeImg : positiveImg}
+            alt={feedbackType === "NEGATIVE" ? "negative" : "positive"}
+            className="w-6 h-6 rounded-full object-cover"
+          />
+          피드백 보내기
         </span>
         <button
           onClick={onClose}
