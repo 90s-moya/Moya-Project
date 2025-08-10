@@ -30,6 +30,10 @@ public class DocsRepositoryImpl implements DocsRepository {
         return docsJpaRepository.findByIdAndUserId(id,userId);
     }
 
+    @Override
+    public Docs selectById(UUID id) {
+        return docsJpaRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("해당 문서를 찾을 수 없습니다."));
+    }
 
 
     @Override

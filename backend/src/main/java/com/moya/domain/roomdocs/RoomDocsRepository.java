@@ -2,6 +2,7 @@ package com.moya.domain.roomdocs;
 
 import com.moya.service.room.command.RoomDocsInfoCommand;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
@@ -18,4 +19,8 @@ public interface RoomDocsRepository extends JpaRepository<RoomDocs, UUID> {
      
      """)
     List<RoomDocsInfoCommand> findDocsByRoomId(UUID roomId);
+
+    @Modifying
+    @Query("DELETE FROM RoomDocs rd where rd.roomId.id = :room_id")
+    void deleteDocs(UUID room_id);
 }

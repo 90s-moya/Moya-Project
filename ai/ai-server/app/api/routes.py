@@ -18,16 +18,75 @@ from pydantic import BaseModel
 import time
 import asyncio
 from sqlalchemy import String
-
-
-
+from app.services.face_service import infer_face
+from app.services.gaze_service import infer_gaze
+from app.services.analysis_service import analyze_all
+from app.utils.posture import analyze_video_bytes
+from fastapi.responses import JSONResponse
 router = APIRouter()
 
 class PromptStartRequest(BaseModel):
     userId: UUID
     text: str
+# 3개 한번에 테스트 할수 있는 함수
+from fastapi import APIRouter, UploadFile, File, HTTPException
+router = APIRouter()
 
-# === GPT 결과 → enum 매핑 함수 ===
+@router.post("/v1/analyze/complete")
+async def analyze_complete(
+    file: UploadFile = File(...),
+    device: str = "cpu", ## 차후에 gpu 서버 사용할때는 cpu -> cuda 로변경
+    stride: int = 5,
+    return_points: bool = False,
+):  
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "빈 파일")
+    try:
+        out = analyze_all(data, device=device, stride=stride, return_points=return_points)
+        return out
+    except Exception as e:
+        raise HTTPException(500, f"complete analysis 실패: {e}")
+
+@router.post("/v1/face/predict")
+async def face_predict(file: UploadFile = File(...), device: str = "cpu"):
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "빈 파일")
+    try:
+        out = infer_face(data, device=device)
+        return {"ok": True, "result": out}
+    except Exception as e:
+        raise HTTPException(500, f"face inference 실패: {e}")
+
+@router.post("/v1/gaze/predict")
+async def gaze_predict(file: UploadFile = File(...)):
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "빈 파일")
+    try:
+        out = infer_gaze(data)
+        return {"ok": True, "result": out}
+    except Exception as e:
+        raise HTTPException(500, f"gaze inference 실패: {e}")
+    
+@router.post("/v1/posture/report")
+async def posture_report(file: UploadFile = File(...)):
+    try:
+        # 확장자 체크(선택)
+        if not file.filename.lower().endswith((".mp4", ".mov", ".avi", ".mkv")):
+            raise HTTPException(status_code=415, detail="지원하지 않는 포맷입니다. mp4/mov/avi/mkv를 업로드 해주세요.")
+
+        data = await file.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="업로드된 파일이 비어있습니다.")
+
+        report = analyze_video_bytes(data)
+        return JSONResponse(content=report)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"자세 분석 실패: {str(e)}")
 
 def map_end_type(result: dict) -> str:
     reason = result["reason_end"].lower()
