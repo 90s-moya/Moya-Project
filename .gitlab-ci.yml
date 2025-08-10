@@ -29,10 +29,16 @@ deploy-be-dev:
     - docker stop be-dev || true
     - docker rm be-dev || true
     - >
-      docker run -d --name be-dev -p 8081:8080
+      docker run -d --name be-dev --network monitoring -p 8081:8080
+      -v /srv/moya/files-dev:/files-dev
+      -e FILE_PATH=/files-dev
       -e DB_URL="$DB_URL_DEV"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
+      -e JWT_SECRET="$JWT_SECRET"
+      -e MAIL_USERNAME="$MAIL_USERNAME"
+      -e MAIL_PASSWORD="$MAIL_PASSWORD"
+      -e PYTHON_PATH="$PYTHON_PATH"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
@@ -47,10 +53,16 @@ deploy-be-prod:
     - docker stop be-main || true
     - docker rm be-main || true
     - >
-      docker run -d --name be-main -p 8080:8080
+      docker run -d --name be-main --network monitoring -p 8080:8080
+      -v /srv/moya/files:/files
+      -e FILE_PATH=/files
       -e DB_URL="$DB_URL_PROD"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
+      -e JWT_SECRET="$JWT_SECRET"
+      -e MAIL_USERNAME="$MAIL_USERNAME"
+      -e MAIL_PASSWORD="$MAIL_PASSWORD"
+      -e PYTHON_PATH="$PYTHON_PATH"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
