@@ -62,6 +62,7 @@ frontend/build/
 frontend/dist/
 frontend/.turbo/
 frontend/.vite/
+frontend/dist-ssr/
 
 # 프론트엔드 환경변수 파일
 frontend/.env
@@ -69,10 +70,13 @@ frontend/.env.local
 frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
+frontend/*.local
 
 # 편집기 설정
 .vscode/
 cursor.json
+# .claude 폴더 전체 무시
+.claude/
 
 # ===============================
 # AI
@@ -104,4 +108,4 @@ instance/
 *.ipynb_checkpoints/
 
 # AI 환경변수 파일
-ai/.env
+ai/**/.env

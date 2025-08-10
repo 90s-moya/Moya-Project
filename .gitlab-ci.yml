@@ -70,3 +70,89 @@ deploy-be-prod:
     - be-main
     - master
 
+# FE - 빌드
+build-fe:
+  stage: build
+  script:
+    - cd frontend
+    - echo "VITE_API_URL=$API_URL" > .env
+    - echo "VITE_RTC_API_URL=$VITE_RTC_API_URL" >> .env
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist
+  tags:
+    - ec2
+  only:
+    - fe-main
+    - master
+
+# FE - 배포
+deploy-fe:
+  stage: deploy
+  script:
+    - sudo rm -rf /var/www/html/*
+    - sudo cp -r frontend/dist/* /var/www/html/
+  tags:
+    - ec2
+  only:
+    - fe-main
+    - master
+# AI - 빌드
+build-ai:
+  stage: build
+  script:
+    - docker build -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai/ai-server
+    - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
+  only:
+    - ai-dev
+    - ai-main
+    - master
+
+# AI - 개발 환경 배포 (8001 포트)
+deploy-ai-dev:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-dev || true
+    - docker rm ai-dev || true
+    - >
+      docker run -d --name ai-dev --network monitoring -p 8001:8000
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_DEV"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
+  only:
+    - ai-dev
+
+# AI - 운영 환경 배포 (8000 포트)
+deploy-ai-prod:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-main || true
+    - docker rm ai-main || true
+    - >
+      docker run -d --name ai-main --network monitoring -p 8000:8000
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_PROD"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
+  only:
+    - ai-main
+    - master
