@@ -10,5 +10,7 @@ import lombok.ToString;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PDFRequest {
-    private String fileURL;
+       private String resumeUrl;
+       private String portfolioUrl;
+       private String coverletterUrl;
 }
