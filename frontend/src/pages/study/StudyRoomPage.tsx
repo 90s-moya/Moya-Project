@@ -1,7 +1,7 @@
 import CameraControlPanel from "@/components/study/CameraControlPanel";
 import MicControlPanel from "@/components/study/MicControlPanel";
 import VideoTile from "@/components/study/VideoTile";
-import Carousel from "@/components/ui/Carousel";
+import Carousel from "@/components/study/Carousel";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
@@ -365,7 +365,6 @@ export default function StudyRoomPage() {
 
   return (
     <div className="min-h-screen bg-white text-[#1b1c1f] flex flex-col">
-
       {/* 메인 콘텐츠 영역 */}
       <div
         className={`flex-1 pt-[100px] w-full px-4 transition-[padding-bottom] duration-300 ${
@@ -382,7 +381,9 @@ export default function StudyRoomPage() {
                   key={`thumb-${p.id}`}
                   onClick={() => setFocusedUserId(p.id)}
                   className={`shrink-0 w-45 h-30 rounded-md overflow-hidden border ${
-                    p.id === focusedUserId ? "border-blue-500" : "border-gray-300"
+                    p.id === focusedUserId
+                      ? "border-blue-500"
+                      : "border-gray-300"
                   }`}
                   title={p.isLocal ? "나" : p.id}
                 >
@@ -432,10 +433,11 @@ export default function StudyRoomPage() {
         ) : (
           /* 일반 모드: 그리드 레이아웃 (참가자 수 기반 반응형) */
           <div
-            className={`grid gap-4 transition-[grid-template-columns] duration-300`
-            }
+            className={`grid gap-4 transition-[grid-template-columns] duration-300`}
             style={{
-              gridTemplateColumns: `repeat(${getGridColumns(participants.length)}, minmax(0, 1fr))`,
+              gridTemplateColumns: `repeat(${getGridColumns(
+                participants.length
+              )}, minmax(0, 1fr))`,
             }}
           >
             {participants.map(renderVideoTile)}
@@ -447,7 +449,9 @@ export default function StudyRoomPage() {
       <button
         onClick={() => setControlsOpen((v) => !v)}
         aria-label={controlsOpen ? "제어 숨기기" : "제어 보이기"}
-        className={`fixed ${controlsOpen ? "bottom-18" : "bottom-3"} left-1/2 -translate-x-1/2 z-30
+        className={`fixed ${
+          controlsOpen ? "bottom-18" : "bottom-3"
+        } left-1/2 -translate-x-1/2 z-30
         w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg
         flex items-center justify-center transition-all duration-300 ease-in-out`}
       >
@@ -461,7 +465,9 @@ export default function StudyRoomPage() {
       {/* 미디어 컨트롤 바 */}
       <footer
         className={`fixed left-0 right-0 bottom-0 bg-blue-500 border-t border-blue-600 py-3 shadow-inner z-20
-        transition-transform duration-300 ${controlsOpen ? "translate-y-0" : "translate-y-full"}`}
+        transition-transform duration-300 ${
+          controlsOpen ? "translate-y-0" : "translate-y-full"
+        }`}
       >
         <div className="flex justify-center gap-3">
           <div className="rounded-full px-4 py-2 border">
