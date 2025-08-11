@@ -5,7 +5,7 @@ export type DocItem = {
   docsId: string;
   userId: string;
   fileUrl: string;
-  docsStatus: "PORTFOLIO" | "RESUME";
+  docsStatus: "PORTFOLIO" | "RESUME" | "COVERLETTER";
 };
 
 const DocsApi = {
@@ -15,7 +15,7 @@ const DocsApi = {
   },
 
   // 서류 업로드
-  uploadDoc(file: File, status: "PORTFOLIO" | "RESUME") {
+  uploadDoc(file: File, status: "PORTFOLIO" | "RESUME" | "COVERLETTER") {
     const formData = new FormData();
     // 백엔드 파라미터 이름과 동일하게
     formData.append("file", file);
