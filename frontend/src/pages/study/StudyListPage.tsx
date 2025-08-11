@@ -35,13 +35,18 @@ export default function StudyListPage() {
   }, []);
 
   // 최신순으로 정렬된 rooms
-  const recentSortedRooms = [...rooms].sort((a, b) => new Date(b.openAt).getTime() - new Date(a.openAt).getTime());
+  const recentSortedRooms = [...rooms].sort(
+    (a, b) => new Date(b.openAt).getTime() - new Date(a.openAt).getTime()
+  );
 
   // 마감순으로 정렬된 rooms
-  const deadlineSortedRooms = [...rooms].sort((a, b) => new Date(a.expiredAt).getTime() - new Date(b.expiredAt).getTime());
+  const deadlineSortedRooms = [...rooms].sort(
+    (a, b) => new Date(a.expiredAt).getTime() - new Date(b.expiredAt).getTime()
+  );
 
   // activeTab에 따라서 변하는 sortedRooms
-  const sortedRooms = activeTab === "recent" ? recentSortedRooms : deadlineSortedRooms;
+  const sortedRooms =
+    activeTab === "recent" ? recentSortedRooms : deadlineSortedRooms;
 
   // 실제로 보여지는 room의 개수 (더보기 버튼 있음)
   const visibleRooms = sortedRooms.slice(0, visibleCount);
@@ -50,7 +55,10 @@ export default function StudyListPage() {
   const hasMore = visibleCount < sortedRooms.length;
 
   // 캐로셀에 쓰이는 rooms
-  const carouselRooms = deadlineSortedRooms.slice(carouselIndex, carouselIndex + 3);
+  const carouselRooms = deadlineSortedRooms.slice(
+    carouselIndex,
+    carouselIndex + 3
+  );
 
   // 캐로셀 이전 버튼 클릭 시 호출되는 함수
   const handlePrev = () => {
@@ -72,24 +80,24 @@ export default function StudyListPage() {
         {/* Title Section */}
         <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">면접 스터디 모집</h1>
-            <p className="text-[#4b4e57] text-lg">회원님에게 맞는 면접 스터디를 찾아보세요!</p>
-          </div>
-          <div className="w-full md:w-[420px] space-y-3">
-            <div className="relative">
-              <Input
-                placeholder="면접 스터디를 검색해보세요"
-                className="pl-6 pr-10 py-4 text-base border border-[#dedee4] rounded-lg focus:border-[#2b7fff] focus:ring-1 focus:ring-[#2b7fff] placeholder:text-base md:placeholder:text-lg"
-              />
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#6f727c] w-5 h-5" />
-            </div>
+            <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">
+              면접 스터디 모집
+            </h1>
+            <p className="text-[#4b4e57] text-lg">
+              회원님에게 맞는 면접 스터디를 찾아보세요!
+            </p>
           </div>
         </div>
 
         {/* Recruitment Notice */}
         <div className="mb-8 flex items-center justify-between">
-          <p className="text-[#2b7fff] font-semibold text-2xl">모집 인원이 얼마 안남았어요!</p>
-          <Button onClick={() => navigate("/study/create")} className="w-40 h-14 bg-[#2b7fff] hover:bg-blue-600 text-white font-semibold text-lg rounded-lg">
+          <p className="text-[#2b7fff] font-semibold text-2xl">
+            모집 인원이 얼마 안남았어요!
+          </p>
+          <Button
+            onClick={() => navigate("/study/create")}
+            className="w-40 h-14 bg-[#2b7fff] hover:bg-blue-600 text-white font-semibold text-lg rounded-lg"
+          >
             스터디 방 생성하기
           </Button>
         </div>
@@ -124,7 +132,9 @@ export default function StudyListPage() {
 
         {/* 스터디 룸 카드  */}
         <div className="mb-20">
-          <h2 className="text-2xl font-bold text-[#1b1c1f] mb-6">면접 스터디를 찾아보세요!</h2>
+          <h2 className="text-2xl font-bold text-[#1b1c1f] mb-6">
+            면접 스터디를 찾아보세요!
+          </h2>
 
           {/* 마감순 및 최신순 탭 */}
           <div className="flex space-x-8 mb-6 text-base">
@@ -133,7 +143,11 @@ export default function StudyListPage() {
                 setActiveTab("deadline");
                 setVisibleCount(6);
               }}
-              className={`text-xl font-semibold pb-2 border-b-2 ${activeTab === "deadline" ? "text-[#1b1c1f] border-[#1b1c1f]" : "text-[#6f727c] border-transparent hover:text-[#1b1c1f]"}`}
+              className={`text-xl font-semibold pb-2 border-b-2 ${
+                activeTab === "deadline"
+                  ? "text-[#1b1c1f] border-[#1b1c1f]"
+                  : "text-[#6f727c] border-transparent hover:text-[#1b1c1f]"
+              }`}
             >
               마감순
             </button>
@@ -142,7 +156,11 @@ export default function StudyListPage() {
                 setActiveTab("recent");
                 setVisibleCount(6);
               }}
-              className={`text-xl font-semibold pb-2 border-b-2 ${activeTab === "recent" ? "text-[#1b1c1f] border-[#1b1c1f]" : "text-[#6f727c] border-transparent hover:text-[#1b1c1f]"}`}
+              className={`text-xl font-semibold pb-2 border-b-2 ${
+                activeTab === "recent"
+                  ? "text-[#1b1c1f] border-[#1b1c1f]"
+                  : "text-[#6f727c] border-transparent hover:text-[#1b1c1f]"
+              }`}
             >
               최신순
             </button>
@@ -151,7 +169,9 @@ export default function StudyListPage() {
           {/* Cards Section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-[16px]">
             {visibleRooms.length === 0 ? (
-              <p className="text-[#6f727c] col-span-full text-center">해당 조건의 면접 스터디가 없습니다.</p>
+              <p className="text-[#6f727c] col-span-full text-center">
+                해당 조건의 면접 스터디가 없습니다.
+              </p>
             ) : (
               visibleRooms.map((room) => <StudyCard key={room.id} {...room} />)
             )}
@@ -159,7 +179,10 @@ export default function StudyListPage() {
 
           {hasMore && (
             <div className="mt-10 flex justify-center">
-              <Button onClick={() => setVisibleCount((prev) => prev + 6)} className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-3 rounded-lg text-lg">
+              <Button
+                onClick={() => setVisibleCount((prev) => prev + 6)}
+                className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-3 rounded-lg text-lg"
+              >
                 더보기
               </Button>
             </div>
@@ -168,7 +191,11 @@ export default function StudyListPage() {
 
         {/* Scroll to Top */}
         <div className="fixed bottom-8 right-8">
-          <Button size="icon" className="bg-[#efeff3] hover:bg-[#dedee4] text-[#6f727c] rounded-full shadow-lg" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+          <Button
+            size="icon"
+            className="bg-[#efeff3] hover:bg-[#dedee4] text-[#6f727c] rounded-full shadow-lg"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          >
             <ArrowUp className="w-5 h-5" />
           </Button>
         </div>
