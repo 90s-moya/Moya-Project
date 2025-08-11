@@ -59,17 +59,17 @@ export default function Carousel({ items, onClose }: CarouselProps) {
   }, [handleKeyDown]);
 
   // 현재 아이템이 변경될 때마다 로딩 상태 초기화
-  useEffect(() => {
-    setIsLoading(true);
-    setError(null);
+  // useEffect(() => {
+  //   setIsLoading(true);
+  //   setError(null);
 
-    // 일정 시간 후 자동으로 로딩 상태 해제 (안전장치)
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 3000);
+  //   // 일정 시간 후 자동으로 로딩 상태 해제 (안전장치)
+  //   const timer = setTimeout(() => {
+  //     setIsLoading(false);
+  //   }, 500);
 
-    return () => clearTimeout(timer);
-  }, [currentIndex]);
+  //   return () => clearTimeout(timer);
+  // }, [currentIndex]);
 
   // 파일 다운로드 핸들러
   const handleDownload = (fileUrl: string, fileName: string) => {
@@ -120,15 +120,15 @@ export default function Carousel({ items, onClose }: CarouselProps) {
     }
 
     // 로딩 중인 경우 보여주는 UI
-    if (isLoading) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-          <p className="text-gray-600">PDF를 불러오는 중...</p>
-          <p className="text-sm text-gray-400 mt-2">{fileName}</p>
-        </div>
-      );
-    }
+    // if (isLoading) {
+    //   return (
+    //     <div className="flex flex-col items-center justify-center h-full">
+    //       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+    //       <p className="text-gray-600">PDF를 불러오는 중...</p>
+    //       <p className="text-sm text-gray-400 mt-2">{fileName}</p>
+    //     </div>
+    //   );
+    // }
 
     return (
       <iframe
