@@ -14,7 +14,7 @@ const menuItems = [
 
 const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onNavigate }) => {
   return (
-    <aside className="w-full md:w-80 md:mr-12 md:pt-12">
+    <aside className="w-full md:w-60 md:mr-12 md:pt-12">
       {/* 데스크톱 버전 - 세로 배치 */}
       <div className="hidden md:block">
         <h1 className="text-[40px] font-semibold text-[#1B1C1F] mb-8 leading-[1.4]">
