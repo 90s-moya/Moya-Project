@@ -4,6 +4,7 @@ import com.moya.domain.category.Category;
 import com.moya.domain.category.CategoryRepository;
 import com.moya.domain.room.Room;
 import com.moya.domain.room.RoomRepository;
+import com.moya.domain.roomdocs.RoomDocsRepository;
 import com.moya.domain.roommember.RoomMember;
 import com.moya.domain.roommember.RoomMemberId;
 import com.moya.domain.roommember.RoomMemberRepository;
@@ -28,6 +29,7 @@ public class RoomService {
     private final RoomMemberRepository roomMemberRepository;
     private final CategoryRepository  categoryRepository;
     private final UserRepository userRepository;
+    private final RoomDocsRepository roomDocsRepository;
 
     // 면접 스터디 전체 조회
     @Transactional(readOnly = true)
@@ -41,6 +43,11 @@ public class RoomService {
     // 면접 스터디 방 삭제
     @Transactional
     public void deleteRoom(UUID room_id) {
+        Room room = roomRepository.findById(room_id).orElseThrow(() -> new RuntimeException("존재하지 않는 방입니다."));
+        // 면접 스터디 멤버 삭제
+        roomMemberRepository.deleteRoomMember(room_id);
+        // 면접 스터디 서류 삭제
+        roomDocsRepository.deleteDocs(room_id);
         roomRepository.deleteById(room_id);
     }
     // 면접 스터디 방 상세 조회
@@ -62,6 +69,7 @@ public class RoomService {
                 .nickname(masterUser.getNickname())
                 .makeRoomCnt(makeRoomCnt)
                 .createdAt(masterUser.getCreatedAt())
+                .masterId(masterUser.getId())
                 .build();
 
         return RoomDetailCommand.builder()
@@ -83,11 +91,10 @@ public class RoomService {
         Category category = categoryRepository.findById(createRoomRequest.getCategory_id()).orElseThrow(() -> new RuntimeException("해당 카테고리가 없습니다."));
         Room room = Room.builder()
                 .categoryId(category)
-                .conversation(null)
                 .maxUser(createRoomRequest.getMax_user())
                 .title(createRoomRequest.getTitle())
                 .body(createRoomRequest.getBody())
-                .expiredAt(createRoomRequest.getExpire_at())
+                .expiredAt(createRoomRequest.getExpired_at())
                 .openAt(createRoomRequest.getOpen_at())
                 .build();
         Room makedRoom = roomRepository.save(room);

@@ -13,7 +13,6 @@ public class RoomInfoCommand {
     private UUID id;
     private String title;
     private String body;
-    private String conversation;
     private int maxUser;
     private int joinUser;
     private LocalDateTime expiredAt;
@@ -25,7 +24,6 @@ public class RoomInfoCommand {
                 .id(room.getId())
                 .title(room.getTitle())
                 .body(room.getBody())
-                .conversation(room.getConversation())
                 .maxUser(room.getMaxUser())
                 .joinUser(joinMemberCount)
                 .expiredAt(room.getExpiredAt())
