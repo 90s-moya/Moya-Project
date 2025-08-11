@@ -15,11 +15,13 @@ interface Result {
 interface CarouselNavigationProps {
   reportId: string;
   results: Result[];
+  onResultClick: (reportId: string, resultId: string) => void;
 }
 
 const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
   reportId,
-  results
+  results,
+  onResultClick
 }) => {
   const [currentPage, setCurrentPage] = React.useState(0);
   const [itemsPerView, setItemsPerView] = React.useState(3);
@@ -89,21 +91,6 @@ const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
   // 마지막 페이지에서 보여줄 수 있는 최대 시작 인덱스 계산
   const maxStartIndex = Math.max(0, results.length - itemsPerView);
 
-  // 결과 클릭 핸들러
-  const handleResultClick = (resultId: string) => {
-    // 추후 상세페이지 구현 시 사용
-    console.log('Navigate to result detail:', reportId, resultId);
-    // navigate(`/mypage/result/${reportId}/${resultId}`);
-  };
-
-  // 순서 표시 포맷
-  const formatOrder = (order: number, suborder: number) => {
-    if (suborder === 0) {
-      return `${order}번 질문`;
-    }
-    return `${order}-${suborder} 꼬리질문`;
-  };
-
   const handlePrev = () => {
     setCurrentPage(prev => Math.max(0, prev - 1));
   };
@@ -121,7 +108,7 @@ const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
   return (
     <div ref={containerRef} className="relative w-full">
       {/* 카드 컨테이너 */}
-      <div className="relative overflow-hidden rounded-lg">
+      <div className="relative overflow-x-hidden overflow-y-visible rounded-lg">
         {/* 페이드 그라데이션 효과 */}
         <div className="absolute left-0 top-0 w-8 h-full z-5 pointer-events-none opacity-50"></div>
         <div className="absolute right-0 top-0 w-8 h-full bg-gradient-to-l from-white to-transparent z-5 pointer-events-none opacity-50"></div>
@@ -148,7 +135,7 @@ const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
         )}
 
         {/* 카드 컨테이너 - 반응형 */}
-        <div className="flex justify-start">
+        <div className="flex justify-start py-4">
           <div 
             className="flex gap-6 transition-transform duration-500 ease-in-out"
             style={{
@@ -159,9 +146,8 @@ const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
               <div key={result.result_id} className="flex-shrink-0" style={{ width: '240px' }}>
                 <ResultCard
                   result={result}
-                  onResultClick={handleResultClick}
                   reportId={reportId}
-                  formatOrder={formatOrder}
+                  onResultClick={onResultClick}
                 />
               </div>
             ))}

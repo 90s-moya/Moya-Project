@@ -11,29 +11,38 @@ interface ResultCardProps {
     question: string;
     thumbnail_url: string;
   };
-  onResultClick: (reportId: string, resultId: string) => void;
   reportId: string;
-  formatOrder: (order: number, suborder: number) => string;
+  onResultClick: (reportId: string, resultId: string) => void;
 }
 
 const ResultCard: React.FC<ResultCardProps> = ({
   result,
-  onResultClick,
   reportId,
-  formatOrder
+  onResultClick
 }) => {
+  // 순서 표시 포맷 함수를 내부로 이동
+  const formatOrder = (order: number, suborder: number) => {
+    if (suborder === 0) {
+      return `${order}번 질문`;
+    }
+    return `${order}-${suborder} 꼬리질문`;
+  };
+
+  // 결과 클릭 핸들러
+  const handleResultClick = () => {
+    if (result.status !== 'IN_PROGRESS') {
+      onResultClick(reportId, result.result_id);
+    }
+  };
+
   return (
     <div
       className={`relative bg-[#fafafc] border border-[#dedee4] rounded-lg overflow-hidden transition-all w-[240px] min-h-60 ${
         result.status === 'IN_PROGRESS' 
           ? 'opacity-40' 
-          : 'cursor-pointer hover:shadow-lg hover:-translate-y-1'
+          : 'cursor-pointer hover:z-50 hover:shadow-lg hover:-translate-y-1'
       }`}
-      onClick={() => {
-        if (result.status !== 'IN_PROGRESS') {
-          onResultClick(reportId, result.result_id);
-        }
-      }}
+      onClick={handleResultClick}
     >
       {/* 썸네일 이미지 */}
       <div className="aspect-video bg-gray-200 relative">

@@ -4,10 +4,28 @@ import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/util/date';
 import EmptyState from '@/components/mypage/result/EmptyState';
 import CarouselNavigation from '@/components/mypage/result/CarouselNavigation';
+import EditableTitle from '../../components/mypage/result/EditableTitle';
 
 const Result: React.FC = () => {
   const navigate = useNavigate();
-  const [reportList] = React.useState(mockReportList); // 추후 API 연동 시 대체
+  const [reportList, setReportList] = React.useState(mockReportList); // 추후 API 연동 시 대체
+
+  // 제목 수정 핸들러
+  const handleTitleChange = (reportId: string, newTitle: string) => {
+    setReportList(prev => 
+      prev.map(report => 
+        report.report_id === reportId 
+          ? { ...report, title: newTitle }
+          : report
+      )
+    );
+  };
+
+  // 결과 클릭 핸들러
+  const handleResultClick = (reportId: string, resultId: string) => {
+    console.log('Navigate to result detail:', reportId, resultId);
+    // navigate(`/mypage/result/${reportId}/${resultId}`);
+  };
 
   return (
     <MypageLayout activeMenu="result">
@@ -26,7 +44,13 @@ const Result: React.FC = () => {
             <div key={report.report_id} className="w-full my-6">
               {/* 리포트 헤더 */}
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-[#1b1c1f]">{report.title}</h3>
+                <div className="flex items-center gap-3">
+                  <EditableTitle
+                    reportId={report.report_id}
+                    title={report.title}
+                    onTitleChange={handleTitleChange}
+                  />
+                </div>
                 <div className="flex items-center gap-4">
                   <div className="w-px h-6 bg-[#dedee4]"></div>
                   <span className="text-sm text-gray-500">
@@ -39,6 +63,7 @@ const Result: React.FC = () => {
               <CarouselNavigation
                 reportId={report.report_id}
                 results={report.results}
+                onResultClick={handleResultClick}
               />
             </div>
           ))}
