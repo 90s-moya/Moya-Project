@@ -3,6 +3,7 @@ package com.moya.interfaces.api.pdf;
 import com.moya.interfaces.api.pdf.request.PDFRequest;
 import com.moya.service.pdf.PDFService;
 import com.moya.support.security.auth.CustomUserDetails;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,12 +15,18 @@ import org.springframework.web.bind.annotation.*;
 public class PDFController {
     private final PDFService pdfService;
     @PostMapping
-    public ResponseEntity<String> selectPDFText(
+    public ResponseEntity<String> selectPDFTextBatch(
             @AuthenticationPrincipal CustomUserDetails user,
-            @RequestBody PDFRequest request
+            @Valid @RequestBody PDFRequest request
     ) {
-        String userId = user.getUserId().toString();  // UUID → String 변환
-        String text = pdfService.getText(userId, request.getFileURL());
-        return ResponseEntity.ok(text);
+        String userId = user.getUserId().toString();
+
+        String merged = pdfService.getTextBatch (
+                userId,
+                request.getResumeUrl(),
+                request.getPortfolioUrl(),
+                request.getCoverletterUrl()
+        );
+        return ResponseEntity.ok(merged);
     }
 }
