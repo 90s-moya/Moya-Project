@@ -71,18 +71,6 @@ export default function Carousel({ items, onClose }: CarouselProps) {
   //   return () => clearTimeout(timer);
   // }, [currentIndex]);
 
-  // 파일 다운로드 핸들러
-  const handleDownload = (fileUrl: string, fileName: string) => {
-    const fullFileUrl = `${BASE_FILE_URL}${fileUrl}`;
-    const link = document.createElement("a");
-    link.href = fullFileUrl;
-    link.download = fileName;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   // 아이템이 없으면 렌더링하지 않음
   if (items.length === 0) {
     return null;
@@ -94,7 +82,7 @@ export default function Carousel({ items, onClose }: CarouselProps) {
 
   // PDF 내용 렌더링
   const renderPdfContent = () => {
-    // 서류가 렌더링 되지 않는 경우 새 탭 혹은 다운로드로 대체
+    // 서류가 렌더링 되지 않는 경우
     if (error) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-gray-500">
@@ -106,13 +94,6 @@ export default function Carousel({ items, onClose }: CarouselProps) {
               className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
             >
               <ExternalLink className="w-4 h-4" />새 탭에서 열기
-            </button>
-            <button
-              onClick={() => handleDownload(currentItem.fileUrl, fileName)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-            >
-              <Download className="w-4 h-4" />
-              다운로드
             </button>
           </div>
         </div>
@@ -213,26 +194,6 @@ export default function Carousel({ items, onClose }: CarouselProps) {
 
       {/* 하단 정보 및 컨트롤 */}
       <div className="bg-gray-50 px-4 py-2 border-t">
-        <div className="flex items-center justify-end text-xs text-gray-600">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.open(fullFileUrl, "_blank")}
-              className="flex text-lg items-center gap-1 px-2 py-1 text-blue-600 hover:bg-blue-50 rounded"
-              title="새 탭에서 열기"
-            >
-              <ExternalLink className="w-3 h-3" />
-              열기
-            </button>
-            <button
-              onClick={() => handleDownload(currentItem.fileUrl, fileName)}
-              className="flex text-lg items-center gap-1 px-2 py-1 text-gray-600 hover:bg-gray-100 rounded"
-              title="다운로드"
-            >
-              <Download className="w-3 h-3" />
-              다운로드
-            </button>
-          </div>
-        </div>
         <div className="text-center mt-1 text-sm text-gray-500">
           <p>← → 방향키로 이동 | ESC로 닫기</p>
         </div>
