@@ -123,8 +123,11 @@ export default ResultDetail;
 const mockDetailData = {
   "video_url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
   "verbal_result": {
-    "answer": "저는 문제 해결 과정에서 끈기를 가지고 끝까지 해내는 성향이 강합니다.",
+    "answer": "저는 문제 해결 과정에서 끈기를 가지고 끝까지 해내는 성향이 강합니다. 왜냐하면 끈기를 가지고 끝까지 해내야 좋기 때문입니다. 그렇기 때문에 앞으로도 끈기를 가지고 모든 일에 임하겠습니다.",
     "stopwords": "NORMAL",
+    "is_ended": true,
+    "reason_end": "답변이 자연스럽게 완결되었으며, 핵심 메시지를 전달함",
+    "context_matched": true,
     "reason_context": "질문이 '본인의 강점'이었고, 답변이 주제에 부합하며 불필요한 내용이 없음.",
     "gpt_comment": "핵심 메시지가 분명하지만, 구체적인 사례를 덧붙이면 더 설득력 있는 답변이 될 수 있음.",
     "end_type": "OUTSTANDING",
