@@ -1,4 +1,4 @@
-#utils/gpt.py
+# utils/gpt.py
 import httpx
 import re
 import json
@@ -6,6 +6,7 @@ from decouple import config
 
 GMS_API_KEY = config('GMS_API_KEY')
 GMS_API_URL = config('GMS_BASE_URL')
+
 
 async def ask_gpt_if_ends_async(question_list: list[str], answer_list: list[str]) -> str:
     """
@@ -51,6 +52,7 @@ async def ask_gpt_if_ends_async(question_list: list[str], answer_list: list[str]
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
 
+
 def parse_gpt_result(gpt_text: str):
     pattern = r"질문\s*(\d+):\s*종결 여부:\s*(True|False)\s*근거:\s*(.*?)\s*맥락 일치 여부:\s*(True|False)\s*근거:\s*(.*?)\s*GPT 코멘트:\s*(.*?)(?:\n{2,}|\Z)"
     matches = re.findall(pattern, gpt_text, re.DOTALL)
@@ -66,10 +68,10 @@ def parse_gpt_result(gpt_text: str):
         })
     return parsed
 
-async def generate_initial_question(text: str) -> str:
+
+async def generate_initial_question(text: str) -> list[str]:
     """
-    PDF/자소서 텍스트를 받아 GPT로부터 면접 질문 3개를 생성하여 JSON 문자열로 반환
-    (DB 저장을 위해 JSON 리스트를 문자열로 직렬화하여 반환)
+    자기소개서/포트폴리오 텍스트를 받아 실제 면접용 대질문 3개를 list[str] 형태로 반환
     """
     prompt = f"""
         너는 AI 면접관이야. 자기소개서, 포트폴리오, 이력서를 바탕으로 실제 면접에서 사용할 수 있는 질문을 총 3개 만들어줘.
@@ -106,16 +108,17 @@ async def generate_initial_question(text: str) -> str:
 
         raw_output = response.json()["choices"][0]["message"]["content"].strip()
 
-        # ✅ 마크다운 제거 (```json ... ```)
-        cleaned_output = re.sub(r"^```json\n?|```$", "", raw_output.strip(), flags=re.MULTILINE)
+        # ```json ... ``` 마크다운 제거
+        cleaned_output = re.sub(r"^```json\s*|\s*```$", "", raw_output.strip(), flags=re.MULTILINE)
 
         try:
             question_list = json.loads(cleaned_output)
-            return json.dumps(question_list, ensure_ascii=False)
-
+            if not isinstance(question_list, list):
+                raise ValueError("응답이 리스트 형식이 아님")
+            return [str(q).strip() for q in question_list][:3]
         except json.JSONDecodeError as e:
             raise ValueError(f"GPT 응답이 올바른 JSON 형식이 아닙니다: {raw_output}") from e
-        
+
 
 async def generate_followup_question(base_question: str, answer: str) -> str:
     """
@@ -134,7 +137,7 @@ async def generate_followup_question(base_question: str, answer: str) -> str:
         답변: "{answer}"
 
         꼬리질문:
-        """
+    """
 
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
@@ -151,10 +154,8 @@ async def generate_followup_question(base_question: str, answer: str) -> str:
         )
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"].strip()
-
-        # "꼬리질문: " 제거 후 리턴
         return content.replace("꼬리질문:", "").strip()
-    
+
 
 async def generate_second_followup_question(base_question: str, answer1: str, followup1: str, answer2: str) -> str:
     """
@@ -176,7 +177,7 @@ async def generate_second_followup_question(base_question: str, answer1: str, fo
         답변: "{answer2}"
 
         꼬리질문:
-        """
+    """
 
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
