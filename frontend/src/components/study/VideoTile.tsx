@@ -104,7 +104,7 @@ export default function VideoTile({
         autoPlay
         playsInline
         muted={isLocal}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover transform scale-x-[-1]"
       />
 
       {/* 오른쪽 상단 서류 아이콘 (썸네일에서는 숨김) */}
