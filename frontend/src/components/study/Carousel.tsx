@@ -8,18 +8,19 @@ import {
 
 interface CarouselProps {
   items: {
-    id: string;
+    id: string; // 서류 고유 ID
     title: string;
     fileUrl: string;
     type: "RESUME" | "COVERLETTER" | "PORTFOLIO";
   }[];
-  onClose: () => void;
+  onClose: () => void; // 캐러셀 닫기 함수
 }
 
 export default function Carousel({ items, onClose }: CarouselProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const BASE_FILE_URL = import.meta.env.VITE_FILE_URL; // 서류를 불러오기 위한 파일 URL
+  const [currentIndex, setCurrentIndex] = useState(0); // 현재 보고 있는 서류 인덱스
+  const [isLoading, setIsLoading] = useState(true); // PDF 로딩 상태
+  const [error, setError] = useState<string | null>(null); // 에러 상태
 
   // props 로깅
   useEffect(() => {
@@ -31,13 +32,19 @@ export default function Carousel({ items, onClose }: CarouselProps) {
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       switch (event.key) {
-        case "ArrowLeft":
+        case "ArrowLeft": // 왼쪽 화살표: 이전 서류
+          event.preventDefault();
+          event.stopPropagation(); // 이벤트 전파 방지
           setCurrentIndex((prev) => (prev > 0 ? prev - 1 : items.length - 1));
           break;
-        case "ArrowRight":
+        case "ArrowRight": // 오른쪽 화살표 : 다음 서류
+          event.preventDefault();
+          event.stopPropagation(); // 이벤트 전파 방지
           setCurrentIndex((prev) => (prev < items.length - 1 ? prev + 1 : 0));
           break;
-        case "Escape":
+        case "Escape": // ESC: 캐러셀 닫기
+          event.preventDefault();
+          event.stopPropagation(); // 이벤트 전파 방지
           onClose();
           break;
       }
@@ -66,7 +73,7 @@ export default function Carousel({ items, onClose }: CarouselProps) {
 
   // 파일 다운로드 핸들러
   const handleDownload = (fileUrl: string, fileName: string) => {
-    const fullFileUrl = `${import.meta.env.VITE_FILE_URL}${fileUrl}`;
+    const fullFileUrl = `${BASE_FILE_URL}${fileUrl}`;
     const link = document.createElement("a");
     link.href = fullFileUrl;
     link.download = fileName;
@@ -81,8 +88,8 @@ export default function Carousel({ items, onClose }: CarouselProps) {
     return null;
   }
 
-  const currentItem = items[currentIndex];
-  const fullFileUrl = `${import.meta.env.VITE_FILE_URL}${currentItem.fileUrl}`;
+  const currentItem = items[currentIndex]; // 현재 선택된 서류
+  const fullFileUrl = `${BASE_FILE_URL}${currentItem.fileUrl}`;
   const fileName = currentItem.fileUrl.split("/").pop() || "파일.pdf";
 
   // PDF 내용 렌더링
@@ -206,16 +213,11 @@ export default function Carousel({ items, onClose }: CarouselProps) {
 
       {/* 하단 정보 및 컨트롤 */}
       <div className="bg-gray-50 px-4 py-2 border-t">
-        <div className="flex items-center justify-between text-xs text-gray-600">
-          <div className="flex items-center gap-4">
-            <span>{currentItem.title}</span>
-            <span className="text-gray-400">•</span>
-            <span>{fileName}</span>
-          </div>
+        <div className="flex items-center justify-end text-xs text-gray-600">
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.open(fullFileUrl, "_blank")}
-              className="flex items-center gap-1 px-2 py-1 text-blue-600 hover:bg-blue-50 rounded"
+              className="flex text-lg items-center gap-1 px-2 py-1 text-blue-600 hover:bg-blue-50 rounded"
               title="새 탭에서 열기"
             >
               <ExternalLink className="w-3 h-3" />
@@ -223,7 +225,7 @@ export default function Carousel({ items, onClose }: CarouselProps) {
             </button>
             <button
               onClick={() => handleDownload(currentItem.fileUrl, fileName)}
-              className="flex items-center gap-1 px-2 py-1 text-gray-600 hover:bg-gray-100 rounded"
+              className="flex text-lg items-center gap-1 px-2 py-1 text-gray-600 hover:bg-gray-100 rounded"
               title="다운로드"
             >
               <Download className="w-3 h-3" />
@@ -231,7 +233,7 @@ export default function Carousel({ items, onClose }: CarouselProps) {
             </button>
           </div>
         </div>
-        <div className="text-center mt-1 text-xs text-gray-500">
+        <div className="text-center mt-1 text-sm text-gray-500">
           <p>← → 방향키로 이동 | ESC로 닫기</p>
         </div>
       </div>
