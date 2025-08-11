@@ -1,12 +1,23 @@
 import { createFeedback } from "@/api/studyApi";
 import { useEffect, useRef, useState } from "react";
+import positiveImg from "@/assets/images/positive.png";
+import negativeImg from "@/assets/images/negative.png";
 import FeedbackPopup from "./FeedbackPopup";
+import Carousel from "../ui/Carousel";
 
 interface VideoTileProps {
   stream: MediaStream | null;
   isLocal?: boolean;
   userId: string;
   roomId: string;
+  userDocs?: {
+    docsId: string; // docs_id → docsId로 변경
+    userId: string; // user_id → userId로 변경
+    fileUrl: string; // file_url → fileUrl로 변경
+    docsStatus: string;
+  }[];
+  onDocsClick?: (userId: string) => void; // 서류 클릭 시 부모 컴포넌트에 알림
+  hideOverlay?: boolean; // 썸네일 등 오버레이 숨김
 }
 
 export default function VideoTile({
@@ -14,13 +25,16 @@ export default function VideoTile({
   isLocal = false,
   userId,
   roomId,
+  userDocs = [],
+  onDocsClick,
+  hideOverlay = false,
 }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false); // 피드백 팝업 여부
-  const [feedbackMessage, setFeedbackMessage] = useState(""); // 피드백 메시지
+  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackType, setFeedbackType] = useState<
     "POSITIVE" | "NEGATIVE" | null
-  >(null); // 피드백 타입
+  >(null);
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
@@ -32,13 +46,13 @@ export default function VideoTile({
   // 서류 아이콘 클릭 시 실행되는 함수
   const handleClickDocs = () => {
     console.log("서류 아이콘 클릭 됨.");
-    console.log(userId);
+    console.log("사용자 ID:", userId);
+    console.log("사용자 서류:", userDocs);
 
-    // api 요청 보내서 서류 받아오기
-
-    // 받아온 서류의 docsStatus에 따라 usestate로 선언된 변수에 담기
-
-    // 그런데 비디오 타일마다 사용자의 user id를 알아야하는데 어떻게 알지..?
+    // 부모 컴포넌트에 서류 클릭 이벤트 전달
+    if (onDocsClick) {
+      onDocsClick(userId);
+    }
   };
 
   // 웃는 얼굴 버튼 눌렀을 때 호출
@@ -66,7 +80,6 @@ export default function VideoTile({
         feedbackType: feedbackType,
         message: feedbackMessage,
       });
-      // console.log("피드백 보낸 결과", res);
       setShowFeedbackPopup(false);
       setFeedbackMessage("");
       setFeedbackType(null);
@@ -95,55 +108,49 @@ export default function VideoTile({
         className="w-full h-full object-cover"
       />
 
-      {/* 사용자 이름 */}
-
-      {/* 오른쪽 상단 서류 아이콘 3개 */}
-      <div className="absolute top-2 right-2 flex flex-col items-center gap-2 text-black">
-        <div
-          onClick={handleClickDocs}
-          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
-        >
-          📄
+      {/* 오른쪽 상단 서류 아이콘 (썸네일에서는 숨김) */}
+      {!hideOverlay && (
+        <div className="absolute top-2 right-2">
+          <div
+            onClick={handleClickDocs}
+            className="w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer transition-colors text-2xl"
+          >
+            📄
+          </div>
         </div>
-        <div
-          onClick={handleClickDocs}
-          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
-        >
-          📝
-        </div>
-        <div
-          onClick={handleClickDocs}
-          className="w-8 h-8 rounded-full bg-white shadow flex items-center justify-center hover:bg-[#e0e7ff] cursor-pointer"
-        >
-          📁
-        </div>
-      </div>
+      )}
 
-      {/* 오른쪽 하단 감정 피드백 */}
-      <div className="absolute bottom-2 right-2 flex gap-2">
-        <button
-          onClick={handleClickPositive}
-          className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]"
-        >
-          🙂
-        </button>
-        <button
-          onClick={handleClickNegative}
-          className="text-xl bg-white rounded-full shadow px-2 hover:bg-[#f0f4ff]"
-        >
-          😢
-        </button>
-      </div>
+      {/* 오른쪽 하단 감정 피드백 (썸네일에서는 숨김) */}
+      {!hideOverlay && (
+        <div className="absolute bottom-2 right-2 flex gap-2">
+          <button
+            onClick={handleClickPositive}
+            className="rounded-full shadow hover:opacity-90 transition"
+            aria-label="긍정 피드백"
+          >
+            <img src={positiveImg} alt="positive" className="w-12 h-12 rounded-full object-cover" />
+          </button>
+          <button
+            onClick={handleClickNegative}
+            className="rounded-full shadow hover:opacity-90 transition"
+            aria-label="부정 피드백"
+          >
+            <img src={negativeImg} alt="negative" className="w-12 h-12 rounded-full object-cover" />
+          </button>
+        </div>
+      )}
 
-      {/* 중앙 하단 피드백 팝업 */}
-      <FeedbackPopup
-        show={showFeedbackPopup}
-        feedbackType={feedbackType}
-        message={feedbackMessage}
-        onMessageChange={setFeedbackMessage}
-        onSubmit={handleSubmitFeedback}
-        onClose={handleClosePopup}
-      />
+      {/* 중앙 하단 피드백 팝업 (썸네일에서는 숨김) */}
+      {!hideOverlay && (
+        <FeedbackPopup
+          show={showFeedbackPopup}
+          feedbackType={feedbackType}
+          message={feedbackMessage}
+          onMessageChange={setFeedbackMessage}
+          onSubmit={handleSubmitFeedback}
+          onClose={handleClosePopup}
+        />
+      )}
     </div>
   );
 }

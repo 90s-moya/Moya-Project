@@ -61,18 +61,7 @@ export default function InterviewScreen() {
         </div>
 
 
-          {/* 마이크 볼륨 게이지 바
-          <div className="w-full max-w-md bg-white border rounded-lg px-4 py-3 text-sm text-gray-700">
-            <div className="mb-2">마이크 볼륨 게이지 바</div>
-            <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-              <div
-                className={`h-full transition-all duration-100 ${
-                  micLevel > 70 ? "bg-red-500" : micLevel > 40 ? "bg-yellow-500" : "bg-green-500"
-                }`}
-                style={{ width: `${isMicOn ? micLevel : 0}%` }}
-              ></div>
-            </div>
-          </div> */}
+        
         </main>
       </div>
     </div>
