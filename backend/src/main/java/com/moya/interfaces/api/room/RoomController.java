@@ -1,7 +1,10 @@
 package com.moya.interfaces.api.room;
 
+import com.moya.domain.roommember.RoomMember;
+import com.moya.domain.roommember.RoomMemberId;
 import com.moya.interfaces.api.room.request.RegisterRoomDocsRequest;
 import com.moya.service.room.RoomDocsService;
+import com.moya.service.room.RoomMemberService;
 import com.moya.service.room.command.RoomDetailCommand;
 import com.moya.service.room.command.RoomDocsInfoCommand;
 import com.moya.service.room.command.RoomInfoCommand;
@@ -22,6 +25,8 @@ import java.util.UUID;
 public class RoomController {
     private final RoomService roomService;
     private final RoomDocsService roomDocsService;
+    private final RoomMemberService roomMemberService;
+
     // 면접 스터디 전체 방 조회
     @GetMapping()
     public List<RoomInfoCommand> getAllRooms() {
@@ -41,10 +46,16 @@ public class RoomController {
         return ResponseEntity.ok(rdc);
     }
 
+    // 면접 스터디 팀 가입
+    @PostMapping("/{roomId}")
+    public ResponseEntity<RoomMemberId> joinRoom(@PathVariable UUID roomId, @AuthenticationPrincipal CustomUserDetails user){
+        RoomMember rm = roomMemberService.joinRoom(roomId, user.getUserId());
+        System.out.println("가입완료" + rm.getRoomMemberId());
+        return ResponseEntity.ok(rm.getRoomMemberId());
+    }
     // 면접 스터디 방 생성
     @PostMapping()
     public UUID createRoom(@RequestBody CreateRoomRequest createRoomRequest, @AuthenticationPrincipal CustomUserDetails user) {
-        System.out.println("================================="+createRoomRequest.getOpen_at());
         // 방 만들고
         UUID roomId = roomService.createRoom(createRoomRequest, user.getUserId());
         return roomId;

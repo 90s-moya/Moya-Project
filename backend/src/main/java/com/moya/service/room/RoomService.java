@@ -89,6 +89,7 @@ public class RoomService {
     public UUID createRoom(CreateRoomRequest createRoomRequest, UUID userId){
         // 방 만들기
         Category category = categoryRepository.findById(createRoomRequest.getCategory_id()).orElseThrow(() -> new RuntimeException("해당 카테고리가 없습니다."));
+        User user = userRepository.findById(userId).orElseThrow(()->new RuntimeException("해당 유저가 없습니다."));
         Room room = Room.builder()
                 .categoryId(category)
                 .maxUser(createRoomRequest.getMax_user())
@@ -98,7 +99,6 @@ public class RoomService {
                 .openAt(createRoomRequest.getOpen_at())
                 .build();
         Room makedRoom = roomRepository.save(room);
-        User user = userRepository.findById(userId).orElseThrow(()->new RuntimeException("해당 유저가 없습니다."));
 
         // 구성원에 방장으로 유저 넣어주기
         RoomMember member = RoomMember.builder()
