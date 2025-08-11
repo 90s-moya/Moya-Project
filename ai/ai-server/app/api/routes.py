@@ -13,7 +13,7 @@ from app.utils.gpt import (
     generate_followup_question,
     generate_second_followup_question
 )
-from app.utils.stt import transcribe_audio_async
+from app.utils.stt import transcribe_audio_async, transcribe_and_analyze
 from pydantic import BaseModel
 import time
 import asyncio
@@ -192,7 +192,16 @@ async def followup_question(
         # if not content:
         #     raise HTTPException(status_code=400, detail="업로드된 오디오가 비어있습니다.")
         answer = await transcribe_audio_async(audio)
-        # 4) GPT 평가 (원문 로깅 + 파싱 실패시 안전값 사용)
+        # 4-1) 발화 속도 평가
+        analysis = None
+        try:
+            await audio.seek(0)
+            analysis = await transcribe_and_analyze(audio)
+            logging.info("발화 분석 결과: %s", analysis)
+        except Exception as e:
+            logging.exception("발화 속도 분석 실패: %s", e)
+            analysis = None
+        # 4-2) GPT 평가 (원문 로깅 + 파싱 실패시 안전값 사용)
         try:
             gpt_text = await ask_gpt_if_ends_async([latest_qa.question], [answer])
             log.info(f"[followup] gpt_raw={gpt_text[:500]}")
