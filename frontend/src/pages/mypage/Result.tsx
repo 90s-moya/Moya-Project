@@ -22,9 +22,11 @@ const Result: React.FC = () => {
   };
 
   // 결과 클릭 핸들러
-  const handleResultClick = (reportId: string, resultId: string) => {
+  const handleResultClick = (reportId: string, resultId: string, question: string) => {
     console.log('Navigate to result detail:', reportId, resultId);
-    // navigate(`/mypage/result/${reportId}/${resultId}`);
+    navigate(`/mypage/result/${reportId}/${resultId}`, {
+      state: { question }
+    });
   };
 
   return (
@@ -63,7 +65,10 @@ const Result: React.FC = () => {
               <CarouselNavigation
                 reportId={report.report_id}
                 results={report.results}
-                onResultClick={handleResultClick}
+                onResultClick={(reportId, resultId) => {
+                  const result = report.results.find(r => r.result_id === resultId);
+                  handleResultClick(reportId, resultId, result?.question || '');
+                }}
               />
             </div>
           ))}
