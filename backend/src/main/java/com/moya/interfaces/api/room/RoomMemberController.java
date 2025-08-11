@@ -31,4 +31,6 @@ public class RoomMemberController {
 
         return ResponseEntity.ok(fileUrl);
     }
+
+
 }
