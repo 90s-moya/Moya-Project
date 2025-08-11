@@ -25,7 +25,7 @@ public class DocsService {
     @Transactional
     public DocsInfo saveDocs(DocsSaveCommand command) throws IOException{
         MultipartFile file=command.getFile();
-        if (command.getDocsStatus() == DocsStatus.RESUME || command.getDocsStatus() == DocsStatus.PORTFOLIO) {
+        if (command.getDocsStatus() == DocsStatus.RESUME || command.getDocsStatus() == DocsStatus.PORTFOLIO || command.getDocsStatus() == DocsStatus.COVERLETTER) {
             long count = docsRepository.countByUserIdAndDocsStatus(command.getUserId(), command.getDocsStatus());
             if (count >= 3) {
                 throw MAXIMUM_DOCS_LIMIT_EXCEEDED.exception();
