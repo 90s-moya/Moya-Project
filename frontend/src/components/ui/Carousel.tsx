@@ -45,37 +45,38 @@ export default function Carousel({ items, onClose }: CarouselProps) {
 
   const currentItem = items[currentIndex];
 
-  // 서류 타입별 아이콘과 색상 매핑
-  const getDocTypeInfo = (type: string) => {
-    switch (type) {
-      case "RESUME":
-        return { icon: "📄", color: "text-blue-600", bgColor: "bg-blue-50" };
-      case "COVERLETTER":
-        return { icon: "📝", color: "text-green-600", bgColor: "bg-green-50" };
-      case "PORTFOLIO":
-        return { icon: "", color: "text-purple-600", bgColor: "bg-purple-50" };
-      default:
-        return { icon: "📄", color: "text-gray-600", bgColor: "bg-gray-50" };
-    }
-  };
-
-  const docTypeInfo = getDocTypeInfo(currentItem.type);
-
   return (
     <div className="h-full flex flex-col">
-      {/* 헤더 */}
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">사용자 서류</h3>
+      {/* 상단 탭바 + 닫기 (sticky) */}
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur px-2 py-2 border-b">
+        <div className="overflow-x-auto max-w-full">
+          <div className="flex gap-2 pr-2">
+            {items.map((item, index) => (
+              <button
+                key={item.id}
+                onClick={() => setCurrentIndex(index)}
+                className={`px-3 py-1 rounded-full text-sm whitespace-nowrap border transition-colors ${
+                  index === currentIndex
+                    ? "bg-blue-500 text-white border-blue-500"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                }`}
+              >
+                {item.title}
+              </button>
+            ))}
+          </div>
+        </div>
         <button
           onClick={onClose}
           className="text-gray-500 hover:text-gray-700 text-xl"
+          aria-label="닫기"
         >
           ✕
         </button>
       </div>
 
-      {/* 캐러셀 컨테이너 */}
-      <div className="flex-1 relative">
+      {/* 본문 영역: 하나의 컨테이너로 최대 공간 확보 */}
+      <div className="flex-1 relative bg-white overflow-hidden">
         {/* 이전 버튼 */}
         {items.length > 1 && (
           <button
@@ -90,33 +91,21 @@ export default function Carousel({ items, onClose }: CarouselProps) {
           </button>
         )}
 
-        {/* 현재 아이템 */}
-        <div
-          className={`h-full p-4 rounded-lg border ${docTypeInfo.bgColor} overflow-y-auto`}
-        >
-          <div className="flex items-center mb-4">
-            <span className="text-xl mr-3">{docTypeInfo.icon}</span>
-            <h4 className={`text-lg font-medium ${docTypeInfo.color}`}>
-              {currentItem.title}
-            </h4>
-          </div>
-
-          <div className="mb-4">
+        {/* 현재 아이템 - 최대 공간 활용 */}
+        <div className="absolute inset-0 overflow-auto p-3 md:p-4">
+          <div className="mb-2">
             <a
               href={currentItem.fileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-500 hover:underline break-all"
+              className="text-blue-600 hover:underline break-all text-sm"
             >
               {currentItem.fileUrl.split("/").pop() || "파일 보기"}
             </a>
           </div>
-
-          {/* 파일 미리보기 영역 */}
-          <div className="bg-gray-100 rounded-lg p-4 min-h-[200px] flex items-center justify-center">
-            <p className="text-gray-500 text-center">
-              파일을 클릭하여 새 탭에서 확인하세요
-            </p>
+          {/* 텍스트 위주 문서를 위한 넓은 영역 */}
+          <div className="min-h-[360px] md:min-h-[420px] whitespace-pre-wrap leading-relaxed text-[15px] md:text-[16px] text-gray-800">
+            서류가 어떤 식으로 오는지에 따라 수정할 것.
           </div>
         </div>
 
@@ -135,24 +124,9 @@ export default function Carousel({ items, onClose }: CarouselProps) {
         )}
       </div>
 
-      {/* 인디케이터 */}
-      {items.length > 1 && (
-        <div className="flex justify-center mt-4 space-x-2">
-          {items.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`w-2 h-2 rounded-full ${
-                index === currentIndex ? "bg-blue-500" : "bg-gray-300"
-              }`}
-            />
-          ))}
-        </div>
-      )}
-
       {/* 키보드 안내 */}
       <div className="text-center mt-2 text-xs text-gray-500">
-        <p>← → 방향키로 이동, ESC로 닫기</p>
+        <p>← → 방향키로 이동 | ESC로 닫기</p>
       </div>
     </div>
   );

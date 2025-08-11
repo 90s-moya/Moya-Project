@@ -8,6 +8,7 @@ import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
 import { getDocsInRoom } from "@/api/studyApi";
 import { uploadVideo } from "@/api/studyApi";
+import { ChevronDown, ChevronUp, PhoneOff } from "lucide-react";
 
 type Participant = {
   id: string;
@@ -43,10 +44,14 @@ export default function StudyRoomPage() {
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
   const [showCarousel, setShowCarousel] = useState(false);
 
+  // 룸 제어 오픈 여부
+  const [controlsOpen, setControlsOpen] = useState(true);
+
   // 마운트 시 스터디 방 참여자들의 서류 조회
   useEffect(() => {
     const requestDocs = async () => {
       try {
+        console.log("roomId", roomId);
         const data = await getDocsInRoom(roomId!);
         console.log("방 참여자들의 서류 조회 성공", data);
         setAllDocs(data);
@@ -73,6 +78,12 @@ export default function StudyRoomPage() {
   // 서류 클릭 핸들러
   const handleDocsClick = (userId: string) => {
     console.log("서류 클릭됨:", userId);
+    // 같은 유저를 다시 클릭하면 토글로 닫기
+    if (focusedUserId === userId && showCarousel) {
+      setShowCarousel(false);
+      setFocusedUserId(null);
+      return;
+    }
     setFocusedUserId(userId);
     setShowCarousel(true);
   };
@@ -94,6 +105,14 @@ export default function StudyRoomPage() {
       fileUrl: doc.fileUrl, // file_url → fileUrl로 변경
       type: doc.docsStatus as "RESUME" | "COVERLETTER" | "PORTFOLIO",
     }));
+  };
+
+  // 참가자 수에 따라 동적으로 그리드 열 개수 결정 (최소 2, 최대 3열)
+  const getGridColumns = (count: number) => {
+    if (count <= 2) return 2; // 1~2명: 2열
+    if (count === 3) return 3; // 3명: 3열
+    if (count === 4) return 2; // 4명: 2열(2x2)
+    return 3; // 5~6명: 3열
   };
 
   // 서류 타입별 제목 반환
@@ -346,62 +365,117 @@ export default function StudyRoomPage() {
 
   return (
     <div className="min-h-screen bg-white text-[#1b1c1f] flex flex-col">
-      {/* 상단 헤더 */}
-      <header className="fixed top-0 left-0 right-0 z-10 bg-white border-b border-[#dedee4] h-[72px] flex items-center justify-center px-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-[#2b7fff]">
-          모의 면접 스터디
-        </h1>
-      </header>
 
       {/* 메인 콘텐츠 영역 */}
-      <div className="flex-1 pt-[100px] pb-24 w-full px-4">
+      <div
+        className={`flex-1 pt-[100px] w-full px-4 transition-[padding-bottom] duration-300 ${
+          controlsOpen ? "pb-24" : "pb-6"
+        }`}
+      >
         {/* 포커스 모드일 때: 왼쪽 비디오, 오른쪽 캐러셀 */}
         {focusedUserId ? (
-          <div className="flex gap-4 h-full">
-            {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
-            <div className="w-1/2">
-              {participants
-                .filter((p) => p.id === focusedUserId)
-                .map((participant) => (
-                  <div key={participant.id} className="w-full aspect-video">
+          <div className="flex flex-col gap-3 h-full">
+            {/* 상단 썸네일 스트립 */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mt-15">
+              {participants.map((p) => (
+                <button
+                  key={`thumb-${p.id}`}
+                  onClick={() => setFocusedUserId(p.id)}
+                  className={`shrink-0 w-45 h-30 rounded-md overflow-hidden border ${
+                    p.id === focusedUserId ? "border-blue-500" : "border-gray-300"
+                  }`}
+                  title={p.isLocal ? "나" : p.id}
+                >
+                  <div className="w-full h-full bg-black/20">
                     <VideoTile
-                      stream={participant.stream}
-                      isLocal={participant.isLocal}
-                      userId={participant.id}
+                      stream={p.stream}
+                      isLocal={p.isLocal}
+                      userId={p.id}
                       roomId={roomId!}
-                      userDocs={getParticipantDocs(participant.id)}
+                      userDocs={getParticipantDocs(p.id)}
                       onDocsClick={handleDocsClick}
+                      hideOverlay
                     />
                   </div>
-                ))}
+                </button>
+              ))}
             </div>
 
-            {/* 오른쪽: 서류 캐러셀 (화면의 절반) */}
-            <div className="w-1/2 bg-gray-50 rounded-lg p-4">
-              <Carousel
-                items={getCarouselItems()}
-                onClose={handleCloseCarousel}
-              />
+            <div className="flex gap-4 h-full">
+              {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
+              <div className="w-1/2 h-[68vh]">
+                {participants
+                  .filter((p) => p.id === focusedUserId)
+                  .map((participant) => (
+                    <div key={participant.id} className="w-full h-full">
+                      <VideoTile
+                        stream={participant.stream}
+                        isLocal={participant.isLocal}
+                        userId={participant.id}
+                        roomId={roomId!}
+                        userDocs={getParticipantDocs(participant.id)}
+                        onDocsClick={handleDocsClick}
+                      />
+                    </div>
+                  ))}
+              </div>
+
+              {/* 오른쪽: 서류 캐러셀 (화면의 절반) */}
+              <div className="w-1/2 h-[68vh] bg-gray-50 rounded-lg p-4 flex flex-col">
+                <Carousel
+                  items={getCarouselItems()}
+                  onClose={handleCloseCarousel}
+                />
+              </div>
             </div>
           </div>
         ) : (
-          /* 일반 모드: 그리드 레이아웃 */
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          /* 일반 모드: 그리드 레이아웃 (참가자 수 기반 반응형) */
+          <div
+            className={`grid gap-4 transition-[grid-template-columns] duration-300`
+            }
+            style={{
+              gridTemplateColumns: `repeat(${getGridColumns(participants.length)}, minmax(0, 1fr))`,
+            }}
+          >
             {participants.map(renderVideoTile)}
           </div>
         )}
       </div>
 
+      {/* 하단 토글 버튼 */}
+      <button
+        onClick={() => setControlsOpen((v) => !v)}
+        aria-label={controlsOpen ? "제어 숨기기" : "제어 보이기"}
+        className={`fixed ${controlsOpen ? "bottom-18" : "bottom-3"} left-1/2 -translate-x-1/2 z-30
+        w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg
+        flex items-center justify-center transition-all duration-300 ease-in-out`}
+      >
+        {controlsOpen ? (
+          <ChevronDown className="w-5 h-5" />
+        ) : (
+          <ChevronUp className="w-5 h-5" />
+        )}
+      </button>
+
       {/* 미디어 컨트롤 바 */}
-      <footer className="fixed bottom-4 left-0 right-0 bg-white border-t border-[#dedee4] py-4 shadow-inner z-20">
-        <div className="flex justify-center gap-10">
-          <MicControlPanel />
-          <CameraControlPanel />
+      <footer
+        className={`fixed left-0 right-0 bottom-0 bg-blue-500 border-t border-blue-600 py-3 shadow-inner z-20
+        transition-transform duration-300 ${controlsOpen ? "translate-y-0" : "translate-y-full"}`}
+      >
+        <div className="flex justify-center gap-3">
+          <div className="rounded-full px-4 py-2 border">
+            <MicControlPanel stream={localStream} />
+          </div>
+          <div className="rounded-full px-4 py-2 border">
+            <CameraControlPanel stream={localStream} />
+          </div>
           <button
             onClick={handleLeaveRoom}
-            className="text-red-400 text-xl font-semibold hover:text-red-700"
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-full px-4 py-2"
           >
-            📤 나가기
+            <PhoneOff className="w-4 h-4" />
+            <span>나가기</span>
           </button>
         </div>
       </footer>
