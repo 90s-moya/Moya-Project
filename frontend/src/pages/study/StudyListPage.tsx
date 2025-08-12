@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
-import { Search, ChevronLeft, ChevronRight, ArrowUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import Header from "@/components/common/Header";
 import StudyCard from "@/components/study/StudyCard";
 import type { StudyRoom } from "@/types/study";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { getRoomList } from "@/api/studyApi";
 
 export default function StudyListPage() {
@@ -54,8 +52,12 @@ export default function StudyListPage() {
   // 더보기 버튼 관련 변수
   const hasMore = visibleCount < sortedRooms.length;
 
-  // 캐로셀에 쓰이는 rooms
-  const carouselRooms = deadlineSortedRooms.slice(
+  // 캐로셀에 쓰이는 rooms (참여 인원 차이가 1인 방만 필터링)
+  const filteredCarouselRooms = deadlineSortedRooms.filter(
+    (room) => room.maxUser - room.joinUser === 1
+  );
+
+  const carouselRooms = filteredCarouselRooms.slice(
     carouselIndex,
     carouselIndex + 3
   );
@@ -67,7 +69,7 @@ export default function StudyListPage() {
 
   // 캐로셀 다음 버튼 클릭 시 호출되는 함수
   const handleNext = () => {
-    if (carouselIndex + 3 < deadlineSortedRooms.length) {
+    if (carouselIndex + 3 < filteredCarouselRooms.length) {
       setCarouselIndex(carouselIndex + 1);
     }
   };
@@ -111,21 +113,21 @@ export default function StudyListPage() {
             className="absolute -left-6 top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-md hover:bg-gray-100"
             disabled={carouselIndex === 0}
           >
-            <ChevronLeft className="w-6 h-6 text-[#6f727c]" />
+            <ChevronLeft className="w-6 h-6 text-[#2b7fff]" />
           </Button>
           <Button
             onClick={handleNext}
             variant="ghost"
             size="icon"
             className="absolute -right-6 top-1/2 transform -translate-y-1/2 z-10 bg-white shadow-md hover:bg-gray-100"
-            disabled={carouselIndex + 3 >= deadlineSortedRooms.length}
+            disabled={carouselIndex + 3 >= filteredCarouselRooms.length}
           >
             <ChevronRight className="w-6 h-6 text-[#2b7fff]" />
           </Button>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 px-6">
             {carouselRooms.map((room) => (
-              <StudyCard key={room.id} {...room} />
+              <StudyCard key={room.id} {...room} isCarousel={true} />
             ))}
           </div>
         </div>

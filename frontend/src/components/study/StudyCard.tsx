@@ -11,7 +11,8 @@ export default function StudyCard({
   openAt,
   title,
   joinUser,
-}: StudyRoom) {
+  isCarousel = false,
+}: StudyRoom & { isCarousel?: boolean }) {
   const navigate = useNavigate();
 
   return (
@@ -29,7 +30,11 @@ export default function StudyCard({
         <div className="space-y-2 min-h-[4.5rem]">
           <div className="flex justify-between text-base">
             <span className="text-[#6f727c]">참여 중인 인원 수</span>
-            <span className="text-[#1b1c1f] font-medium">
+            <span
+              className={`font-medium ${
+                isCarousel ? "text-red-500" : "text-[#1b1c1f]"
+              }`}
+            >
               {joinUser}/{maxUser}
             </span>
           </div>
