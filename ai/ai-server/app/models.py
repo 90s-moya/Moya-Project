@@ -12,8 +12,9 @@ class EvaluationSession(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), nullable=False)
+    title=Column(String(100),nullable=True,default="AI 모의면접 결과")
     created_at = Column(DateTime, default=datetime.utcnow)
-    summary = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow)
     original_text = Column(Text, nullable=True)  # 필요 없으면 삭제 가능
 
     qa_pairs = relationship("QuestionAnswerPair", back_populates="session", cascade="all, delete")
