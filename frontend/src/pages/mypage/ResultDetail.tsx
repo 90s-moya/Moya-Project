@@ -146,11 +146,11 @@ const mockDetailData = {
   },
   "posture_result": {
     "timestamp": "2025-08-05T11:08:59.549094",
-    "total_frames": 577,
+    "total_frames": 1177,
     "frame_distribution": {
-      "Good Posture": "284",
-      "Shoulders Uneven": "231",
-      "Hands Above Shoulders": "100"
+      "Good Posture": 884,
+      "Shoulders Uneven": 231,
+      "Hands Above Shoulders": 100
     },
     "detailed_logs": [
       {

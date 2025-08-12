@@ -19,7 +19,7 @@ export interface PostureResultProps {
     timestamp: string;
     total_frames: number;
     frame_distribution: {
-      [key: string]: string;
+      [key: number]: number;
     };
     detailed_logs: Array<{
       label: string;
@@ -39,32 +39,26 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-
-
   // 점선 그래프용 데이터 생성
   const generateLineChartData = () => {
     const firstStart = posture_result.detailed_logs[0]?.start_frame || 0;
     const lastEnd = posture_result.detailed_logs[posture_result.detailed_logs.length - 1]?.end_frame || 0;
-    
+
     // 자세 상태별 y축 값 매핑
     const postureYValues = {
       'Good Posture': 3,
       'Shoulders Uneven': 2,
       'Hands Above Shoulders': 1
     };
-    
-    const data: any[] = [];
-    
-    // 1초 단위로 데이터 포인트 생성 (30fps 기준)
-    const interval = 30; // 1초 = 30프레임
 
-    // 1초 단위로 데이터 포인트 생성
+    const data: any[] = [];
+    const interval = 30; // 1초 단위 (30fps)
+
     for (let frame = firstStart; frame <= lastEnd; frame += interval) {
-      // 현재 프레임의 자세 상태 찾기
-      const currentPosture = posture_result.detailed_logs.find(log => 
-        frame >= log.start_frame && frame <= log.end_frame
+      const currentPosture = posture_result.detailed_logs.find(
+        log => frame >= log.start_frame && frame <= log.end_frame
       );
-      
+
       data.push({
         frame,
         posture: currentPosture ? postureYValues[currentPosture.label as keyof typeof postureYValues] : 0
@@ -78,7 +72,7 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
   const generatePieChartData = () => {
     return Object.entries(posture_result.frame_distribution).map(([label, frames]) => ({
       name: getPostureStatusText(label as PostureStatusType),
-      value: parseInt(frames),
+      value: frames,
       color: getPostureColor(label)
     }));
   };
@@ -89,96 +83,86 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
   return (
     <div className="bg-[#fafafc] border border-[#dedee4] rounded-lg p-6">
       <div className="space-y-6">
-        {/* 자세 상태 타임라인 그래프 */}
+        {/* 타임라인 그래프 */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <BarChart3 size={18} className="text-[#2B7FFF]" />
             <h4 className="text-sm font-semibold text-[#2B7FFF]">타임라인</h4>
           </div>
           <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
-                         <div className="h-64">
-                               <ResponsiveContainer width="100%" height="100%">
-                                     <LineChart 
-                     data={lineChartData} 
-                     margin={{ top: 20, right: 5, left: 5, bottom: 5 }}
-                     onClick={(data) => {
-                       console.log('Chart clicked:', data);
-                       if (data && data.activeLabel !== undefined && onFrameChange) {
-                         const frame = Number(data.activeLabel);
-                         console.log('Moving to frame:', frame);
-                         onFrameChange(frame);
-                       }
-                     }}
-                   >
-                                       <CartesianGrid stroke="#e5e7eb" strokeDasharray="8 8" />
-                                                            <XAxis 
-                       dataKey="frame" 
-                       tickFormatter={(value) => frameToTime(value)}
-                       fontSize={10}
-                       tick={{ fill: '#9CA3AF' }}
-                       interval={2}
-                     />
-                                       <YAxis 
-                      domain={[0.5, 3.5]}
-                      ticks={[1, 2, 3]}
-                      tickFormatter={(value) => {
-                        switch (value) {
-                          case 1: return getPostureStatusText('Hands Above Shoulders');
-                          case 2: return getPostureStatusText('Shoulders Uneven');
-                          case 3: return getPostureStatusText('Good Posture');
-                          default: return '';
-                        }
-                      }}
-                      fontSize={12}
-                      width={80}
-                      tickLine={false}
-                      tickMargin={8}
-                    />
-                                       <Tooltip 
-                      labelFormatter={(value) => frameToTime(value)}
-                      formatter={(value) => {
-                        let postureName = '';
-                        switch (value) {
-                          case 1: postureName = getPostureStatusText('Hands Above Shoulders'); break;
-                          case 2: postureName = getPostureStatusText('Shoulders Uneven'); break;
-                          case 3: postureName = getPostureStatusText('Good Posture'); break;
-                          default: postureName = 'Unknown';
-                        }
-                        return [postureName];
-                      }}
-                       contentStyle={{
-                         fontSize: '11px',
-                         border: '1px solid #dedee4',
-                         borderRadius: '6px',
-                         backgroundColor: 'white',
-                         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                         outline: 'none'
-                       }}
-                      isAnimationActive={false}
-                    />
-                    
-                                                           <Line 
-                      type="monotone" 
-                      dataKey="posture" 
-                      stroke="#2B7FFF"
-                      strokeWidth={2}
-                      dot={false}
-                      style={{ cursor: 'pointer' }}
-                    />
-                                         
-                 </LineChart>
-               </ResponsiveContainer>
-             </div>
-             <div className="mt-4 flex flex-wrap items-center gap-4">
-               <div className="flex items-center gap-2 text-xs">
-                 <div className="w-3 h-3 rounded-sm bg-[#2B7FFF]" />
-                 <span className="text-gray-600">자세 상태 변화</span>
-               </div>
-             </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={lineChartData}
+                  margin={{ top: 20, right: 5, left: 5, bottom: 5 }}
+                  onClick={(data) => {
+                    if (data && data.activeLabel !== undefined && onFrameChange) {
+                      onFrameChange(Number(data.activeLabel));
+                    }
+                  }}
+                >
+                  <CartesianGrid stroke="#e5e7eb" strokeDasharray="8 8" />
+                  <XAxis
+                    dataKey="frame"
+                    tickFormatter={frameToTime}
+                    fontSize={10}
+                    tick={{ fill: '#9CA3AF' }}
+                    interval={2}
+                  />
+                  <YAxis
+                    domain={[0.5, 3.5]}
+                    ticks={[1, 2, 3]}
+                    tickFormatter={(value) => {
+                      switch (value) {
+                        case 1: return getPostureStatusText('Hands Above Shoulders');
+                        case 2: return getPostureStatusText('Shoulders Uneven');
+                        case 3: return getPostureStatusText('Good Posture');
+                        default: return '';
+                      }
+                    }}
+                    fontSize={12}
+                    width={80}
+                    tickLine={false}
+                    tickMargin={8}
+                  />
+                  <Tooltip
+                    labelFormatter={frameToTime}
+                    formatter={(value) => {
+                      switch (value) {
+                        case 1: return [getPostureStatusText('Hands Above Shoulders')];
+                        case 2: return [getPostureStatusText('Shoulders Uneven')];
+                        case 3: return [getPostureStatusText('Good Posture')];
+                        default: return ['Unknown'];
+                      }
+                    }}
+                    contentStyle={{
+                      fontSize: '11px',
+                      border: '1px solid #dedee4',
+                      borderRadius: '6px',
+                      backgroundColor: 'white',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}
+                    isAnimationActive={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="posture"
+                    stroke="#2B7FFF"
+                    strokeWidth={2}
+                    dot={false}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-xs">
+              <div className="w-3 h-3 rounded-sm bg-[#2B7FFF]" />
+              <span className="text-gray-600">자세 상태 변화</span>
+            </div>
           </div>
         </div>
 
-        {/* 자세 상태 분포 (원형 그래프) */}
+        {/* 원형 그래프 */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Clock size={18} className="text-[#2B7FFF]" />
@@ -189,32 +173,26 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                      data={pieChartData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      innerRadius={50}
-                      dataKey="value"
-                      label={({ percent }) => 
-                        `${((percent || 0) * 100).toFixed(1)}%`
-                      }
-                      labelLine={false}
-                    >
-                     {pieChartData.map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={entry.color} />
-                     ))}
-                   </Pie>
-                 </PieChart>
+                    data={pieChartData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    innerRadius={50}
+                    dataKey="value"
+                    label={({ percent }) => `${((percent || 0) * 100).toFixed(1)}%`}
+                    labelLine={false}
+                  >
+                    {pieChartData.map((entry, index) => (
+                      <Cell key={index} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
               </ResponsiveContainer>
             </div>
-            {/* 색상 범례 */}
             <div className="mt-4 flex flex-wrap gap-3">
               {pieChartData.map((entry, index) => (
                 <div key={index} className="flex items-center gap-2 text-xs">
-                  <div 
-                    className="w-3 h-3 rounded-sm" 
-                    style={{ backgroundColor: entry.color }}
-                  />
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: entry.color }} />
                   <span className="text-gray-600">{entry.name}</span>
                 </div>
               ))}
@@ -222,21 +200,37 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
           </div>
         </div>
 
-        
-
-        {/* 자세 개선 팁 */}
+        {/* 피드백 */}
         <div>
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp size={18} className="text-[#2B7FFF]" />
-            <h4 className="text-sm font-semibold text-[#2B7FFF]">자세 개선 팁</h4>
+            <h4 className="text-sm font-semibold text-[#2B7FFF]">자세 피드백</h4>
           </div>
-          <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 shadow-sm">
-            <div className="space-y-2 text-sm text-[#1b1c1f]">
-              <p>• 어깨를 균등하게 유지하고 한쪽으로 기울이지 않도록 주의하세요.</p>
-              <p>• 손을 어깨 높이 이상으로 올리지 말고 자연스럽게 배치하세요.</p>
-              <p>• 등을 곧게 펴고 시선은 정면을 향하도록 유지하세요.</p>
-            </div>
-          </div>
+          {(() => {
+            const goodPostureData = pieChartData.find(entry => entry.name === getPostureStatusText('Good Posture'));
+            const goodPosturePercentage =
+              goodPostureData
+                ? (goodPostureData.value / pieChartData.reduce((sum, entry) => sum + entry.value, 0)) * 100
+                : 0;
+
+            if (goodPosturePercentage >= 70) {
+              return (
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 shadow-sm">
+                  <p className="font-medium text-green-700 mb-2">좋은 자세를 잘 유지했어요! 👍</p>
+                  <p className="mt-1 text-gray-600">거의 모든 시간 동안 바른 자세를 유지하고 있어요.</p>
+                </div>
+              );
+            } else {
+              return (
+                <div className="bg-gradient-to-r from-red-50 to-rose-50 p-4 rounded-lg border border-red-200 shadow-sm">
+                  <p className="font-medium text-red-700 mb-2">자세 개선이 필요해요</p>
+                  <p>• 어깨를 균등하게 유지하고 한쪽으로 기울이지 않도록 주의하세요.</p>
+                  <p>• 답변을 할 때 나도 모르게 손을 올려 제스처를 하지 않는지 되짚어보세요.</p>
+                  <p>• 등을 곧게 펴고 시선은 정면을 향하도록 유지하세요.</p>
+                </div>
+              );
+            }
+          })()}
         </div>
       </div>
     </div>

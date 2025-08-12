@@ -123,9 +123,9 @@ export const getPostureStatusText = (status: PostureStatusType): string => {
 
 // 자세 상태별 색상 매핑
 export const POSTURE_COLOR_MAP = {
-  'Good Posture': '#10B981', // green-500
-  'Shoulders Uneven': '#F59E0B', // yellow-500
-  'Hands Above Shoulders': '#EF4444', // red-500
+  'Good Posture': '#86EFAC',
+  'Shoulders Uneven': '#FCD34D',
+  'Hands Above Shoulders': '#FCA5A5',
 } as const;
 
 export const getPostureColor = (status: string): string => {
