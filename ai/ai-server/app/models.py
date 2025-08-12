@@ -1,3 +1,5 @@
+# app/models.py
+
 import uuid
 from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import relationship
@@ -12,9 +14,9 @@ class EvaluationSession(Base):
     user_id = Column(String(36), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     summary = Column(Text, nullable=True)
+    original_text = Column(Text, nullable=True)  # 필요 없으면 삭제 가능
 
     qa_pairs = relationship("QuestionAnswerPair", back_populates="session", cascade="all, delete")
-    original_text = Column(Text, nullable=False) 
 
 
 class QuestionAnswerPair(Base):
@@ -24,15 +26,19 @@ class QuestionAnswerPair(Base):
     session_id = Column(String(36), ForeignKey("evaluation_session.id"), nullable=False)
 
     order = Column(Integer, nullable=False)
+    sub_order = Column(Integer, nullable=False)
     question = Column(Text, nullable=False)
-    answer = Column(Text, nullable=False)
 
-    is_ended = Column(Boolean, nullable=False)
-    reason_end = Column(Text, nullable=False)
-    context_matched = Column(Boolean, nullable=False)
-    reason_context = Column(Text, nullable=False)
+    answer = Column(Text, nullable=True)
+    stopwords = Column(Text, nullable=True)
+    is_ended = Column(Boolean, nullable=True)
+    reason_end = Column(Text, nullable=True)
+    context_matched = Column(Boolean, nullable=True)
+    reason_context = Column(Text, nullable=True)
     gpt_comment = Column(Text, nullable=True)
+    end_type = Column(Text, nullable=True)
+    # 필요 컬럼 추가
 
     created_at = Column(DateTime, default=datetime.utcnow)
-
+    updated_at = Column(DateTime, default=datetime.utcnow)
     session = relationship("EvaluationSession", back_populates="qa_pairs")

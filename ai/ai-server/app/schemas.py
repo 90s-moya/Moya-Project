@@ -1,3 +1,5 @@
+# app/schemas.py
+
 from pydantic import BaseModel, UUID4
 from typing import List, Optional
 from datetime import datetime
@@ -5,18 +7,19 @@ from datetime import datetime
 # Q&A pair (기본 구조)
 class QuestionAnswerPairBase(BaseModel):
     order: int
+    sub_order: int
     question: str
-    answer: str
-    is_ended: bool
-    reason_end: str
-    context_matched: bool
-    reason_context: str
-    gpt_comment: Optional[str] = None
-
+    answer: Optional[str] = ""
+    is_ended: Optional[bool] = False
+    reason_end: Optional[str] = ""
+    context_matched: Optional[bool] = False
+    reason_context: Optional[str] = ""
+    gpt_comment: Optional[str] = ""
+    stopwords: Optional[str] = ""
+    end_type: Optional[str] = ""
 
 class QuestionAnswerPairCreate(QuestionAnswerPairBase):
     session_id: UUID4
-
 
 class QuestionAnswerPairRead(QuestionAnswerPairBase):
     id: int
@@ -24,18 +27,15 @@ class QuestionAnswerPairRead(QuestionAnswerPairBase):
     created_at: datetime
 
     class Config:
-        from_attributes = True  
+        from_attributes = True  # SQLAlchemy -> Pydantic 매핑
 
-
-# Evaluation session (기본 구조)
+# Evaluation session
 class EvaluationSessionBase(BaseModel):
     user_id: UUID4
     summary: Optional[str] = None
 
-
 class EvaluationSessionCreate(EvaluationSessionBase):
     pass
-
 
 class EvaluationSessionRead(EvaluationSessionBase):
     id: UUID4
@@ -43,4 +43,4 @@ class EvaluationSessionRead(EvaluationSessionBase):
     qa_pairs: List[QuestionAnswerPairRead] = []
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
