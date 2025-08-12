@@ -30,7 +30,7 @@ from app.utils.gpt import (
 from app.utils.stt import (
     transcribe_audio_async,             # (레거시) 필요 시 유지
     transcribe_audio_bytes,             # 빠른 경로: 최소 STT
-    analyze_audio_bytes,                # 백그라운드: 상세 분석
+    transcribe_and_analyze,                # 백그라운드: 상세 분석
 )
 from app.utils.posture import analyze_video_bytes
 
@@ -492,13 +492,19 @@ async def _bg_analyze_and_persist(qa_id: int, audio_bytes: bytes):
     """
     db = SessionLocal()
     try:
-        analysis = await analyze_audio_bytes(audio_bytes)
+        analysis = await transcribe_and_analyze(audio_bytes)
         qa = db.query(QuestionAnswerPair).get(qa_id)
         if qa:
             try:
-                # JSON 칼럼이 있는 경우
-                if hasattr(qa, "speech_analysis"):
-                    qa.speech_analysis = analysis
+                # 1) 개별 컬럼이 있는 경우 우선 저장
+                if hasattr(qa, "speech_label") and hasattr(qa, "speech_reason"):
+                    qa.speech_label = analysis.get("label")
+                    qa.speech_reason = analysis.get("reason")
+
+                # 2) JSON 컬럼이 있는 경우(겸용 또는 대안)
+                elif hasattr(qa, "speech_analysis"):
+                    qa.speech_analysis = analysis  # dict 그대로 (JSON 타입이어야 함)
+
                 else:
                     # 하위호환: 문자열 필드에 JSON을 덧붙여 저장
                     payload = "\n[SPEECH_ANALYSIS]\n" + json.dumps(analysis, ensure_ascii=False)
