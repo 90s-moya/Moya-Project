@@ -1,6 +1,7 @@
 # app/services/report_services.py
 from typing import List, Dict, Any,Optional
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_
 from app.models import EvaluationSession, QuestionAnswerPair
 import json
 def get_result_by_id(db: Session, result_id: str) -> Optional[Dict[str, Any]]:
@@ -125,4 +126,50 @@ def get_report_by_id(db: Session, session_id: str) -> Dict[str, Any] | None:
             }
             for r in results
         ]
+    }
+
+def get_result_detail_secure(db: Session, report_id: str, result_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    # result_id가 해당 report_id에 속하는지 + 그 report가 해당 user_id 소유인지 검증
+    r = (
+        db.query(QuestionAnswerPair)
+        .join(EvaluationSession, QuestionAnswerPair.session_id == EvaluationSession.id)
+        .options(joinedload(QuestionAnswerPair.session))
+        .filter(
+            and_(
+                QuestionAnswerPair.id == result_id,
+                QuestionAnswerPair.session_id == report_id,
+            )
+        )
+        .first()
+    )
+    if not r:
+        # result_id가 없거나 report_id와 매칭되지 않음
+        return None
+
+    # 소유자 검증
+    if not r.session or str(r.session.user_id) != str(user_id):
+        # 소유자 불일치 → 호출자에게 노출하지 않기 위해 여기서 None을 반환하고
+        # 라우터에서 403 처리(또는 여기서 예외 던져도 됨)
+        raise PermissionError("Forbidden")
+
+    return {
+        "result_id": r.id,
+        "report_id": r.session_id,
+        "report_title": r.session.title if r.session else None,
+        "created_at": r.created_at.isoformat() + "Z" if r.created_at else None,
+        "video_url": getattr(r, "video_url", None),
+        "verbal_result": {
+            "answer": r.answer,
+            "stopwords": r.stopwords,
+            "is_ended": r.is_ended,
+            "reason_end": r.reason_end,
+            "context_matched": r.context_matched,
+            "reason_context": r.reason_context,
+            "gpt_comment": r.gpt_comment,
+            "end_type": r.end_type,
+            "speech_label": r.speech_label,
+            "syll_art": float(r.syll_art) if getattr(r, "syll_art", None) not in (None, "") else None,
+        },
+        "posture_result": _maybe_load_json(getattr(r, "posture_result", None)),
+        "face_result": _maybe_load_json(getattr(r, "face_result", None)),
     }
