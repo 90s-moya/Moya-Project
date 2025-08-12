@@ -6,12 +6,14 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 import com.moya.infras.report.ReportDto;
+import com.moya.infras.report.ResultDetailResponse;
 import com.moya.infras.report.ResultDto;
 import com.moya.interfaces.api.report.UserIdRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 @Service
@@ -52,12 +54,23 @@ public class ReportService {
     }
 
     /** 단일 결과 조회(임시) — FastAPI에 단건 API 추가 권장 */
-    public ResultDto fetchResultById(String userId, String resultId) {
-        List<ReportDto> list = fetchReportsByUser(userId);
-        return list.stream()
-                .flatMap(r -> r.getResults().stream())
-                .filter(res -> resultId.equals(res.getResultId()))
-                .findFirst()
-                .orElseThrow(() -> new NoSuchElementException("Result not found"));
+    public ResultDto fetchResultById(String resultId) {
+        URI uri = URI.create(pythonPath + "/reports/results/" + resultId);
+
+        try {
+            ResponseEntity<ResultDto> resp = restTemplate.exchange(
+                    uri, HttpMethod.GET, null, ResultDto.class
+            );
+            return resp.getBody();
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new NoSuchElementException("Result not found");
+        }
+    }
+    public ResultDetailResponse fetchResultDetailById(String resultId) {
+        URI uri = URI.create(pythonPath + "/reports/results/" + resultId + "/detail");
+        ResponseEntity<ResultDetailResponse> resp = restTemplate.exchange(
+                uri, HttpMethod.GET, null, ResultDetailResponse.class
+        );
+        return resp.getBody();
     }
 }

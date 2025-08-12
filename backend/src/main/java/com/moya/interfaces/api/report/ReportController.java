@@ -3,6 +3,7 @@ package com.moya.interfaces.api.report;
 
 
 import com.moya.infras.report.ReportDto;
+import com.moya.infras.report.ResultDetailResponse;
 import com.moya.infras.report.ResultDto;
 import com.moya.service.report.ReportService;
 import com.moya.support.security.auth.CustomUserDetails;
@@ -19,14 +20,14 @@ import java.util.List;
 @RequestMapping("/v1/me/report")
 public class ReportController {
 
-    private final ReportService service;
+    private final ReportService reportService;
 
 
 
     // React → GET /api/reports?userId=...
     @GetMapping
     public ResponseEntity<List<ReportDto>> listReports(@AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(service.fetchReportsByUser(user.getUserId().toString()));
+        return ResponseEntity.ok(reportService.fetchReportsByUser(user.getUserId().toString()));
     }
 
 //    // React → GET /api/reports/{reportId}?userId=...
@@ -37,8 +38,13 @@ public class ReportController {
 
     // React → GET /api/reports/results/{resultId}?userId=...
     // (reportId 없이 resultId만으로 단건 조회)
-    @GetMapping("/{resultId}")
-    public ResponseEntity<ResultDto> getResult(@PathVariable String resultId, @AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(service.fetchResultById(user.getUserId().toString(), resultId));
+//    @GetMapping("/")
+//    public ResponseEntity<ResultDto> getMyReportResult(@RequestParam("resultId") String resultId) {
+//        return ResponseEntity.ok(reportService.fetchResultById(resultId));
+//    }
+    // 예: /v1/me/report/detail?resultId=...
+    @GetMapping("/")
+    public ResponseEntity<ResultDetailResponse> getMyReportDetail(@RequestParam String resultId,@AuthenticationPrincipal CustomUserDetails user) {
+        return ResponseEntity.ok(reportService.fetchResultDetailById(resultId));
     }
 }
