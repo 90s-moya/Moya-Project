@@ -8,13 +8,13 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import String
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models import EvaluationSession, QuestionAnswerPair
 from app.schemas import EvaluationSessionRead
 from app.services.analysis_service import analyze_all
@@ -27,8 +27,12 @@ from app.utils.gpt import (
     generate_second_followup_question,
     parse_gpt_result,
 )
+from app.utils.stt import (
+    transcribe_audio_async,             # (레거시) 필요 시 유지
+    transcribe_audio_bytes,             # 빠른 경로: 최소 STT
+    analyze_audio_bytes,                # 백그라운드: 상세 분석
+)
 from app.utils.posture import analyze_video_bytes
-from app.utils.stt import transcribe_and_analyze, transcribe_audio_async
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -146,10 +150,11 @@ async def prompt_start(payload: PromptStartRequest, db: Session = Depends(get_db
 
 
 # --------------------------
-# 꼬리질문 생성 & 평가
+# 꼬리질문 생성 & 평가 (빠른 경로 + 백그라운드 분석)
 # --------------------------
 @router.post("/v1/followup-question")
 async def followup_question(
+    background_tasks: BackgroundTasks,
     session_id: str = Form(...),          # 세션 UUID 문자열
     order: int = Form(...),               # 요청한 대질문 번호(우선 사용)
     sub_order: int = Form(...),           # 무시(하위호환용)
@@ -262,7 +267,7 @@ async def followup_question(
                   .first()
             )
         if not current:
-            return {"finished": True}
+            return {"finished": True, "analysis": None}
 
         log.info("[followup] session=%s -> current(order=%s, sub=%s, id=%s)",
                  session_val, current.order, current.sub_order, current.id)
@@ -286,19 +291,15 @@ async def followup_question(
             db.commit()
             db.refresh(current)
 
-        # 5) STT
-        answer = await transcribe_audio_async(audio)
+        # 5) 오디오를 한 번만 읽어서 bytes 확보
+        audio_bytes = await audio.read()
+        filename = audio.filename or "audio.wav"
+        content_type = audio.content_type or "audio/wav"
 
-        # 5-1) 발화 분석(실패해도 흐름 유지)
-        analysis = None
-        try:
-            await audio.seek(0)
-            analysis = await transcribe_and_analyze(audio)
-            log.info("[followup] speech analysis: %s", analysis)
-        except Exception as e:
-            log.warning("[followup] speech analysis 실패: %s", e)
+        # 5-0) 빠른 STT (최소 처리) → 다음 질문을 서빙하기 위한 텍스트만 확보
+        answer = await transcribe_audio_bytes(audio_bytes, filename, content_type)
 
-        # 6) GPT 평가 (파싱 실패시 안전값)
+        # 6) GPT 평가 (가볍게 유지)
         try:
             gpt_text = await ask_gpt_if_ends_async([current.question], [answer])
             parsed = parse_gpt_result(gpt_text) or []
@@ -319,7 +320,7 @@ async def followup_question(
         is_ended = bool(res.get("is_ended", False))
         log.info("[followup] ended=%s, order=%s, sub=%s", is_ended, current.order, current.sub_order)
 
-        # 7) 현재 row 업데이트 (답변/평가 결과)
+        # 7) 현재 row 업데이트 (빠른 경로: 답변/평가 결과까지만 저장)
         current.answer = answer
         current.end_type = map_end_type(res)
         current.reason_end = res.get("reason_end", "")
@@ -331,6 +332,9 @@ async def followup_question(
         db.commit()
         db.refresh(current)
 
+        # 7-1) 음성 분석은 백그라운드에서 실행하여 DB에만 저장
+        background_tasks.add_task(_bg_analyze_and_persist, current.id, audio_bytes)
+
         # 8) 같은 order에서 꼬리질문 계속 (종결 여부 무시)
         if current.sub_order < MAX_FOLLOWUPS_PER_ORDER:
             if current.sub_order == 0:
@@ -341,7 +345,6 @@ async def followup_question(
                       .filter_by(session_id=session_val, order=current.order, sub_order=0)
                       .first()
                 )
-            # q0는 sub_order==1일 때만 필요
                 if not q0:
                     raise HTTPException(status_code=404, detail="첫 질문이 존재하지 않습니다.")
                 next_q = await generate_second_followup_question(
@@ -392,7 +395,7 @@ async def followup_question(
                 "sub_order": new_pair.sub_order,
                 "question": new_pair.question,
                 "switch_order": False,  # 같은 order 유지
-                "analysis": analysis,
+                "analysis": None,       # 이제 즉시 분석값은 반환하지 않음
             }
 
         # 9) 다음 order로 스위치 (sub_order=0, 미답변)
@@ -407,11 +410,11 @@ async def followup_question(
                 "sub_order": 0,
                 "question": next_row.question,
                 "switch_order": True,
-                "analysis": analysis,
+                "analysis": None,
             }
 
         # 10) 모든 질문 종료
-        return {"finished": True, "analysis": analysis}
+        return {"finished": True, "analysis": None}
 
     except HTTPException:
         raise
@@ -476,3 +479,36 @@ async def posture_report(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="업로드된 파일이 비어있습니다.")
     report = analyze_video_bytes(data)
     return JSONResponse(content=report)
+
+
+# --------------------------
+# 백그라운드 작업: 음성 상세 분석 저장
+# --------------------------
+async def _bg_analyze_and_persist(qa_id: int, audio_bytes: bytes):
+    """
+    무거운 분석은 응답 후에 실행. 새 DB 세션을 쓰고, 실패해도 서비스 흐름엔 영향 X.
+    - QuestionAnswerPair에 JSON 칼럼 speech_analysis가 있으면 그 칼럼에 저장.
+    - 없으면 gpt_comment에 JSON 문자열로 덧붙여 임시 저장(하위호환).
+    """
+    db = SessionLocal()
+    try:
+        analysis = await analyze_audio_bytes(audio_bytes)
+        qa = db.query(QuestionAnswerPair).get(qa_id)
+        if qa:
+            try:
+                # JSON 칼럼이 있는 경우
+                if hasattr(qa, "speech_analysis"):
+                    qa.speech_analysis = analysis
+                else:
+                    # 하위호환: 문자열 필드에 JSON을 덧붙여 저장
+                    payload = "\n[SPEECH_ANALYSIS]\n" + json.dumps(analysis, ensure_ascii=False)
+                    qa.gpt_comment = (qa.gpt_comment or "") + payload
+                db.add(qa)
+                db.commit()
+            except Exception:
+                # 어떤 이유로든 저장 실패 시 로깅만
+                log.exception("[bg] 분석 결과 저장 실패 (qa_id=%s)", qa_id)
+    except Exception as e:
+        log.exception("Background analysis failed: %s", e)
+    finally:
+        db.close()
