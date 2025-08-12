@@ -1,6 +1,5 @@
 package com.moya.interfaces.api.room;
 
-import com.moya.interfaces.api.room.request.RegisterRoomDocsRequest;
 import com.moya.service.room.RoomDocsService;
 import com.moya.service.room.command.RoomDetailCommand;
 import com.moya.service.room.command.RoomDocsInfoCommand;
@@ -25,13 +24,18 @@ public class RoomController {
     // 면접 스터디 전체 방 조회
     @GetMapping()
     public List<RoomInfoCommand> getAllRooms() {
-        return roomService.getAllRooms();
+        return roomService.getAllRooms().stream()
+                .map(RoomInfoCommand::from)
+                .toList();
     }
 
     // 면접 스터디 방 삭제
     @DeleteMapping("/{roomId}")
     public void deleteRoom(@PathVariable UUID roomId) {
+        // TODO: 존재하는 방인지 확인하는 로직 추가 해야함
+        // TODO: 삭제 완료 여부 BOOLEAN 받을지 말지 고민
         roomService.deleteRoom(roomId);
+        // TODO: 성공여부 리턴
     }
 
     // 면접 스터디 방 상세 조회
@@ -44,7 +48,6 @@ public class RoomController {
     // 면접 스터디 방 생성
     @PostMapping()
     public UUID createRoom(@RequestBody CreateRoomRequest createRoomRequest, @AuthenticationPrincipal CustomUserDetails user) {
-        System.out.println("================================="+createRoomRequest.getOpen_at());
         // 방 만들고
         UUID roomId = roomService.createRoom(createRoomRequest, user.getUserId());
         return roomId;
@@ -53,20 +56,14 @@ public class RoomController {
     // 내 면접 스터디 방 조회
     @GetMapping("/me")
     public List<RoomInfoCommand> getMyRoom(@AuthenticationPrincipal CustomUserDetails user) {
-        return roomService.getMyRooms(user.getUserId());
+        return roomService.getMyRooms(user.getUserId()).stream()
+                .map(RoomInfoCommand::from)
+                .toList();
     }
 
     // 면접 스터디 방 서류 조회
     @GetMapping("/{roomId}/docs")
     public ResponseEntity<List<RoomDocsInfoCommand>> getRoomDocs(@PathVariable UUID roomId) {
         return ResponseEntity.ok(roomDocsService.getRoomDocs(roomId));
-    }
-
-    // 면접 스터디 방 서류 등록
-    @PostMapping("/{roomId}/register")
-    public ResponseEntity<String> registerDocs(@PathVariable UUID roomId, @RequestBody RegisterRoomDocsRequest registerRoomDocsRequest) {
-
-        roomDocsService.createRoomDocs(registerRoomDocsRequest, roomId);
-        return ResponseEntity.ok("면접스터디 서류가 등록되었습니다.");
     }
 }

@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 export default function Component() {
   const navigate = useNavigate()
   const handleStartInterview = () => {
-    navigate("/interview/fileselect")
+    navigate("/interview/documentlist")
   }
   return (
     <div className="min-h-screen bg-gray-50">

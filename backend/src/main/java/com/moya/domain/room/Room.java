@@ -25,8 +25,7 @@ public class Room extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", referencedColumnName = "category_id")
     private Category categoryId;
-    // 대화 전문 대신 화면 녹화로 전환으로 인한 column제거
-    //private String conversation;
+    private String conversation;
     @Column(name="max_user")
     private int maxUser;
     private String title;

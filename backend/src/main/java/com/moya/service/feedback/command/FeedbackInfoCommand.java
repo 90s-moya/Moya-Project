@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Builder
@@ -14,8 +13,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class FeedbackInfoCommand {
-    private UUID fdId;
+    private UUID feedbackId;
+    private UUID roomId;
     private FeedbackType feedbackType;
     private String message;
-    private LocalDateTime createdAt;
 }

@@ -3,7 +3,6 @@ package com.moya.interfaces.api.feedback;
 import com.moya.interfaces.api.feedback.request.FeedbackRequest;
 import com.moya.service.feedback.FeedbackService;
 import com.moya.service.feedback.command.FeedbackInfoCommand;
-import com.moya.service.feedback.command.FeedbackResultCommand;
 import com.moya.support.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,17 +19,10 @@ public class FeedbackController {
     private final FeedbackService feedbackService;
 
     // 내 피드백 전체 조회
-//    @GetMapping()
-//    public ResponseEntity<List<FeedbackInfoCommand>> getFeedback(@AuthenticationPrincipal CustomUserDetails user) {
-//        UUID userId = user.getUserId();
-//        List<FeedbackInfoCommand> feedback = feedbackService.selectFeedback(userId);
-//        return ResponseEntity.ok(feedback);
-//    }
-    // 특정 방에서 받은 피드백 조회
-    @GetMapping("/{roomId}")
-    public ResponseEntity<FeedbackResultCommand> getFeedback(@AuthenticationPrincipal CustomUserDetails user, @PathVariable("roomId") UUID roomId) {
+    @GetMapping()
+    public ResponseEntity<List<FeedbackInfoCommand>> getFeedback(@AuthenticationPrincipal CustomUserDetails user) {
         UUID userId = user.getUserId();
-        FeedbackResultCommand feedback = feedbackService.selectFeedback(userId, roomId);
+        List<FeedbackInfoCommand> feedback = feedbackService.selectFeedback(userId);
         return ResponseEntity.ok(feedback);
     }
 
