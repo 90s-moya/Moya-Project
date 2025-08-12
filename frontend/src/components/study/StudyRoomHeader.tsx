@@ -33,9 +33,15 @@ export default function StudyRoomHeader({
   if (!focusedUserId) return null;
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 -mt-13 mb-4">
+    <div className="flex gap-2 overflow-x-auto pb-1 -mt-13 mb-4 justify-center">
       {participants
         .filter((p) => p.id !== focusedUserId)
+        .sort((a, b) => {
+          // isLocal이 true인 참가자(나)를 제일 앞으로 정렬
+          if (a.isLocal && !b.isLocal) return -1;
+          if (!a.isLocal && b.isLocal) return 1;
+          return 0;
+        })
         .slice(0, 5)
         .map((p) => (
           <button
