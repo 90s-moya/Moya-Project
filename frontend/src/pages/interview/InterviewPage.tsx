@@ -1,38 +1,17 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, MicOff } from "lucide-react"
 import aiCharacter from "@/assets/images/ai-character.png"
-import Header from "@/components/common/Header"
-import { useParams, useLocation } from "react-router-dom"
-
-// 추가: 녹음 컴포넌트
-import AnswerRecorder from "@/components/interview/AnswerRecorder"
-import { type QuestionKey } from "@/types/interview"
 
 export default function InterviewScreen() {
   const [isMicOn, setIsMicOn] = useState(true)
   const [micLevel, setMicLevel] = useState(0)
 
-  // 라우터 params에서 sessionId, location.state로 질문 메타 받기
-  const { sessionId } = useParams<{ sessionId: string }>()
-  const location = useLocation()
-
-  // location.state에 { order, subOrder, text } 형태로 전달 받는다고 가정
-  const currentOrder = (location.state as any)?.order ?? 1
-  const currentSubOrder = (location.state as any)?.subOrder ?? 0
-  const questionText = (location.state as any)?.text ?? "질문이 없습니다."
-
-  // AnswerRecorder에 넘길 keyInfo
-  const keyInfo: QuestionKey = useMemo(
-    () => ({ sessionId: sessionId ?? "", order: currentOrder, subOrder: currentSubOrder }),
-    [sessionId, currentOrder, currentSubOrder]
-  )
-
   // 마이크 음량 시뮬레이션
   useEffect(() => {
-    let interval: NodeJS.Timeout | undefined
+    let interval: NodeJS.Timeout
     if (isMicOn) {
       interval = setInterval(() => {
         setMicLevel(Math.random() * 100)
@@ -40,10 +19,12 @@ export default function InterviewScreen() {
     } else {
       setMicLevel(0)
     }
-    return () => interval && clearInterval(interval)
+    return () => clearInterval(interval)
   }, [isMicOn])
 
-  const toggleMic = () => setIsMicOn((v) => !v)
+  const toggleMic = () => {
+    setIsMicOn(!isMicOn)
+  }
 
   return (
     <div className="min-h-screen bg-gray-300 py-6 px-4">
@@ -53,39 +34,34 @@ export default function InterviewScreen() {
       {/* 전체 박스 */}
       <div className="bg-white rounded-lg border-4 border-blue-500 max-w-6xl mx-auto">
         {/* 헤더 */}
-        <Header scrollBg={false} />
+        <header className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          {/* 로고 */}
+          <div className="text-2xl font-bold text-blue-500">MOYA</div>
+
+          {/* 네비게이션 */}
+          <nav className="hidden md:flex items-center space-x-8">
+            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">AI 모의 면접</a>
+            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">면접 스터디</a>
+            <a href="#" className="text-gray-700 hover:text-blue-500 font-medium">마이페이지</a>
+          </nav>
+
+          {/* 로그인 상태 */}
+          <div className="flex items-center space-x-4">
+            <span className="text-gray-700">로그인</span>
+            <Button className="bg-blue-500 hover:bg-blue-600 text-white">00님</Button>
+          </div>
+        </header>
 
         {/* 본문 */}
-        <main className="p-10 flex flex-col items-center justify-center mt-16">
-          {/* AI 면접 영상 영역 */}
-          <div className="w-full max-w-3xl h-[400px] bg-white flex flex-col justify-center mb-8">
-            <h3 className="text-lg font-semibold mb-4">Q. {questionText}</h3>
-            <img src={aiCharacter} alt="AI 면접관" className="object-contain max-h-full" />
-          </div>
+        <main className="p-10 flex flex-col items-center justify-center">
+        {/* AI 면접 영상 영역 */}
+        <div className="w-full max-w-3xl h-[400px] bg-white flex flex-col  justify-center mb-8">
+          <h3 className="text-lg font-semibold mb-4">Q. 당신의 장점을 설명해주세요.</h3>
+          <img src={aiCharacter} alt="AI 면접관" className="object-contain max-h-full" />
+        </div>
 
-          {/* 녹음 컨트롤: sessionId/order/subOrder 기준으로 저장·업로드 */}
-          <div className="w-full max-w-3xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm text-gray-600">
-                세션 {sessionId} · 순서 {currentOrder}-{currentSubOrder}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-32 h-2 bg-gray-200 rounded">
-                  <div
-                    className="h-2 bg-blue-500 rounded"
-                    style={{ width: `${micLevel}%` }}
-                  />
-                </div>
-                <Button variant="outline" onClick={toggleMic}>
-                  {isMicOn ? <Mic className="w-4 h-4 mr-2" /> : <MicOff className="w-4 h-4 mr-2" />}
-                  {isMicOn ? "마이크 켜짐" : "마이크 꺼짐"}
-                </Button>
-              </div>
-            </div>
 
-            {/* 녹음기 */}
-            <AnswerRecorder keyInfo={keyInfo} />
-          </div>
+        
         </main>
       </div>
     </div>

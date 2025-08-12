@@ -10,7 +10,6 @@ const menuItems = [
   { key: "resume", label: "이력서 / 포트폴리오 / 자기소개서" },
   { key: "result", label: "모의 면접 결과" },
   { key: "feedback", label: "면접 스터디 피드백" },
-  { key: "room", label: "등록한 면접 스터디 목록" },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onNavigate }) => {

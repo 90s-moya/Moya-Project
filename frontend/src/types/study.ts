@@ -18,7 +18,6 @@ export type MasterInfo = {
   masterId: string;
 };
 
-// 방 상세 정보
 export type StudyRoomDetail = {
   body: string;
   categoryName: string;
@@ -67,16 +66,4 @@ export type createFeedbackParams = {
   receiverId: string;
   feedbackType: "POSITIVE" | "NEGATIVE";
   message: string;
-};
-
-// 내가 등록한 방 목록
-export type MyRegisteredRoom = {
-  id: string;
-  categoryName: string;
-  title: string;
-  body: string;
-  joinUser: number;
-  maxUser: number;
-  openAt: string;
-  expiredAt: string;
 };

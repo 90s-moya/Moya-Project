@@ -4,13 +4,12 @@ import StudyBackToList from "@/components/study/StudyBackToList";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { formatDateTime } from "@/util/date";
-import { deleteRoom, getRoomDetail, registerForRoom } from "@/api/studyApi";
+import { deleteRoom, getRoomDetail } from "@/api/studyApi";
 import type { StudyRoomDetail } from "@/types/study";
 import { useAuthStore } from "@/store/useAuthStore";
-import UserApi from "@/api/userApi";
 
 export default function StudyDetailPage() {
-  const { roomId } = useParams();
+  const { id } = useParams();
   const [roomDetail, setRoomDetail] = useState<StudyRoomDetail>();
   const [isMine, setIsMine] = useState(false);
 
@@ -18,34 +17,17 @@ export default function StudyDetailPage() {
   // 방 삭제 시 참고할 현재 사용자의 UUID
   const UUID = useAuthStore((state) => state.UUID);
 
-  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
-  const [userNickname, setUserNickname] = useState<string>("");
-
-  // 사용자 닉네임 조회
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        const res = await UserApi.getMyInfo();
-        setUserNickname(res.data.nickname);
-      } catch (error) {
-        console.error("사용자 닉네임 조회 실패:", error);
-      }
-    };
-
-    fetchUserInfo();
-  }, []);
-
-  // 마운트 시 방 상세 조회 API 요청 보내기
+  // 마운트 시 방 상세 API 요청 보내기
   useEffect(() => {
     // id가 undefined일 경우 return
-    if (!roomId) {
+    if (!id) {
       return;
     }
 
-    const requestRoomDetail = async (roomId: string) => {
+    const requestRoomDetail = async (id: string) => {
       try {
-        const data = await getRoomDetail(roomId);
-        // console.log("방 상세 조회 결과 : ", data);
+        const data = await getRoomDetail(id);
+        console.log("방 상세 조회 결과 : ", data);
 
         setRoomDetail(data);
       } catch (err) {
@@ -53,20 +35,12 @@ export default function StudyDetailPage() {
       }
     };
 
-    requestRoomDetail(roomId);
-  }, [roomId]);
-
-  // 방 상세 조회 시 이미 등록한 방인지 확인
-  useEffect(() => {
-    if (roomDetail?.joinUsers && userNickname) {
-      const isRegistered = roomDetail.joinUsers.includes(userNickname);
-      setIsAlreadyRegistered(isRegistered);
-    }
-  }, [roomDetail, userNickname]);
+    requestRoomDetail(id);
+  }, [id]);
 
   // 방 삭제하는 함수
   const handleDeleteRoom = async () => {
-    if (!roomId) {
+    if (!id) {
       return;
     }
 
@@ -76,7 +50,7 @@ export default function StudyDetailPage() {
     if (!confirmed) return;
 
     try {
-      const data = await deleteRoom(roomId);
+      const data = await deleteRoom(id);
 
       console.log("방 삭제 완료!", data);
       // 방 목록 페이지로 이동
@@ -93,29 +67,6 @@ export default function StudyDetailPage() {
       setIsMine(true);
     }
   }, [roomDetail, UUID]);
-
-  // 방 참여 등록 함수
-  const handleRegisterForRoom = async () => {
-    try {
-      if (!roomId) {
-        alert("잘못된 요청입니다.");
-        navigate("/");
-        return;
-      }
-
-      if (isAlreadyRegistered) {
-        alert("이미 등록한 방입니다.");
-        return;
-      }
-
-      const data = await registerForRoom(roomId);
-      console.log("방 참여 등록 성공:", data);
-
-      navigate(`/mypage/room`);
-    } catch (error) {
-      console.error("방 등록 에러: ", error);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#ffffff] text-[17px] leading-relaxed">
@@ -231,11 +182,10 @@ export default function StudyDetailPage() {
               </div>
             </div>
             <Button
-              onClick={handleRegisterForRoom}
-              disabled={isAlreadyRegistered}
+              onClick={() => navigate(`/study/setup/${id}`)}
               className="w-full bg-[#2b7fff] hover:bg-[#3758f9] text-white py-7 text-lg rounded-lg mt-5"
             >
-              {isAlreadyRegistered ? "이미 등록함" : "방 등록하기"}
+              참여하기
             </Button>
             <StudyBackToList />
             <div className="flex justify-end">

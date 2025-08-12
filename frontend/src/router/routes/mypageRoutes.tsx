@@ -8,7 +8,6 @@ import Result from "@/pages/mypage/Result";
 import Feedback from "@/pages/mypage/Feedback";
 import FeedbackDetail from "@/pages/mypage/FeedbackDetail";
 import CoverLetter from "@/pages/mypage/CoverLetter";
-import StudyRoom from "@/pages/mypage/StudyRoom";
 
 export const mypageRoutes: RouteObject[] = [
   { path: "/mypage/userinfo", element: <UserInfo /> },
@@ -17,7 +16,9 @@ export const mypageRoutes: RouteObject[] = [
   { path: "/mypage/result", element: <Result /> },
   { path: "/mypage/feedback", element: <Feedback /> },
   { path: "/mypage/feedback/:id", element: <FeedbackDetail /> },
-  { path: "/mypage/coverletter", element: <CoverLetter /> },
-  { path: "/mypage/room", element: <StudyRoom /> },
+  {
+    path: "/mypage/coverletter",
+    element: <CoverLetter />,
+  },
 ];
 export default mypageRoutes;
