@@ -30,10 +30,7 @@ const Login: React.FC = () => {
       navigate("/"); // 메인 페이지로 이동
     } catch (error: any) {
       // login 액션에서 throw된 에러 처리
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "로그인에 실패했습니다.";
+      const errorMessage = "로그인에 실패했습니다.";
       setErrorMsg(errorMessage);
     } finally {
       setIsLoading(false);
