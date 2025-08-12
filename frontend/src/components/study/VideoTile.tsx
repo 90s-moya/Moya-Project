@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import positiveImg from "@/assets/images/positive.png";
 import negativeImg from "@/assets/images/negative.png";
 import FeedbackPopup from "./FeedbackPopup";
-import Carousel from "../ui/Carousel";
 
 interface VideoTileProps {
   stream: MediaStream | null;
@@ -105,7 +104,7 @@ export default function VideoTile({
         autoPlay
         playsInline
         muted={isLocal}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover transform scale-x-[-1]"
       />
 
       {/* 오른쪽 상단 서류 아이콘 (썸네일에서는 숨김) */}
@@ -128,14 +127,22 @@ export default function VideoTile({
             className="rounded-full shadow hover:opacity-90 transition"
             aria-label="긍정 피드백"
           >
-            <img src={positiveImg} alt="positive" className="w-12 h-12 rounded-full object-cover" />
+            <img
+              src={positiveImg}
+              alt="positive"
+              className="w-12 h-12 rounded-full object-cover"
+            />
           </button>
           <button
             onClick={handleClickNegative}
             className="rounded-full shadow hover:opacity-90 transition"
             aria-label="부정 피드백"
           >
-            <img src={negativeImg} alt="negative" className="w-12 h-12 rounded-full object-cover" />
+            <img
+              src={negativeImg}
+              alt="negative"
+              className="w-12 h-12 rounded-full object-cover"
+            />
           </button>
         </div>
       )}
