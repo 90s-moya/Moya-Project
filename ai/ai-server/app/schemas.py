@@ -22,7 +22,7 @@ class QuestionAnswerPairCreate(QuestionAnswerPairBase):
     session_id: UUID4
 
 class QuestionAnswerPairRead(QuestionAnswerPairBase):
-    id: int
+    id: UUID4
     session_id: UUID4
     created_at: datetime
 
