@@ -11,6 +11,7 @@ GMS_API_URL = config('GMS_BASE_URL')
 async def ask_gpt_if_ends_async(question_list: list[str], answer_list: list[str]) -> str:
     """
     GPT API 호출 (비동기 httpx 사용) - 답변 평가
+    경량 모델을 사용해 응답 지연을 낮춤.
     """
     prompt = """
     당신은 면접 지원자를 평가한 경력이 10년 차 되는 면접관입니다.
@@ -36,7 +37,7 @@ async def ask_gpt_if_ends_async(question_list: list[str], answer_list: list[str]
         GPT 코멘트:
     """
 
-    async with httpx.AsyncClient(timeout=90) as client:
+    async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
             f"{GMS_API_URL}/chat/completions",
             headers={
@@ -44,7 +45,7 @@ async def ask_gpt_if_ends_async(question_list: list[str], answer_list: list[str]
                 "Content-Type": "application/json"
             },
             json={
-                "model": "gpt-4o",
+                "model": "gpt-4o",  # 경량 모델 사용으로 지연 절감
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0
             }

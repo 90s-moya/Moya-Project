@@ -1,4 +1,4 @@
-#utils/stt.py
+# utils/stt.py
 import tempfile
 import os
 import re
@@ -17,14 +17,147 @@ GMS_API_URL = config('GMS_BASE_URL')
 FRAME_MS = 30      # 10/20/30ms
 VAD_AGGR = 2       # 0(느슨)~3(공격적)
 
+# -------------------------------
+# 빠른 경로: 최소 STT (bytes 기반)
+# -------------------------------
+async def transcribe_audio_bytes(contents: bytes, filename: str = "audio.wav", content_type: str = "audio/wav") -> str:
+    async with httpx.AsyncClient(timeout=60) as client:
+        files = {
+            "file": (filename, contents, content_type),
+            "model": (None, "whisper-1")
+        }
+        response = await client.post(
+            f"{GMS_API_URL.rstrip('/')}/audio/transcriptions",
+            headers={"Authorization": f"Bearer {GMS_API_KEY}"},
+            files=files
+        )
+        response.raise_for_status()
+        return response.json()["text"]
+
+# -------------------------------
+# 백그라운드: 상세 분석 (bytes 기반)
+# -------------------------------
+async def analyze_audio_bytes(contents: bytes) -> dict:
+    """
+    transcribe_and_analyze(upload_file)와 동일 로직을 bytes 입력으로.
+    (UploadFile 의존 제거)
+    """
+    # 임시 파일로 저장 (soundfile, VAD용)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+        tmp_file.write(contents)
+        temp_path = tmp_file.name
+
+    try:
+        # 1) Whisper API 호출 (segments 포함)
+        async with httpx.AsyncClient(timeout=120) as client:
+            files = {
+                "file": ("audio.wav", contents, "audio/wav"),
+                "model": (None, "whisper-1"),
+                "response_format": (None, "verbose_json"),
+                "temperature": (None, "0"),
+            }
+            resp = await client.post(
+                f"{GMS_API_URL.rstrip('/')}/audio/transcriptions",
+                headers={"Authorization": f"Bearer {GMS_API_KEY}"},
+                files=files
+            )
+            resp.raise_for_status()
+            whisper_data = resp.json()
+
+        text = whisper_data.get("text", "").strip()
+
+        # OpenAI verbose_json 형태를 가정(segments가 없으면 빈 리스트)
+        w_segments = []
+        for seg in whisper_data.get("segments", []) or []:
+            try:
+                s = float(seg.get("start", 0))
+                e = float(seg.get("end", 0))
+                if e > s:
+                    w_segments.append((s, e))
+            except (TypeError, ValueError):
+                continue
+
+        # 2) 오디오 로딩 (float32, mono)
+        audio_f32, sr = sf.read(temp_path, dtype="float32", always_2d=True)
+        if audio_f32.shape[1] > 1:
+            audio_f32 = audio_f32.mean(axis=1)  # 스테레오 → 모노
+        else:
+            audio_f32 = np.squeeze(audio_f32)
+        total_time = len(audio_f32) / sr if sr > 0 else 0.0
+
+        # 3) PCM(int16) 변환 for VAD
+        audio_i16 = np.clip(audio_f32 * 32767.0, -32768, 32767).astype(np.int16)
+        pcm_bytes = audio_i16.tobytes()
+
+        # 4) VAD 세그먼트
+        v_segments = _collect_vad_segments(pcm_bytes, sr, FRAME_MS, VAD_AGGR)
+
+        # 5) Whisper × VAD 교집합
+        iv_segments = _intersect_intervals(w_segments, v_segments)
+        iv_segments = _merge_intervals(iv_segments)
+
+        speech_time_iv = sum(e - s for (s, e) in iv_segments)
+        silence_time_iv = max(0.0, total_time - speech_time_iv)
+
+        # 6) pause 통계
+        pauses = []
+        for i in range(1, len(iv_segments)):
+            prev_end = iv_segments[i - 1][1]
+            cur_start = iv_segments[i][0]
+            if cur_start > prev_end:
+                pauses.append(cur_start - prev_end)
+
+        avg_pause = (sum(pauses) / len(pauses)) if pauses else 0.0
+        max_pause = max(pauses) if pauses else 0.0
+        pause_count_over_200ms = sum(1 for p in pauses if p >= 0.2)
+
+        # 7) 텍스트 기반 카운트
+        syllable_count = len(re.findall(r"[가-힣]", text))
+        word_count = len(text.split())
+
+        # 8) 속도 지표 (overall / articulation)
+        syll_overall = (syllable_count / total_time) if total_time > 0 else 0.0
+        wpm_overall = ((word_count / total_time) * 60) if total_time > 0 else 0.0
+
+        syll_art = (syllable_count / speech_time_iv) if speech_time_iv > 0 else 0.0
+        wpm_art = ((word_count / speech_time_iv) * 60) if speech_time_iv > 0 else 0.0
+
+        speaking_ratio = (speech_time_iv / total_time) if total_time > 0 else 0.0
+        label = _classify_speed(syll_art, speaking_ratio, avg_pause)
+
+        return {
+            "text": text,
+            "total_time": total_time,
+            "speech_time": speech_time_iv,
+            "silence_time": silence_time_iv,
+            "segments_intersection": iv_segments,
+            "avg_pause": avg_pause,
+            "max_pause": max_pause,
+            "pause_count": pause_count_over_200ms,
+            "syllable_count": syllable_count,
+            "word_count": word_count,
+            "syll_overall": syll_overall,
+            "wpm_overall": wpm_overall,
+            "syll_art": syll_art,
+            "wpm_art": wpm_art,
+            "speaking_ratio": speaking_ratio,
+            "speed_label": label
+        }
+
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+# -------------------------------
+# (레거시) UploadFile 기반 함수들 — 필요 시 유지
+# -------------------------------
 async def transcribe_audio_async(upload_file: UploadFile) -> str:
     """
     Whisper STT: GMS API 호출 기반 비동기 추론
     """
-    # 파일 내용 읽기
     contents = await upload_file.read()
 
-    # 임시 파일로 저장 (디버깅 또는 오류 대응용, 원치 않으면 제거 가능)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
         tmp_file.write(contents)
         temp_path = tmp_file.name
@@ -55,7 +188,7 @@ def save_uploadfile_to_temp(upload_file: UploadFile) -> str:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(upload_file.file.read())
         return tmp.name
-    
+
 # 발화 속도 분석 코드
 @dataclass
 class _Frame:
@@ -88,8 +221,6 @@ def _collect_vad_segments(pcm: bytes, sample_rate: int, frame_ms: int, aggressiv
                 cur_start, last_end = None, None
     if cur_start is not None and last_end is not None:
         segments.append((cur_start, last_end))
-    # 필요하면 초단 세그먼트 제거 규칙 추가 가능
-    # segments = [(s, e) for (s, e) in segments if (e - s) >= 0.06]
     return segments
 
 def _merge_intervals(intervals, eps=1e-6):
@@ -155,10 +286,9 @@ def _classify_speed(syll_art, speaking_ratio, avg_pause):
 
 async def transcribe_and_analyze(upload_file: UploadFile) -> dict:
     """
-    업로드된 오디오를 Whisper API(segments 포함)로 STT 후,
+    (레거시) 업로드된 오디오를 Whisper API(segments 포함)로 STT 후,
     webrtcvad와 교집합을 계산하여 발화/속도 지표를 반환.
     """
-    # 파일 읽기 & 임시 저장
     contents = await upload_file.read()
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
         tmp_file.write(contents)
@@ -183,7 +313,6 @@ async def transcribe_and_analyze(upload_file: UploadFile) -> dict:
 
         text = whisper_data.get("text", "").strip()
 
-        # OpenAI verbose_json 형태를 가정(segments가 없으면 빈 리스트)
         w_segments = []
         for seg in whisper_data.get("segments", []) or []:
             try:
@@ -228,11 +357,9 @@ async def transcribe_and_analyze(upload_file: UploadFile) -> dict:
         max_pause = max(pauses) if pauses else 0.0
         pause_count_over_200ms = sum(1 for p in pauses if p >= 0.2)
 
-        # 7) 텍스트 기반 카운트
         syllable_count = len(re.findall(r"[가-힣]", text))
         word_count = len(text.split())
 
-        # 8) 속도 지표 (overall / articulation)
         syll_overall = (syllable_count / total_time) if total_time > 0 else 0.0
         wpm_overall = ((word_count / total_time) * 60) if total_time > 0 else 0.0
 
