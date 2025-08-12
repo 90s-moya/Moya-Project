@@ -43,13 +43,22 @@ export default function StudyListPage() {
     requestRooms();
   }, []);
 
+  // 현재 날짜
+  const now = new Date();
+
+  // 마감일이 지나지 않은 스터디만 필터링
+  const activeRooms = rooms.filter((room) => {
+    if (!room.expiredAt) return true; // 마감일이 없는 경우 포함
+    return new Date(room.expiredAt) > now; // 마감일이 현재보다 미래인 경우만 포함
+  });
+
   // 최신순으로 정렬된 rooms
-  const recentSortedRooms = [...rooms].sort(
+  const recentSortedRooms = [...activeRooms].sort(
     (a, b) => new Date(b.openAt).getTime() - new Date(a.openAt).getTime()
   );
 
   // 마감순으로 정렬된 rooms
-  const deadlineSortedRooms = [...rooms].sort(
+  const deadlineSortedRooms = [...activeRooms].sort(
     (a, b) => new Date(a.expiredAt).getTime() - new Date(b.expiredAt).getTime()
   );
 
@@ -63,8 +72,8 @@ export default function StudyListPage() {
   // 더보기 버튼 관련 변수
   const hasMore = visibleCount < sortedRooms.length;
 
-  // 긴급 모집 스터디 필터링 및 정렬
-  const urgentRooms = rooms
+  // 긴급 모집 스터디 필터링 및 정렬 (마감일이 지나지 않은 것만)
+  const urgentRooms = activeRooms
     .filter((room) => room.maxUser - room.joinUser === 1) // 참여 인원 차이가 1인 방만
     .sort((a, b) => {
       // 마감일이 없는 스터디는 가장 후순위
@@ -73,7 +82,6 @@ export default function StudyListPage() {
       if (!b.expiredAt) return -1;
 
       // 마감일이 가까운 순서로 정렬
-      const now = new Date();
       const aTimeLeft = new Date(a.expiredAt).getTime() - now.getTime();
       const bTimeLeft = new Date(b.expiredAt).getTime() - now.getTime();
 
