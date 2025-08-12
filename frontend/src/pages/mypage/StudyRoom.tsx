@@ -14,7 +14,7 @@ const StudyRoom: React.FC = () => {
   const [sortOption, setSortOption] = useState<SortOption>("latest");
   const navigate = useNavigate();
 
-  // 등록한 방 목록 조회
+  // 참여한 방 목록 조회
   useEffect(() => {
     const fetchRegisteredRooms = async () => {
       try {
@@ -62,7 +62,7 @@ const StudyRoom: React.FC = () => {
       {/* 페이지 제목과 정렬 옵션 */}
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-2xl font-semibold text-[#2B7FFF] leading-[1.4]">
-          등록한 면접 스터디 목록
+          참여한 면접 스터디 목록
         </h3>
 
         {/* 정렬 드롭다운 */}
@@ -87,7 +87,7 @@ const StudyRoom: React.FC = () => {
         )}
       </div>
 
-      {/* 등록한 스터디 리스트 */}
+      {/* 참여한 스터디 리스트 */}
       {registeredRooms.length === 0 ? (
         <div className="w-full max-w-[880px] h-[360px] bg-[#FAFAFC] border border-[#EFEFF3] rounded-[10px] flex flex-col items-center justify-center">
           <div className="flex flex-col items-center gap-3">
@@ -111,7 +111,7 @@ const StudyRoom: React.FC = () => {
             </div>
             {/* 메시지 텍스트 */}
             <p className="text-center text-[#6F727C] font-semibold text-base leading-[1.875] mb-3">
-              등록한 스터디 방이 없어요.
+              참여한 스터디 방이 없어요.
               <br />
               면접 스터디를 생성하고 참여해보세요!
             </p>
