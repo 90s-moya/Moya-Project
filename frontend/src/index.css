@@ -122,6 +122,17 @@
   }
 }
 
+/* Prevent layout shift when vertical scrollbar appears */
+@layer base {
+  @supports (scrollbar-gutter: stable) {
+    html { scrollbar-gutter: stable both-edges; }
+  }
+  @supports not (scrollbar-gutter: stable) {
+    /* Fallback for older browsers */
+    html { overflow-y: scroll; }
+  }
+}
+
 /* globals.css 또는 app/globals.css */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;

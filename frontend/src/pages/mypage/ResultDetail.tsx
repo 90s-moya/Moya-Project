@@ -4,7 +4,7 @@ import Header from '@/components/common/Header';
 import VerbalAnalysis from '@/components/mypage/result/detail/VerbalAnalysis';
 import FaceAnalysis from '@/components/mypage/result/detail/FaceAnalysis';
 import PostureAnalysis from '@/components/mypage/result/detail/PostureAnalysis';
-import EyeAnalysis from '@/components/mypage/result/detail/EyeAnalysis';
+import GazeAnalysis from '@/components/mypage/result/detail/GazeAnalysis';
 
 const ResultDetail: React.FC = () => {
   const { reportId, resultId } = useParams<{ reportId: string; resultId: string }>();
@@ -42,7 +42,7 @@ const ResultDetail: React.FC = () => {
       case 'posture':
         return <PostureAnalysis posture_result={mockDetailData.posture_result} onFrameChange={handleFrameChange} />;
       case 'eye':
-        return <EyeAnalysis />;
+        return <GazeAnalysis />;
       default:
         return <VerbalAnalysis verbal_result={mockDetailData.verbal_result} />;
     }

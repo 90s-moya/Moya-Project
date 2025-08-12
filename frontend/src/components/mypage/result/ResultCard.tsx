@@ -1,5 +1,5 @@
 import React from 'react';
-import { MoreVertical, Clock } from 'lucide-react';
+import { ImageOff, Clock } from 'lucide-react';
 
 interface ResultCardProps {
   result: {
@@ -35,6 +35,9 @@ const ResultCard: React.FC<ResultCardProps> = ({
     }
   };
 
+  const [imgError, setImgError] = React.useState(false);
+  const showImage = !!result.thumbnail_url && !imgError;
+
   return (
     <div
       className={`relative bg-[#fafafc] border border-[#dedee4] rounded-lg overflow-hidden transition-all w-[240px] min-h-60 ${
@@ -45,16 +48,19 @@ const ResultCard: React.FC<ResultCardProps> = ({
       onClick={handleResultClick}
     >
       {/* 썸네일 이미지 */}
-      <div className="aspect-video bg-gray-200 relative">
-        <img
-          src={result.thumbnail_url}
-          alt="면접 썸네일"
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = 'https://via.placeholder.com/400x225/2B7FFF/FFFFFF?text=Interview';
-          }}
-        />
+      <div className="aspect-video bg-gray-200 relative flex items-center justify-center">
+        {showImage ? (
+          <img
+            src={result.thumbnail_url}
+            alt="면접 썸네일"
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+            <ImageOff size={40} className="text-gray-400" />
+          </div>
+        )}
         {/* 진행중인 경우 오버레이 */}
         {result.status === 'IN_PROGRESS' && (
           <div className="absolute inset-0 bg-gray-700 bg-opacity-40 flex items-center justify-center">
