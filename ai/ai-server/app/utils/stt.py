@@ -157,7 +157,7 @@ def _classify_speed(syll_art, speaking_ratio, avg_pause):
 
     reason_parts.append(f"{syll_art:.2f}")
     
-    labels_ko = ["느림", "조금느림", "적당", "조금빠름", "빠름"]
+    labels_ko = ["SLOW", "SLIGHTLY SLOW", "NORMAL", "SLIGHTLY FAST", "FAST"]
     return labels_ko[level], "/".join(reason_parts)
 
 async def transcribe_and_analyze(contents: bytes) -> dict:

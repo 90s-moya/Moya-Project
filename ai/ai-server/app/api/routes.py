@@ -497,9 +497,9 @@ async def _bg_analyze_and_persist(qa_id: int, audio_bytes: bytes):
         if qa:
             try:
                 # 1) 개별 컬럼이 있는 경우 우선 저장
-                if hasattr(qa, "speech_label") and hasattr(qa, "speech_reason"):
+                if hasattr(qa, "speech_label") and hasattr(qa, "syll_art"):
                     qa.speech_label = analysis.get("label")
-                    qa.speech_reason = analysis.get("reason")
+                    qa.syll_art = analysis.get("reason")
 
                 # 2) JSON 컬럼이 있는 경우(겸용 또는 대안)
                 elif hasattr(qa, "speech_analysis"):

@@ -39,7 +39,7 @@ class QuestionAnswerPair(Base):
     end_type = Column(Text, nullable=True)
 
     speech_label = Column(Text, nullable=True)
-    speech_reason = Column(Text, nullable=True)
+    syll_art = Column(Text, nullable=True)
     # 필요 컬럼 추가
 
     created_at = Column(DateTime, default=datetime.utcnow)
