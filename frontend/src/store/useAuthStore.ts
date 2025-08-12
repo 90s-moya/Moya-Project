@@ -95,23 +95,19 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // AuthApi 파일 안에 logout 함수가 없어서 에러가 났습니다.
-      // 임시로 아래처럼 해놓았습니다.
       logout: async () => {
-        localStorage.removeItem("auth");
-        // try {
-        //   await AuthApi.logout();
-        // } catch (error) {
-        //   console.error("로그아웃 API 요청 실패:", error);
-        // } finally {
-        //   set({
-        //     token: "",
-        //     user: null,
-        //     isLogin: false,
-        //     UUID: "",
-        //     tutorialStatus: "",
-        //   });
-        // }
+        try {
+          localStorage.removeItem("auth-storage");
+          set({
+            token: "",
+            user: null,
+            isLogin: false,
+            UUID: "",
+            tutorialStatus: "",
+          });
+        } catch (error) {
+          console.error("로그아웃 처리 실패:", error);
+        }
       },
 
       getToken: () => get().token,
