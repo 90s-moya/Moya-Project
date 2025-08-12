@@ -1,9 +1,0 @@
-{
-  "gaze_consistency": 63.23,
-  "target_focus_ratio": 84.52,
-  "details": {
-    "total_frames": 155,
-    "unstable_moves": 57,
-    "roi_focus_frames": 131
-  }
-}
