@@ -159,11 +159,11 @@ export default function StudyRoomPage() {
       try {
         recorder = new MediaRecorder(stream, {
           mimeType: "video/webm;codecs=vp9",
-          videoBitsPerSecond: 3_000_000, // 약 3Mbps
+          videoBitsPerSecond: 1_500_000, // qHD, 30fps 권장 필요시 변경!
         });
       } catch {
         recorder = new MediaRecorder(stream, {
-          videoBitsPerSecond: 3_000_000,
+          videoBitsPerSecond: 1_500_000
         });
       }
 
@@ -342,8 +342,8 @@ export default function StudyRoomPage() {
       // QHD 타겟 제약(웹캠이 지원하는 범위 내에서 적용됨)
       const local = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 2560, max: 2560 },
-          height: { ideal: 1440, max: 1440 },
+          width: { ideal: 960, max: 960 },
+          height: { ideal: 540, max: 540 },
           frameRate: { ideal: 30, max: 30 },
         },
         audio: true,
