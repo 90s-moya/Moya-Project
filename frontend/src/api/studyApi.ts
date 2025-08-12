@@ -10,7 +10,7 @@ import type {
 
 // 방 전체 조회
 export const getRoomList = async (): Promise<StudyRoom[]> => {
-  const res = await api.get("/v1/roo");
+  const res = await api.get("/v1/room");
 
   return res.data;
 };
