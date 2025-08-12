@@ -154,3 +154,25 @@ export const getFaceColor = (status: string): string => {
   return FACE_COLOR_MAP[status as FaceStatusType] || '#9CA3AF'; // gray-400 as default
 };
 
+// 히트맵 색상 팔레트 타입 정의
+export type Rgb = { r: number; g: number; b: number };
+export type ColorStop = { value: number; color: Rgb };
+
+// 시선 집중도 히트맵 기본 색상 팔레트
+export const DEFAULT_THERMAL_STOPS: ColorStop[] = [
+  { value: 0.0,  color: { r: 250, g: 252, b: 255 } }, // 거의 흰색 (아무것도 없는 곳)
+  { value: 0.1,  color: { r: 220, g: 235, b: 245 } }, // 연한 회색-파랑 (가장 낮은 집중도)
+  { value: 0.25, color: { r: 70,  g: 130, b: 255 } }, // 파랑
+  { value: 0.45, color: { r: 0,   g: 180, b: 200 } }, // 청록
+  { value: 0.65, color: { r: 50,  g: 220, b: 50  } }, // 초록
+  { value: 0.8,  color: { r: 255, g: 200, b: 0   } }, // 노랑
+  { value: 0.95, color: { r: 255, g: 100, b: 30  } }, // 주황
+  { value: 1.0,  color: { r: 220, g: 20,  b: 20  } }, // 진한 빨강 (최고 집중)
+];
+
+// 그라데이션 CSS 빌더
+export const buildGradientCss = (stops: ColorStop[]): string => {
+  const parts = stops.map((s) => `rgb(${s.color.r}, ${s.color.g}, ${s.color.b}) ${Math.round(s.value * 100)}%`);
+  return `linear-gradient(90deg, ${parts.join(', ')})`;
+};
+

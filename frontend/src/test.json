@@ -1,23 +1,4 @@
 {
-    "metadata": {
-      "timestamp": "2025-08-12 17:19:02",
-      "screen_size": {
-        "width": 1344,
-        "height": 756
-      },
-      "grid_size": {
-        "width": 160,
-        "height": 90
-      },
-      "grid_cell_size": {
-        "width": 8,
-        "height": 8
-      },
-      "total_gaze_samples": 192,
-      "active_grid_cells": 164,
-      "max_gaze_count": 3,
-      "center_gaze_ratio": 88.02
-    },
     "heatmap_data": [
       [
         1,

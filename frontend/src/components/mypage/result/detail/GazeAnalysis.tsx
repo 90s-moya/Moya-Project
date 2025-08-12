@@ -1,15 +1,48 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Eye } from 'lucide-react';
-import { HeatMapGrid } from 'react-grid-heatmap';
 import testData from '@/test.json';
+import { DEFAULT_THERMAL_STOPS, buildGradientCss } from '@/lib/constants';
+import HeatmapCanvas from '@/components/common/HeatmapCanvas';
+
+type HeatmapJson = {
+  heatmap_data?: number[][];
+};
 
 const GazeAnalysis: React.FC = () => {
-  const heatmap = (testData as any).heatmap_data as number[][];
-  const xCount = heatmap?.[0]?.length ?? 0;
-  const yCount = heatmap?.length ?? 0;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  // 실제 test.json 데이터 사용
+  const heatmap = ((testData as unknown) as HeatmapJson).heatmap_data ?? [];
 
-  const xLabels = Array.from({ length: xCount }, (_, i) => `${i + 1}`);
-  const yLabels = Array.from({ length: yCount }, (_, i) => `${i + 1}`);
+  // 컨테이너 크기 감지 (캔버스 크기 설정만 담당)
+  useEffect(() => {
+    const updateWidth = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.offsetWidth;
+        setContainerWidth(width);
+        if (!isLoaded && width > 0) {
+          setIsLoaded(true);
+        }
+      }
+    };
+
+    const timeoutId = setTimeout(updateWidth, 50);
+    const resizeObserver = new ResizeObserver(updateWidth);
+    
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    
+    window.addEventListener('resize', updateWidth);
+
+    return () => {
+      clearTimeout(timeoutId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [isLoaded]);
 
   return (
     <div className="bg-[#fafafc] border border-[#dedee4] rounded-lg p-6">
@@ -17,27 +50,42 @@ const GazeAnalysis: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Eye size={18} className="text-[#2B7FFF]" />
-            <h4 className="text-sm font-semibold text-[#2B7FFF]">시선 히트맵</h4>
+            <h4 className="text-sm font-semibold text-[#2B7FFF]">시선 분포도</h4>
           </div>
-          <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
-            <div className="max-h-[560px] overflow-auto">
-              {heatmap && heatmap.length > 0 ? (
-                <HeatMapGrid
-                  data={heatmap}
-                  xLabels={xLabels}
-                  yLabels={yLabels}
-                  cellRender={(x: number, y: number, value: number) => (value ? `${value}` : '')}
-                  cellStyle={(x: number, y: number, ratio: number) => ({
-                    border: '1px solid #f3f4f6',
-                    backgroundColor: `rgba(43, 127, 255, ${ratio})`
-                  })}
-                  square
-                  cellHeight="6px"
-                />
-              ) : (
-                <div className="text-sm text-gray-500">표시할 데이터가 없습니다.</div>
-              )}
-            </div>
+
+          <div className="bg-white p-4 pt-8 rounded-lg border border-[#dedee4] shadow-sm" ref={containerRef}>
+            {!isLoaded ? (
+              <div className="flex justify-center">
+                <div className="w-[85%] aspect-video bg-gray-100 animate-pulse rounded-lg border border-gray-200" />
+              </div>
+            ) : Array.isArray(heatmap) && heatmap.length > 0 ? (
+              <>
+                <div className="flex justify-center">
+                  <div className="w-fit border border-gray-200 rounded-lg overflow-hidden">
+                    <HeatmapCanvas 
+                      data={heatmap}
+                      containerWidth={containerWidth}
+                      aspectRatio={16/9}
+                      className="block"
+                    />
+                  </div>
+                </div>
+                
+                {/* 범례 */}
+                <div className="flex items-center justify-start gap-2 mt-4 mb-2 w-9/10 mx-auto">
+                  <span className="text-xs text-gray-500">낮음</span>
+                  <div
+                    className="h-2 w-24 rounded-full"
+                    style={{ background: buildGradientCss(DEFAULT_THERMAL_STOPS) }}
+                  />
+                  <span className="text-xs text-gray-500">높음</span>
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-gray-500 text-center py-8">
+                표시할 데이터가 없습니다.
+              </div>
+            )}
           </div>
         </div>
       </div>
