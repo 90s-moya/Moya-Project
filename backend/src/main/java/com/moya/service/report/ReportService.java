@@ -66,11 +66,19 @@ public class ReportService {
             throw new NoSuchElementException("Result not found");
         }
     }
-    public ResultDetailResponse fetchResultDetailById(String resultId) {
-        URI uri = URI.create(pythonPath + "/reports/results/" + resultId + "/detail");
-        ResponseEntity<ResultDetailResponse> resp = restTemplate.exchange(
-                uri, HttpMethod.GET, null, ResultDetailResponse.class
+
+    public ResultDetailResponse fetchResultDetail(String reportId, String resultId, String userId) {
+        URI uri = URI.create(
+                pythonPath + "/reports/" + reportId + "/results/" + resultId + "/detail?user_id=" + userId
         );
-        return resp.getBody();
+        try {
+            ResponseEntity<ResultDetailResponse> resp =
+                    restTemplate.exchange(uri, HttpMethod.GET, null, ResultDetailResponse.class);
+            return resp.getBody();
+        } catch (HttpClientErrorException.Forbidden e) { // 403: 소유자 불일치
+            throw new org.springframework.security.access.AccessDeniedException("Forbidden");
+        } catch (HttpClientErrorException.NotFound e) {  // 404: reportId-resultId 불일치 또는 없음
+            throw new java.util.NoSuchElementException("Result not found");
+        }
     }
 }

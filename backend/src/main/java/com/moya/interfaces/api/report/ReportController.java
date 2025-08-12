@@ -43,8 +43,13 @@ public class ReportController {
 //        return ResponseEntity.ok(reportService.fetchResultById(resultId));
 //    }
     // 예: /v1/me/report/detail?resultId=...
-    @GetMapping("/")
-    public ResponseEntity<ResultDetailResponse> getMyReportDetail(@RequestParam String resultId,@AuthenticationPrincipal CustomUserDetails user) {
-        return ResponseEntity.ok(reportService.fetchResultDetailById(resultId));
+    @GetMapping("/{reportId}/result/{resultId}")
+    public ResponseEntity<ResultDetailResponse> getMyReportDetail(
+            @PathVariable String reportId,
+            @PathVariable String resultId,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        var body = reportService.fetchResultDetail(reportId, resultId, user.getUserId().toString());
+        return ResponseEntity.ok(body);
     }
 }
