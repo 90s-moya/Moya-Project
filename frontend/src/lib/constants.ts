@@ -132,3 +132,25 @@ export const getPostureColor = (status: string): string => {
   return POSTURE_COLOR_MAP[status as PostureStatusType] || '#6B7280'; // gray-500 as default
 };
 
+// 표정 상태 매핑
+export const FACE_STATUS_MAP = {
+  'sad': '슬픔',
+  'fear': '두려움',
+} as const;
+
+export type FaceStatusType = keyof typeof FACE_STATUS_MAP;
+
+export const getFaceStatusText = (status: FaceStatusType): string => {
+  return FACE_STATUS_MAP[status] || String(status);
+};
+
+// 표정 상태별 색상 매핑
+export const FACE_COLOR_MAP = {
+  'sad': '#3B82F6', // 파란색
+  'fear': '#EF4444', // 빨간색
+} as const;
+
+export const getFaceColor = (status: string): string => {
+  return FACE_COLOR_MAP[status as FaceStatusType] || '#9CA3AF'; // gray-400 as default
+};
+

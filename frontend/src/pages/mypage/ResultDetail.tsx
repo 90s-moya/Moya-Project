@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Header from '@/components/common/Header';
 import VerbalAnalysis from '@/components/mypage/result/detail/VerbalAnalysis';
-import FacialAnalysis from '@/components/mypage/result/detail/FacialAnalysis';
+import FaceAnalysis from '@/components/mypage/result/detail/FaceAnalysis';
 import PostureAnalysis from '@/components/mypage/result/detail/PostureAnalysis';
 import EyeAnalysis from '@/components/mypage/result/detail/EyeAnalysis';
 
@@ -10,7 +10,7 @@ const ResultDetail: React.FC = () => {
   const { reportId, resultId } = useParams<{ reportId: string; resultId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'verbal' | 'facial' | 'posture' | 'eye'>('verbal');
+  const [activeTab, setActiveTab] = useState<'verbal' | 'face' | 'posture' | 'eye'>('verbal');
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // state로 전달된 question
@@ -19,7 +19,7 @@ const ResultDetail: React.FC = () => {
   // 탭 목록
   const tabs = [
     { id: 'verbal', label: '답변 분석' },
-    { id: 'facial', label: '표정 분석' },
+    { id: 'face', label: '표정 분석' },
     { id: 'posture', label: '자세 분석' },
     { id: 'eye', label: '시선 분석' }
   ] as const;
@@ -37,8 +37,8 @@ const ResultDetail: React.FC = () => {
     switch (activeTab) {
       case 'verbal':
         return <VerbalAnalysis verbal_result={mockDetailData.verbal_result} />;
-      case 'facial':
-        return <FacialAnalysis />;
+      case 'face':
+        return <FaceAnalysis face_result={mockDetailData.face_result} onFrameChange={handleFrameChange} />;
       case 'posture':
         return <PostureAnalysis posture_result={mockDetailData.posture_result} onFrameChange={handleFrameChange} />;
       case 'eye':
@@ -174,6 +174,31 @@ const mockDetailData = {
         "end_frame": 700
       }
     ]
+  },
+  "face_result": {
+    "timestamp": "2025-08-12T14:43:43.315235",
+    "total_frames": 208,
+    "frame_distribution": {
+      "sad": 22,
+      "fear": 186
+    },
+    "detailed_logs": [
+      { "label": "sad", "start_frame": 1, "end_frame": 5 },
+      { "label": "fear", "start_frame": 6, "end_frame": 8 },
+      { "label": "sad", "start_frame": 9, "end_frame": 9 },
+      { "label": "fear", "start_frame": 10, "end_frame": 11 },
+      { "label": "sad", "start_frame": 12, "end_frame": 14 },
+      { "label": "fear", "start_frame": 15, "end_frame": 20 },
+      { "label": "sad", "start_frame": 21, "end_frame": 23 },
+      { "label": "fear", "start_frame": 24, "end_frame": 117 },
+      { "label": "sad", "start_frame": 118, "end_frame": 118 },
+      { "label": "fear", "start_frame": 119, "end_frame": 124 },
+      { "label": "sad", "start_frame": 125, "end_frame": 127 },
+      { "label": "fear", "start_frame": 128, "end_frame": 129 },
+      { "label": "sad", "start_frame": 130, "end_frame": 131 },
+      { "label": "fear", "start_frame": 132, "end_frame": 136 },
+      { "label": "sad", "start_frame": 137, "end_frame": 140 },
+      { "label": "fear", "start_frame": 141, "end_frame": 208 }
+    ]
   }
 }
-

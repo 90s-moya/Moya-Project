@@ -5,10 +5,33 @@ import { formatDate } from '@/util/date';
 import EmptyState from '@/components/mypage/result/EmptyState';
 import CarouselNavigation from '@/components/mypage/result/CarouselNavigation';
 import EditableTitle from '../../components/mypage/result/EditableTitle';
+import { getReportList } from '@/api/interviewApi';
 
 const Result: React.FC = () => {
   const navigate = useNavigate();
-  const [reportList, setReportList] = React.useState(mockReportList); // 추후 API 연동 시 대체
+  const [reportList, setReportList] = React.useState(mockReportList);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // API로 리포트 목록 조회
+  React.useEffect(() => {
+    const fetchReportList = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getReportList();
+        setReportList(data);
+      } catch (err) {
+        console.error('리포트 목록 조회 실패:', err);
+        setError('리포트 목록을 불러오는데 실패했습니다.');
+        // 에러 시에도 mock 데이터 유지
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReportList();
+  }, []);
 
   // 제목 수정 핸들러
   const handleTitleChange = (reportId: string, newTitle: string) => {
@@ -36,8 +59,16 @@ const Result: React.FC = () => {
         AI 면접 결과
       </h2>
 
-      {/* 결과가 없을 때 */}
-      {reportList.length === 0 ? (
+      {/* 로딩 중 */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-500">로딩 중...</div>
+        </div>
+      ) : error ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-red-500">{error}</div>
+        </div>
+      ) : reportList.length === 0 ? (
         <EmptyState />
       ) : (
         /* 결과가 있을 때 */

@@ -24,7 +24,7 @@ const EmptyState: React.FC = () => {
         
         {/* AI 모의 면접 하러가기 버튼 */}
         <button 
-          onClick={onGoToInterview}
+          onClick={handleGoToInterview}
           className="bg-[#2B7FFF] hover:bg-[#1E6FE8] text-white px-4 py-2 rounded-[10px] text-sm font-semibold leading-[1.714] transition-colors h-10"
         >
           AI 모의 면접 하러가기
