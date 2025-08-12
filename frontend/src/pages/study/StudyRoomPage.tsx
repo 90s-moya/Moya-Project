@@ -1,14 +1,14 @@
 import CameraControlPanel from "@/components/study/CameraControlPanel";
 import MicControlPanel from "@/components/study/MicControlPanel";
 import VideoTile from "@/components/study/VideoTile";
-import Carousel from "@/components/study/Carousel";
+import Carousel from "@/components/study/FileCarousel";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
 import { getDocsInRoom } from "@/api/studyApi";
 import { uploadVideo } from "@/api/studyApi";
-import { ChevronDown, ChevronUp, PhoneOff } from "lucide-react";
+import { PhoneOff } from "lucide-react";
 
 type Participant = {
   id: string;
@@ -21,6 +21,13 @@ type ParticipantsDocs = {
   userId: string; // user_id → userId로 변경
   fileUrl: string; // file_url → fileUrl로 변경
   docsStatus: string;
+};
+
+type DocItem = {
+  id: string;
+  title: string;
+  fileUrl: string;
+  type: "RESUME" | "COVERLETTER" | "PORTFOLIO";
 };
 
 export default function StudyRoomPage() {
@@ -43,9 +50,6 @@ export default function StudyRoomPage() {
   // 포커스된 비디오 타일 상태 관리
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
   const [showCarousel, setShowCarousel] = useState(false);
-
-  // 룸 제어 오픈 여부
-  const [controlsOpen, setControlsOpen] = useState(true);
 
   // 마운트 시 스터디 방 참여자들의 서류 조회
   useEffect(() => {
@@ -95,24 +99,25 @@ export default function StudyRoomPage() {
   };
 
   // 포커스된 참가자의 서류를 캐러셀용 데이터로 변환
-  const getCarouselItems = () => {
+  const getCarouselItems = (): DocItem[] => {
     if (!focusedUserId) return [];
 
     const userDocs = getParticipantDocs(focusedUserId);
     return userDocs.map((doc) => ({
-      id: doc.docsId, // docs_id → docsId로 변경
+      id: doc.docsId,
       title: getDocTypeTitle(doc.docsStatus),
-      fileUrl: doc.fileUrl, // file_url → fileUrl로 변경
+      fileUrl: doc.fileUrl,
       type: doc.docsStatus as "RESUME" | "COVERLETTER" | "PORTFOLIO",
     }));
   };
 
-  // 참가자 수에 따라 동적으로 그리드 열 개수 결정 (최소 2, 최대 3열)
+  // 참가자 수에 따라 동적으로 그리드 열 개수 결정 (최대 6명)
   const getGridColumns = (count: number) => {
     if (count <= 2) return 2; // 1~2명: 2열
     if (count === 3) return 3; // 3명: 3열
     if (count === 4) return 2; // 4명: 2열(2x2)
-    return 3; // 5~6명: 3열
+    if (count === 5) return 3; // 5명: 3열(2행)
+    return 3; // 6명: 3열(2행)
   };
 
   // 서류 타입별 제목 반환
@@ -365,43 +370,49 @@ export default function StudyRoomPage() {
 
   return (
     <div className="min-h-screen bg-white text-[#1b1c1f] flex flex-col">
-      {/* 메인 콘텐츠 영역 */}
-      <div
-        className={`flex-1 pt-[100px] w-full px-4 transition-[padding-bottom] duration-300 ${
-          controlsOpen ? "pb-24" : "pb-6"
-        }`}
-      >
-        {/* 포커스 모드일 때: 왼쪽 비디오, 오른쪽 캐러셀 */}
-        {focusedUserId ? (
-          <div className="flex flex-col gap-3 h-full">
-            {/* 상단 썸네일 스트립 */}
-            <div className="flex gap-2 overflow-x-auto pb-1 -mt-15">
-              {participants.map((p) => (
-                <button
-                  key={`thumb-${p.id}`}
-                  onClick={() => setFocusedUserId(p.id)}
-                  className={`shrink-0 w-45 h-30 rounded-md overflow-hidden border ${
-                    p.id === focusedUserId
-                      ? "border-blue-500"
-                      : "border-gray-300"
-                  }`}
-                  title={p.isLocal ? "나" : p.id}
-                >
-                  <div className="w-full h-full bg-black/20">
-                    <VideoTile
-                      stream={p.stream}
-                      isLocal={p.isLocal}
-                      userId={p.id}
-                      roomId={roomId!}
-                      userDocs={getParticipantDocs(p.id)}
-                      onDocsClick={handleDocsClick}
-                      hideOverlay
-                    />
-                  </div>
-                </button>
-              ))}
+      {/* 메인 콘텐츠 영역 - 푸터와 완전히 분리 */}
+      <main className="flex-1 overflow-hidden">
+        <div className="h-full pt-[60px] px-4">
+          {/* 포커스 모드일 때만 상단 썸네일 스트립 표시 */}
+          {focusedUserId && (
+            <div className="flex gap-2 overflow-x-auto pb-1 -mt-13 mb-4">
+              {participants
+                .filter((p) => p.id !== focusedUserId)
+                .slice(0, 5)
+                .map((p) => (
+                  <button
+                    key={`thumb-${p.id}`}
+                    onClick={() => setFocusedUserId(p.id)}
+                    className="shrink-0 w-45 h-30 rounded-md overflow-hidden border border-gray-300 hover:border-gray-400 transition-all duration-200"
+                    title={p.isLocal ? "나" : p.id}
+                  >
+                    <div className="w-full h-full bg-black/20 relative">
+                      <VideoTile
+                        stream={p.stream}
+                        isLocal={p.isLocal}
+                        userId={p.id}
+                        roomId={roomId!}
+                        userDocs={getParticipantDocs(p.id)}
+                        onDocsClick={handleDocsClick}
+                        hideOverlay
+                      />
+                    </div>
+                  </button>
+                ))}
+              {/* 5명 초과 시 더보기 표시 (포커스된 유저 제외한 수 기준) */}
+              {participants.filter((p) => p.id !== focusedUserId).length >
+                5 && (
+                <div className="shrink-0 w-45 h-30 rounded-md border border-gray-300 bg-gray-100 flex items-center justify-center text-sm text-gray-600">
+                  +
+                  {participants.filter((p) => p.id !== focusedUserId).length -
+                    5}
+                </div>
+              )}
             </div>
+          )}
 
+          {/* 포커스 모드일 때: 왼쪽 포커스된 비디오 + 오른쪽 서류 */}
+          {focusedUserId ? (
             <div className="flex gap-4 h-full">
               {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
               <div className="w-1/2 h-[68vh]">
@@ -422,67 +433,48 @@ export default function StudyRoomPage() {
               </div>
 
               {/* 오른쪽: 서류 캐러셀 (화면의 절반) */}
-              <div className="w-1/2 h-[68vh] bg-gray-50 rounded-lg p-4 flex flex-col">
+              <div className="w-1/2 h-[68vh] bg-gray-50 rounded-lg overflow-hidden">
                 <Carousel
                   items={getCarouselItems()}
                   onClose={handleCloseCarousel}
                 />
               </div>
             </div>
-          </div>
-        ) : (
-          /* 일반 모드: 그리드 레이아웃 (참가자 수 기반 반응형) */
-          <div
-            className={`grid gap-4 transition-[grid-template-columns] duration-300`}
-            style={{
-              gridTemplateColumns: `repeat(${getGridColumns(
-                participants.length
-              )}, minmax(0, 1fr))`,
-            }}
-          >
-            {participants.map(renderVideoTile)}
-          </div>
-        )}
-      </div>
+          ) : (
+            /* 일반 모드: 그리드 레이아웃 (참가자 수 기반 반응형) */
+            <div
+              className={`grid gap-4 h-full transition-[grid-template-columns] duration-300`}
+              style={{
+                gridTemplateColumns: `repeat(${getGridColumns(
+                  participants.length
+                )}, minmax(0, 1fr))`,
+              }}
+            >
+              {participants.map(renderVideoTile)}
+            </div>
+          )}
+        </div>
+      </main>
 
-      {/* 하단 토글 버튼 */}
-      <button
-        onClick={() => setControlsOpen((v) => !v)}
-        aria-label={controlsOpen ? "제어 숨기기" : "제어 보이기"}
-        className={`fixed ${
-          controlsOpen ? "bottom-18" : "bottom-3"
-        } left-1/2 -translate-x-1/2 z-30
-        w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-lg
-        flex items-center justify-center transition-all duration-300 ease-in-out`}
-      >
-        {controlsOpen ? (
-          <ChevronDown className="w-5 h-5" />
-        ) : (
-          <ChevronUp className="w-5 h-5" />
-        )}
-      </button>
-
-      {/* 미디어 컨트롤 바 */}
-      <footer
-        className={`fixed left-0 right-0 bottom-0 bg-blue-500 border-t border-blue-600 py-3 shadow-inner z-20
-        transition-transform duration-300 ${
-          controlsOpen ? "translate-y-0" : "translate-y-full"
-        }`}
-      >
-        <div className="flex justify-center gap-3">
-          <div className="rounded-full px-4 py-2 border">
-            <MicControlPanel stream={localStream} />
+      {/* 푸터 영역 - 메인 콘텐츠와 완전히 분리 */}
+      <footer className="relative bg-white border-gray-200">
+        {/* 컨트롤 패널 */}
+        <div className="bg-blue-500/95 backdrop-blur-sm border-blue-600 py-3 shadow-lg">
+          <div className="flex justify-center items-center gap-3">
+            {/* 컨트롤 버튼들 */}
+            <div className="rounded-full px-4 py-2 border bg-white/20 backdrop-blur-sm">
+              <MicControlPanel stream={localStream} />
+            </div>
+            <div className="rounded-full px-4 py-2 border bg-white/20 backdrop-blur-sm">
+              <CameraControlPanel stream={localStream} />
+            </div>
+            <button
+              onClick={handleLeaveRoom}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-full px-4 py-2 shadow-md"
+            >
+              <PhoneOff className="w-4 h-4" />
+            </button>
           </div>
-          <div className="rounded-full px-4 py-2 border">
-            <CameraControlPanel stream={localStream} />
-          </div>
-          <button
-            onClick={handleLeaveRoom}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-full px-4 py-2"
-          >
-            <PhoneOff className="w-4 h-4" />
-            <span>나가기</span>
-          </button>
         </div>
       </footer>
     </div>
