@@ -22,7 +22,7 @@ class EvaluationSession(Base):
 class QuestionAnswerPair(Base):
     __tablename__ = "question_answer_pair"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     session_id = Column(String(36), ForeignKey("evaluation_session.id"), nullable=False)
 
     order = Column(Integer, nullable=False)
