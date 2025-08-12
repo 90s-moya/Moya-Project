@@ -11,10 +11,13 @@ import lombok.Setter;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class ResultDto {
     private String resultId;
-    private String createdAt;   // 필요하면 Instant로 바꿔도 됨
+    private String createdAt;
+    private String reportId;
+    private String reportTitle;
     private String status;
     private Integer order;
     private Integer suborder;
+    private String answer;
     private String question;
     private String thumbnailUrl;
 
