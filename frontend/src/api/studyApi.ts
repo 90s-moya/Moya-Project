@@ -97,19 +97,3 @@ export const uploadVideo = async (formData: FormData) => {
   const res = await api.post("/v1/room-member/upload-video", formData);
   return res.data;
 };
-
-// 방 참여 등록 함수
-export const registerForRoom = async (roomId: string) => {
-  const res = await api.post(`/v1/room/${roomId}`);
-
-  return res.data;
-};
-
-// 내가 등록한 방 목록 조회 함수
-export const getMyRegisteredRooms = async () => {
-  const res = await api.get("/v1/room/me");
-
-  console.log("getMyRegisteredRooms의 res.data:", res.data);
-
-  return res.data;
-};

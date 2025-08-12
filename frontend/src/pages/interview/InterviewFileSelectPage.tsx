@@ -9,7 +9,7 @@ import Header from "@/components/common/Header";
 type DocItem = {
   docsId: string;
   userId: string;
-  fileUrl: string; // 백엔드가 내려주는 '원본(api-dev)' URL
+  fileUrl: string; // 백엔드가 내려주는 원본 URL(여기에 api-dev가 포함될 수 있음)
   docsStatus: "PORTFOLIO" | "RESUME" | "COVERLETTER";
 };
 
@@ -27,23 +27,24 @@ const STATUS_LABEL: Record<DocType, string> = {
   COVERLETTER: "자기소개서",
 };
 
+/** api-dev가 들어간 원본 URL을 파일 접근 도메인으로 치환 */
 function toFileUrl(originalUrl: string) {
-  const apiBase = import.meta.env.VITE_API_URL || "";
-  const fileBase = import.meta.env.VITE_FILE_URL || "";
+  const apiBase = import.meta.env.VITE_API_URL || "";   // e.g. https://.../api-dev
+  const fileBase = import.meta.env.VITE_FILE_URL || ""; // e.g. https://...
   if (!originalUrl) return originalUrl;
   return originalUrl.startsWith(apiBase)
     ? originalUrl.replace(apiBase, fileBase)
     : originalUrl;
 }
 
-const safe = (s?: string) => (s ?? "").trim();
-
-function toInitialSelected(docs: DocItem[]): DocUrls {
+/** 최초 데이터에서 상태별 URL 하나씩 뽑아 저장(치환된 URL로 보관) */
+function toDocUrls(docs: DocItem[]): DocUrls {
   const acc: DocUrls = {};
   for (const d of docs) {
-    if (d.docsStatus === "RESUME" && !acc.resumeUrl) acc.resumeUrl = safe(d.fileUrl);
-    if (d.docsStatus === "PORTFOLIO" && !acc.portfolioUrl) acc.portfolioUrl = safe(d.fileUrl);
-    if (d.docsStatus === "COVERLETTER" && !acc.coverletterUrl) acc.coverletterUrl = safe(d.fileUrl);
+    const replaced = toFileUrl(d.fileUrl);
+    if (d.docsStatus === "RESUME" && !acc.resumeUrl) acc.resumeUrl = replaced;
+    if (d.docsStatus === "PORTFOLIO" && !acc.portfolioUrl) acc.portfolioUrl = replaced;
+    if (d.docsStatus === "COVERLETTER" && !acc.coverletterUrl) acc.coverletterUrl = replaced;
   }
   return acc;
 }
@@ -68,86 +69,75 @@ export default function InterviewFileSelectPage() {
   useEffect(() => {
     (async () => {
       const res = await DocsApi.getMyDocs();
+      console.log("[DocsApi] GET /v1/docs/me raw:", res);
       const data: DocItem[] = (res as any)?.data ?? res;
+      console.log("[DocsApi] parsed data:", data);
       setDocs(data);
-      setSelected(toInitialSelected(data)); // 원본으로 초기화
+      const initial = toDocUrls(data); // ← 치환된 URL로 초기화
+      console.log("[Docs] initial selected (by status):", initial);
+      setSelected(initial);
     })();
   }, []);
 
   const grouped = useMemo(() => {
     const g: Record<DocType, DocItem[]> = { RESUME: [], PORTFOLIO: [], COVERLETTER: [] };
     docs.forEach((d) => g[d.docsStatus].push(d));
+    console.log("[Docs] grouped by status:", g);
     return g;
   }, [docs]);
 
   const onPick = (type: DocType, rawUrl: string) => {
-    const url = safe(rawUrl);
-    setSelected((prev) =>
-      type === "RESUME"
-        ? { ...prev, resumeUrl: url }
-        : type === "PORTFOLIO"
-        ? { ...prev, portfolioUrl: url }
-        : { ...prev, coverletterUrl: url }
-    );
+    const url = toFileUrl(rawUrl); // ← 선택 시에도 치환
+    setSelected((prev) => {
+      const next =
+        type === "RESUME"
+          ? { ...prev, resumeUrl: url }
+          : type === "PORTFOLIO"
+          ? { ...prev, portfolioUrl: url }
+          : { ...prev, coverletterUrl: url };
+      console.log(`[Select] ${type} ->`, url, "next selected:", next);
+      return next;
+    });
   };
 
-  // 다음 단계 전송
+  // /v1/pdf 로 전송해서 텍스트 추출 → 다음 페이지로 이동
   const handleNext = async () => {
     const payload = {
-      resumeUrl: safe(selected.resumeUrl),
-      portfolioUrl: safe(selected.portfolioUrl),
-      coverletterUrl: safe(selected.coverletterUrl),
+      resumeUrl: selected.resumeUrl ?? "",
+      portfolioUrl: selected.portfolioUrl ?? "",
+      coverletterUrl: selected.coverletterUrl ?? "",
     };
-    console.log("==================dkjfdkfj",payload);
+
+    console.log("=== Sending /v1/pdf ===");
+    console.log("Request Body(JSON):", JSON.stringify(payload, null, 2));
 
     try {
       setLoading(true);
-
-      // 토큰 만료 로그(옵션)
-      // try {
-      //   const auth = localStorage.getItem("auth-storage");
-      //   const token = auth ? JSON.parse(auth).state.token : "";
-      //   const expired = (() => {
-      //     try {
-      //       const [, p] = token.split(".");
-      //       const { exp } = JSON.parse(atob(p));
-      //       return Date.now() >= exp * 1000;
-      //     } catch {
-      //       return true;
-      //     }
-      //   })();
-      //   console.log("[/v1/pdf] token expired?", expired);
-      // } catch (e) {
-      //   console.log("[/v1/pdf] token parse error", e);
-      // }
-
       const extracted = await extractTextFromPdf(payload);
-      console.log("extracted result:", extracted);
+      console.log("[/v1/pdf] OK:", extracted);
 
-      //if(extracted) localStorage.setItem("interviewSessionId", extracted.data.id);
-    
       navigate("/interview/modelist", {
         state: {
-          ...payload,    // 원본 URL들
-          ...extracted,  // resumeText / portfolioText / coverletterText
+          ...payload,      // 치환된 URL 3개
+          ...extracted,    // resumeText / portfolioText / coverletterText
         },
       });
     } catch (err: any) {
       const status = err?.response?.status;
-      console.error("[/v1/pdf] failed:", status, err?.response?.data || err);
+      const data = err?.response?.data;
+      console.error("[/v1/pdf] failed:", status, data, err);
       alert(status === 401 ? "인증이 만료되었습니다. 다시 로그인해주세요." : "요청 실패. 콘솔 로그를 확인하세요.");
     } finally {
       setLoading(false);
     }
-  }; // ← 반드시 닫기!
+  };
 
   const isNextDisabled =
     !selected.resumeUrl && !selected.portfolioUrl && !selected.coverletterUrl;
 
-  const displayName = (raw?: string) => getNameFromUrl(toFileUrl(safe(raw || "")));
-
   return (
     <>
+      {/* 여기! JSX는 컴포넌트 반환 안에서 렌더링해야 합니다 */}
       <Header scrollBg={false} />
 
       <div className="mx-auto max-w-3xl px-6 py-8 mt-16">
@@ -166,9 +156,9 @@ export default function InterviewFileSelectPage() {
                 <h2 className="text-lg font-medium">{STATUS_LABEL[type]}</h2>
                 <span className="text-xs text-gray-500">
                   현재 선택:{" "}
-                  {type === "RESUME" && (displayName(selected.resumeUrl) || "-")}
-                  {type === "PORTFOLIO" && (displayName(selected.portfolioUrl) || "-")}
-                  {type === "COVERLETTER" && (displayName(selected.coverletterUrl) || "-")}
+                  {type === "RESUME" && (getNameFromUrl(selected.resumeUrl) || "-")}
+                  {type === "PORTFOLIO" && (getNameFromUrl(selected.portfolioUrl) || "-")}
+                  {type === "COVERLETTER" && (getNameFromUrl(selected.coverletterUrl) || "-")}
                 </span>
               </div>
 
@@ -177,32 +167,32 @@ export default function InterviewFileSelectPage() {
               ) : (
                 <ul className="space-y-2">
                   {grouped[type].map((d) => {
-                    const raw = safe(d.fileUrl);        // 원본
-                    const display = toFileUrl(raw);     // 화면용
+                    const replaced = toFileUrl(d.fileUrl); // ← 리스트/링크 노출도 치환
                     const checked =
-                      (type === "RESUME" && selected.resumeUrl === raw) ||
-                      (type === "PORTFOLIO" && selected.portfolioUrl === raw) ||
-                      (type === "COVERLETTER" && selected.coverletterUrl === raw);
+                      (type === "RESUME" && selected.resumeUrl === replaced) ||
+                      (type === "PORTFOLIO" && selected.portfolioUrl === replaced) ||
+                      (type === "COVERLETTER" && selected.coverletterUrl === replaced);
                     return (
-                      <li key={d.docsId} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                      <li
+                        key={d.docsId}
+                        className="flex items-center justify-between rounded-lg border px-3 py-2"
+                      >
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
                             type="radio"
                             name={`pick-${type}`}
                             checked={checked}
-                            onChange={() => onPick(type, raw)}
+                            onChange={() => onPick(type, d.fileUrl)}
                           />
                           <span className="text-sm">
-                            {getNameFromUrl(display)}
-                            <span className="ml-2 text-xs text-gray-400">
-                              ({STATUS_LABEL[d.docsStatus as DocType]})
-                            </span>
+                            {getNameFromUrl(replaced)}
+                            <span className="ml-2 text-xs text-gray-400">({STATUS_LABEL[d.docsStatus]})</span>
                           </span>
                         </label>
 
                         <a
                           className="text-xs underline text-blue-600"
-                          href={display}
+                          href={replaced}
                           target="_blank"
                           rel="noreferrer"
                           onClick={(e) => e.stopPropagation()}
