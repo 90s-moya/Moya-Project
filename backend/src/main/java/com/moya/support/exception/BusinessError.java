@@ -37,10 +37,13 @@ public enum BusinessError {
 	FILE_TYPE_MISMATCH_ERROR(BAD_REQUEST,"파일 타입이 일치하지 않습니다"),
 	MAXIMUM_DOCS_LIMIT_EXCEEDED(BAD_REQUEST,"파일은 3개 초과될 수 없습니다."),
 	INVALID_FILE_TYPE(BAD_REQUEST,"pdf 파일만 허용됩니다."),
-	FILE_URL_NULL_OR_EMPTY(NOT_FOUND,"파일이 존재하지 않습니다");
-
+	FILE_URL_NULL_OR_EMPTY(NOT_FOUND,"파일이 존재하지 않습니다"),
+	//PDF 관련 Error
+	PDF_GET_URL_ERROR(NOT_FOUND,"유효한 PDF가 존재하지 않습니다."),
+	PDF_GET_TEXT_FAIL(BAD_REQUEST,"PDF 파일 추출에 실패했습니다"),
+	PDF_FAIL_TEXT(BAD_REQUEST,"PDF 파일을 텍스트 변환하는데 실패하였습니다."),
 	//ai 모의 면접 관련 Error
-
+;
 
 	//화상채팅 관련 Error
 

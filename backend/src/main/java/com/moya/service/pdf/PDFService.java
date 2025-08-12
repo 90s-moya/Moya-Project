@@ -1,6 +1,7 @@
 package com.moya.service.pdf;
 
 import com.moya.domain.docs.DocsStatus;
+import com.moya.support.exception.BusinessException;
 import com.moya.support.file.PdfTextExtractor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,8 @@ import java.io.UncheckedIOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+
+import static com.moya.support.exception.BusinessError.*;
 
 @Service
 @RequiredArgsConstructor
@@ -48,43 +51,60 @@ public class PDFService {
     }
 
 
-    // 배치(이력서/포폴/자소서)
     public ResponseEntity<String> getTextBatch(
             String userId, String resumeUrl, String portfolioUrl, String coverletterUrl
     ) {
         Map<DocsStatus, String> urls = new EnumMap<>(DocsStatus.class);
-        if (!isBlank(resumeUrl))     urls.put(DocsStatus.RESUME,     resumeUrl);
-        if (!isBlank(portfolioUrl))  urls.put(DocsStatus.PORTFOLIO,  portfolioUrl);
-        if (!isBlank(coverletterUrl))urls.put(DocsStatus.COVERLETTER,coverletterUrl);
-        if (urls.isEmpty()) throw new IllegalArgumentException("유효한 PDF URL이 없습니다.");
+
+        // isBlank() 강화: "null", "undefined" 문자열도 필터
+        if (!isBlank(resumeUrl)) urls.put(DocsStatus.RESUME, resumeUrl);
+        if (!isBlank(portfolioUrl)) urls.put(DocsStatus.PORTFOLIO, portfolioUrl);
+        if (!isBlank(coverletterUrl)) urls.put(DocsStatus.COVERLETTER, coverletterUrl);
+
+        if (urls.isEmpty()) {
+            throw PDF_GET_URL_ERROR.exception();
+        }
 
         try {
             var futures = urls.entrySet().stream()
                     .map(e -> CompletableFuture.supplyAsync(() -> {
                         try {
                             String text = PdfTextExtractor.extractTextFromUrl(e.getValue());
-                            return Map.entry(e.getKey(), text);
+                            return Map.entry(e.getKey(), Optional.of(text));
                         } catch (IOException ex) {
-                            throw new UncheckedIOException(ex);
+                            // 실패는 Optional.empty()로 표시
+                            return Map.entry(e.getKey(), Optional.<String>empty());
                         }
                     }))
                     .toList();
 
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
+            // 성공한 PDF만 병합
             String merged = futures.stream()
                     .map(CompletableFuture::join)
+                    .filter(e -> e.getValue().isPresent()) // 성공한 경우만
                     .sorted(Comparator.comparing(e -> e.getKey().ordinal()))
-                    .map(e -> "==== " + e.getKey().name() + " ====\n" + e.getValue())
+                    .map(e -> "==== " + e.getKey().name() + " ====\n" + e.getValue().get())
                     .collect(Collectors.joining("\n\n"));
 
-            // 파이썬으로 전송하고, 그 응답(성공/에러)을 그대로 반환
+            if (merged.isEmpty()) {
+                throw PDF_GET_TEXT_FAIL.exception();
+            }
+
+            // 파이썬 서버로 전송
             return postPromptStart(userId, merged);
 
         } catch (UncheckedIOException e) {
-            throw new RuntimeException("PDF 병렬 추출 중 I/O 오류: " + e.getCause().getMessage(), e);
+            throw PDF_FAIL_TEXT.exception();
         }
     }
 
-    private boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }
+    private boolean isBlank(String s) {
+        if (s == null) return true;
+        String t = s.trim();
+        return t.isEmpty()
+                || "null".equalsIgnoreCase(t)
+                || "undefined".equalsIgnoreCase(t);
+    }
 }

@@ -1,6 +1,7 @@
 package com.moya.interfaces.api.interview;
 
 import com.moya.service.interview.InterviewService;
+import com.moya.support.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +29,7 @@ public class InterviewController {
             @RequestParam("session_id") UUID sessionId,
             @RequestParam("order") int order,
             @RequestParam("sub_order") int subOrder,
-            @AuthenticationPrincipal Object principal
+            @AuthenticationPrincipal CustomUserDetails user
     ) throws IOException {
         Map<String, Object> result =
                 interviewService.followupQuestion(sessionId, order, subOrder, audio);
