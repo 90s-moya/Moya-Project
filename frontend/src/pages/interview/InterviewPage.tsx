@@ -16,13 +16,13 @@ export default function InterviewScreen() {
   const [micLevel, setMicLevel] = useState(0)
 
   // 라우터 params에서 sessionId, location.state로 질문 메타 받기
-  const { sessionId } = useParams<{ sessionId: string }>()
-  const location = useLocation()
+  const sessionId = localStorage.getItem("interviewSessionId")
 
   // location.state에 { order, subOrder, text } 형태로 전달 받는다고 가정
-  const currentOrder = (location.state as any)?.order ?? 1
-  const currentSubOrder = (location.state as any)?.subOrder ?? 0
-  const questionText = (location.state as any)?.text ?? "질문이 없습니다."
+  // 그렇지만 localStorage에 저장했어요 ^0^
+  const currentOrder = parseInt(localStorage.getItem("currentOrder") ?? "0", 10);
+  const currentSubOrder = parseInt(localStorage.getItem("currentSubOrder") ?? "0", 10);
+  const questionText = localStorage.getItem("questions")
 
   // AnswerRecorder에 넘길 keyInfo
   const keyInfo: QuestionKey = useMemo(
@@ -67,7 +67,7 @@ export default function InterviewScreen() {
           <div className="w-full max-w-3xl">
             <div className="flex items-center justify-between mb-3">
               <div className="text-sm text-gray-600">
-                세션 {sessionId} · 순서 {currentOrder}-{currentSubOrder}
+                순서 {currentOrder}-{currentSubOrder}
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-32 h-2 bg-gray-200 rounded">

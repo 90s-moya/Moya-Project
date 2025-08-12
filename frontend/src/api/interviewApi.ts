@@ -8,8 +8,32 @@ export interface PdfExtractRequest {
   coverletterUrl: string
 }
 
+export interface QAPair {
+  order: number;
+  subOrder: number;
+  question: string;
+  answer: string;
+  isEnded: boolean;
+  reasonEnd: string;
+  contextMatched: boolean;
+  reasonContext: string;
+  gptComment: string;
+  stopwords: string;
+  endType: string;
+  id: string;
+  sessionId: string;
+  createdAt: string;
+}
+
+type FollowupResponse = {
+  order: number;
+  sub_order: number;
+  question: string;
+};
+
 export interface PdfExtractResponse {
   id:string
+  qa_pairs: QAPair[]
 }
 
 export const extractTextFromPdf = async (
@@ -23,6 +47,12 @@ export const extractTextFromPdf = async (
 
   if (res.status >= 200 && res.status < 300) {
     localStorage.setItem("interviewSessionId", res.data.id);
+      // 질문만 뽑기
+    const questions = res.data.qa_pairs[0];
+    localStorage.setItem("questions", res.data.qa_pairs?.[0]?.question ?? "");
+    localStorage.setItem("currentOrder", "1");
+    localStorage.setItem("currentSubOrder", "0");
+
     return res.data;
   }
   throw new Error(`PDF extract failed: ${res.status}`);
@@ -51,8 +81,14 @@ export async function sendFollowupAudio(params: {
   // origin만 추출해서 per-request baseURL로 지정
   const ORIGIN = new URL(import.meta.env.VITE_API_URL).origin // ex) https://i13a602.p.ssafy.io
 
-  await api.post("/v1/followup", form, {
+  const res = await api.post("/v1/followup", form, {
     withCredentials: true,
     validateStatus: () => true,
   })
+  console.log("맞아 아니야 딱 말해 ",res)
+   const { currentOrder, currentSubOrder, question } = res.data;
+  localStorage.getItem("currentOrder") ?? "0", 10;
+  localStorage.getItem("currentSubOrder") ?? "0", 10;
+  localStorage.getItem("questions")
+
 }
