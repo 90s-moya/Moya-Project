@@ -29,7 +29,7 @@ deploy-be-dev:
     - docker stop be-dev || true
     - docker rm be-dev || true
     - >
-      docker run -d --name be-dev -p 8081:8080
+      docker run -d --name be-dev --network monitoring -p 8081:8080
       -v /srv/moya/files-dev:/files-dev
       -e FILE_PATH=/files-dev
       -e DB_URL="$DB_URL_DEV"
@@ -38,6 +38,7 @@ deploy-be-dev:
       -e JWT_SECRET="$JWT_SECRET"
       -e MAIL_USERNAME="$MAIL_USERNAME"
       -e MAIL_PASSWORD="$MAIL_PASSWORD"
+      -e PYTHON_PATH="$PYTHON_PATH"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
@@ -52,7 +53,7 @@ deploy-be-prod:
     - docker stop be-main || true
     - docker rm be-main || true
     - >
-      docker run -d --name be-main -p 8080:8080
+      docker run -d --name be-main --network monitoring -p 8080:8080
       -v /srv/moya/files:/files
       -e FILE_PATH=/files
       -e DB_URL="$DB_URL_PROD"
@@ -61,6 +62,7 @@ deploy-be-prod:
       -e JWT_SECRET="$JWT_SECRET"
       -e MAIL_USERNAME="$MAIL_USERNAME"
       -e MAIL_PASSWORD="$MAIL_PASSWORD"
+      -e PYTHON_PATH="$PYTHON_PATH"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
@@ -96,4 +98,61 @@ deploy-fe:
     - ec2
   only:
     - fe-main
+    - master
+# AI - 빌드
+build-ai:
+  stage: build
+  script:
+    - docker build -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai/ai-server
+    - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
+  only:
+    - ai-dev
+    - ai-main
+    - master
+
+# AI - 개발 환경 배포 (8001 포트)
+deploy-ai-dev:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-dev || true
+    - docker rm ai-dev || true
+    - >
+      docker run -d --name ai-dev --network monitoring -p 8001:8000
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_DEV"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
+  only:
+    - ai-dev
+
+# AI - 운영 환경 배포 (8000 포트)
+deploy-ai-prod:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-main || true
+    - docker rm ai-main || true
+    - >
+      docker run -d --name ai-main --network monitoring -p 8000:8000
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_PROD"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+  tags:
+    - ec2
+  only:
+    - ai-main
     - master

@@ -49,6 +49,19 @@ dependencies {
 	//Mail
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
 
+	//WebSocket
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+	//Json
+	implementation 'org.json:json:20240303'
+
+	// Monitoring
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
+	// PDF
+	implementation 'org.apache.pdfbox:pdfbox:2.0.30'
+
 }
 
 dependencyManagement {

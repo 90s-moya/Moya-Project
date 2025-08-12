@@ -1,0 +1,224 @@
+# app/utils/posture.py
+import cv2
+import mediapipe as mp
+from collections import Counter
+import numpy as np
+import datetime
+import tempfile
+import os
+
+mp_pose = mp.solutions.pose
+
+def _get_center(p1, p2):
+    return [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]
+
+def _extract_feedbacks(landmarks, mp_pose):
+    """
+    한 프레임에서 발견된 모든 자세 피드백을 리스트로 반환
+    """
+    def get_xy(idx):
+        lm = landmarks[idx]
+        return [lm.x, lm.y]
+
+    feedbacks = []
+
+    r_shoulder = get_xy(mp_pose.PoseLandmark.RIGHT_SHOULDER.value)
+    l_shoulder = get_xy(mp_pose.PoseLandmark.LEFT_SHOULDER.value)
+    nose = get_xy(mp_pose.PoseLandmark.NOSE.value)
+    r_eye = get_xy(mp_pose.PoseLandmark.RIGHT_EYE.value)
+    l_eye = get_xy(mp_pose.PoseLandmark.LEFT_EYE.value)
+
+    shoulder_center = _get_center(r_shoulder, l_shoulder)
+    eye_center = _get_center(r_eye, l_eye)
+
+    shoulder_diff_y = abs(r_shoulder[1] - l_shoulder[1])
+    head_down_ratio = abs(nose[1] - eye_center[1])
+    off_center_ratio = abs(nose[0] - shoulder_center[0])
+
+    if shoulder_diff_y > 0.02:
+        feedbacks.append("Shoulders Uneven")
+    if head_down_ratio > 0.07:
+        feedbacks.append("Head Down")
+    if off_center_ratio > 0.05:
+        feedbacks.append("Head Off-Center")
+
+    upper_parts = [
+        mp_pose.PoseLandmark.LEFT_ELBOW,
+        mp_pose.PoseLandmark.RIGHT_ELBOW,
+        mp_pose.PoseLandmark.LEFT_WRIST,
+        mp_pose.PoseLandmark.RIGHT_WRIST,
+        mp_pose.PoseLandmark.LEFT_INDEX,
+        mp_pose.PoseLandmark.RIGHT_INDEX,
+    ]
+    shoulder_y = shoulder_center[1]
+    for part in upper_parts:
+        part_y = landmarks[part.value].y
+        if part_y < shoulder_y:
+            feedbacks.append("Hands Above Shoulders")
+            break
+
+    if not feedbacks:
+        feedbacks.append("Good Posture")
+    return feedbacks
+
+# 프레임별 대표 라벨 우선순위 (원하면 자유롭게 조정)
+_LABEL_PRIORITY = [
+    "Shoulders Uneven",
+    "Head Down",
+    "Head Off-Center",
+    "Hands Above Shoulders",
+    "Good Posture",
+]
+
+def _choose_label(feedbacks):
+    """
+    여러 피드백이 동시에 있을 때, 프레임당 대표 라벨 하나 선택
+    """
+    if not feedbacks:
+        return "Good Posture"
+    for p in _LABEL_PRIORITY:
+        if p in feedbacks:
+            return p
+    return feedbacks[0]
+
+def _compress_runs(sampled_frames, labels, step):
+    """
+    동일 라벨이 연속되는 구간을 start/end 프레임으로 압축
+    sampled_frames: 샘플링된 프레임 인덱스 리스트 (오름차순)
+    labels: 각 프레임의 대표 라벨
+    step: 샘플링 스텝(프레임 단위), 예: 30 -> 30fps에서 1fps
+    """
+    if not sampled_frames:
+        return []
+    segments = []
+    cur_label = labels[0]
+    seg_start = sampled_frames[0]
+    prev_frame = sampled_frames[0]
+
+    for i in range(1, len(sampled_frames)):
+        f = sampled_frames[i]
+        lb = labels[i]
+        contiguous = (f == prev_frame + step)
+        if lb == cur_label and contiguous:
+            prev_frame = f
+            continue
+        # 구간 종료 후 저장
+        segments.append({"label": cur_label, "start_frame": seg_start, "end_frame": prev_frame})
+        # 새 구간 시작
+        cur_label = lb
+        seg_start = f
+        prev_frame = f
+
+    # 마지막 구간 저장
+    segments.append({"label": cur_label, "start_frame": seg_start, "end_frame": prev_frame})
+    return segments
+
+def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every: int = 1):
+    """
+    업로드된 동영상 바이트 -> 샘플링/분석 -> JSON 리포트 반환
+
+    Parameters
+    ----------
+    mode : "segments" | "samples"
+        - "segments": 동일 라벨의 연속 구간을 압축하여 {"label","start_frame","end_frame"} 형태로 반환
+        - "samples" : 샘플 프레임별 {"frame","label"} 형태로 반환
+    sample_every : int
+        N프레임마다 1회 처리. 예) 30이면 30fps 영상을 1fps처럼 분석
+
+    Returns
+    -------
+    dict
+        {
+          "timestamp": ISO8601,
+          "total_frames_read": int,   # 원본에서 읽은 총 프레임 수(스킵 포함)
+          "total_samples": int,       # 실제 분석한 샘플 수
+          "source_fps": float|0.0,    # 원본 FPS(못 읽으면 0.0)
+          "frame_step": int,          # sample_every
+          "effective_fps": float|None,# source_fps / sample_every
+          "summary": {...},           # 라벨별 비율
+          "detailed_logs": [...],     # segments 또는 samples
+          "mode": "segments"|"samples"
+        }
+    """
+    assert mode in ("segments", "samples"), "mode must be 'segments' or 'samples'"
+    assert sample_every >= 1
+
+    # 임시 파일 저장
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    pose_ctx = mp_pose.Pose(static_image_mode=False,
+                            min_detection_confidence=0.5,
+                            model_complexity=1)
+    cap = cv2.VideoCapture(tmp_path)
+
+    try:
+        source_fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+        total_frames_read = 0
+        sampled_frames = []
+        per_frame_labels = []
+
+        frame_idx = -1  # 0-based 인덱스
+        while True:
+            grabbed = cap.grab()
+            if not grabbed:
+                break
+            frame_idx += 1
+            total_frames_read += 1
+
+            # 샘플링: sample_every 프레임마다 1회 처리
+            if (frame_idx % sample_every) != 0:
+                continue
+
+            ret, frame = cap.retrieve()
+            if not ret:
+                continue
+
+            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = pose_ctx.process(image_rgb)
+
+            feedbacks = []
+            if results.pose_landmarks:
+                feedbacks = _extract_feedbacks(results.pose_landmarks.landmark, mp_pose)
+            label = _choose_label(feedbacks)
+
+            sampled_frames.append(frame_idx)
+            per_frame_labels.append(label)
+    finally:
+        cap.release()
+        pose_ctx.close()
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+    # 요약(라벨 비율)
+    total_samples = len(per_frame_labels)
+    if total_samples > 0:
+        counts = Counter(per_frame_labels)
+        summary = {
+            k: {"frames": v, "ratio": round((v / total_samples) * 100, 1)}
+            for k, v in counts.items()
+        }
+    else:
+        summary = {}
+
+    # detailed_logs 생성
+    if mode == "samples":
+        detailed_logs = [{"frame": f, "label": lb} for f, lb in zip(sampled_frames, per_frame_labels)]
+    else:
+        detailed_logs = _compress_runs(sampled_frames, per_frame_labels, step=sample_every)
+
+    report = {
+        "timestamp": datetime.datetime.now().isoformat(),
+        "total_frames_read": total_frames_read,
+        "total_samples": total_samples,
+        "source_fps": float(source_fps) if source_fps else 0.0,
+        "frame_step": sample_every,
+        "effective_fps": (float(source_fps) / sample_every) if source_fps else None,
+        "summary": summary,
+        "detailed_logs": detailed_logs,
+        "mode": mode,
+    }
+    return report
