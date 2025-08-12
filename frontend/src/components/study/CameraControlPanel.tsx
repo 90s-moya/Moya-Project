@@ -30,9 +30,9 @@ export default function CameraControlPanel({ stream }: Props) {
         className="flex items-center gap-1 text-white hover:text-white/80 transition disabled:opacity-50"
       >
         {isCameraOn ? (
-          <Video className="w-5 h-5" />
+          <Video className="w-4 h-4" />
         ) : (
-          <VideoOff className="w-5 h-5" />
+          <VideoOff className="w-4 h-4" />
         )}
       </button>
     </div>
