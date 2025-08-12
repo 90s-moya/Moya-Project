@@ -5,13 +5,26 @@ export default function StudyBackToList() {
   const navigate = useNavigate();
 
   return (
-    <div className="mt-10 text-right">
+    <div className="mb-6 flex justify-start -ml-4">
       <Button
         variant="ghost"
-        className="text-[#6f727c] hover:text-[#1b1c1f] underline text-lg"
+        className="text-[#2b7fff] hover:text-blue-600 font-semibold text-lg flex items-center gap-2 transition-colors"
         onClick={() => navigate("/study")}
       >
-        ← 스터디 목록으로 돌아가기
+        <svg
+          className="w-5 h-5 flex-shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M15 19l-7-7 7-7"
+          />
+        </svg>
+        <span className="leading-none">스터디 목록으로 돌아가기</span>
       </Button>
     </div>
   );

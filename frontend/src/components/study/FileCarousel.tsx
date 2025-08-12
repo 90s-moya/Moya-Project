@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  ExternalLink,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 
 interface CarouselProps {
   items: {
@@ -16,10 +11,9 @@ interface CarouselProps {
   onClose: () => void; // 캐러셀 닫기 함수
 }
 
-export default function Carousel({ items, onClose }: CarouselProps) {
+export default function FileCarousel({ items, onClose }: CarouselProps) {
   const BASE_FILE_URL = import.meta.env.VITE_FILE_URL; // 서류를 불러오기 위한 파일 URL
   const [currentIndex, setCurrentIndex] = useState(0); // 현재 보고 있는 서류 인덱스
-  const [isLoading, setIsLoading] = useState(true); // PDF 로딩 상태
   const [error, setError] = useState<string | null>(null); // 에러 상태
 
   // props 로깅
@@ -58,19 +52,6 @@ export default function Carousel({ items, onClose }: CarouselProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // 현재 아이템이 변경될 때마다 로딩 상태 초기화
-  // useEffect(() => {
-  //   setIsLoading(true);
-  //   setError(null);
-
-  //   // 일정 시간 후 자동으로 로딩 상태 해제 (안전장치)
-  //   const timer = setTimeout(() => {
-  //     setIsLoading(false);
-  //   }, 500);
-
-  //   return () => clearTimeout(timer);
-  // }, [currentIndex]);
-
   // 아이템이 없으면 렌더링하지 않음
   if (items.length === 0) {
     return null;
@@ -100,28 +81,12 @@ export default function Carousel({ items, onClose }: CarouselProps) {
       );
     }
 
-    // 로딩 중인 경우 보여주는 UI
-    // if (isLoading) {
-    //   return (
-    //     <div className="flex flex-col items-center justify-center h-full">
-    //       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-    //       <p className="text-gray-600">PDF를 불러오는 중...</p>
-    //       <p className="text-sm text-gray-400 mt-2">{fileName}</p>
-    //     </div>
-    //   );
-    // }
-
     return (
       <iframe
         src={`${fullFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-        className="w-full h-full border-0"
-        onLoad={() => {
-          console.log("PDF 로드 완료:", fullFileUrl);
-          setIsLoading(false);
-        }}
+        className="w-full h-full border-0 rounded-lg"
         onError={() => {
           console.error("PDF 로드 실패:", fullFileUrl);
-          setIsLoading(false);
           setError("PDF 파일을 불러올 수 없습니다.");
         }}
       />
