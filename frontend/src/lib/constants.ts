@@ -11,19 +11,13 @@ export const getQualityText = (type: QualityScaleType): string => {
   return QUALITY_SCALE_MAP[type] || String(type);
 };
 
-// 말하기 속도 매핑
-export const SPEED_MAP = {
-  SLOW: '느림',
-  SLIGHTLY_SLOW: '조금 느림',
-  NORMAL: '양호',
-  SLIGHTLY_FAST: '조금 빠름',
-  FAST: '빠름',
-} as const;
+// SpeedType 정의 (SPEED_RANGES에서 추출)
+export type SpeedType = typeof SPEED_RANGES[number]['speedType'];
 
-export type SpeedType = keyof typeof SPEED_MAP;
-
+// SPEED_RANGES를 기반으로 한 getSpeedText 함수
 export const getSpeedText = (type: SpeedType): string => {
-  return SPEED_MAP[type] || String(type);
+  const range = SPEED_RANGES.find(r => r.speedType === type);
+  return range?.label || String(type);
 };
 
 // 불린 상태 텍스트
@@ -50,3 +44,67 @@ export const getBooleanStatusConfig = (status: boolean) => {
     };
   }
 };
+
+// 통합된 속도/구간 설정 (말하기 속도 + 음절 아티큘레이션 공용)
+export const SPEED_RANGES = [
+  { 
+    start: 0, 
+    end: 3.6, 
+    label: '느림', 
+    color: '#FFE4E6', // rose-100
+    speedType: 'SLOW' as const
+  },
+  { 
+    start: 3.6, 
+    end: 4.0, 
+    label: '조금 느림', 
+    color: '#FEF3C7', // amber-100
+    speedType: 'SLIGHTLY_SLOW' as const
+  },
+  { 
+    start: 4.0, 
+    end: 4.6, 
+    label: '적정', 
+    color: '#DCFCE7', // green-100
+    speedType: 'NORMAL' as const
+  },
+  { 
+    start: 4.6, 
+    end: 5.2, 
+    label: '조금 빠름', 
+    color: '#DBEAFE', // blue-100
+    speedType: 'SLIGHTLY_FAST' as const
+  },
+  { 
+    start: 5.2, 
+    end: 8.0, 
+    label: '빠름', 
+    color: '#EDE9FE', // violet-100
+    speedType: 'FAST' as const
+  }
+] as const;
+
+// 차트용 상수
+export const SPEED_CHART_CONFIG = {
+  X_MIN: 0,
+  X_MAX: 8.0,
+  TICK_COUNT: 7
+} as const;
+
+// 값에 따른 구간 찾기
+export const getSpeedRange = (value: number) => {
+  return SPEED_RANGES.find(range => value >= range.start && value < range.end) || SPEED_RANGES[2]; // 기본값: 적정
+};
+
+// 값에 따른 라벨 반환
+export const getSpeedLabel = (value: number): string => {
+  const range = getSpeedRange(value);
+  return range.label;
+};
+
+// 값에 따른 속도 타입 반환
+export const getSpeedType = (value: number): SpeedType => {
+  const range = getSpeedRange(value);
+  return range.speedType;
+};
+

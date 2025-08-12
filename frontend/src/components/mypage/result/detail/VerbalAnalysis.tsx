@@ -1,13 +1,25 @@
 import React from 'react';
 import { MessageSquare, Smile, Frown, Target, Brain, Star, Speech, ListEnd, Puzzle } from 'lucide-react';
-import { 
+import {
   getQualityText,
   getSpeedText,
   getBooleanStatusConfig,
+  SPEED_RANGES,
+  SPEED_CHART_CONFIG,
+  getSpeedRange,
   type QualityScaleType,
-  type SpeedType
+  type SpeedType,
 } from '@/lib/constants';
 import chatGpt from '@/assets/images/chat-gpt.png';
+
+
+import {
+  ComposedChart,
+  XAxis,
+  ReferenceArea,
+  ReferenceLine,
+  ResponsiveContainer,
+} from 'recharts';
 
 export interface VerbalResultProps {
   verbal_result: {
@@ -24,8 +36,10 @@ export interface VerbalResultProps {
   };
 }
 
+
+
 const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
-  // 상태에 따른 아이콘과 색상 결정
+  // 상태에 따른 아이콘/텍스트/색상
   const getStatusIcon = (status: boolean) => {
     const config = getBooleanStatusConfig(status);
     const IconComponent = status ? Smile : Frown;
@@ -42,6 +56,12 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
     return config.textColor;
   };
 
+  // 현재 syll_art 값이 속한 구간
+  const currentRange = getSpeedRange(verbal_result.syll_art);
+
+  // 툴팁용
+  const formatTooltip = (value: number) => `${value.toFixed(2)}`;
+
   return (
     <div className="bg-[#fafafc] border border-[#dedee4] rounded-lg p-6">
       <div className="space-y-6">
@@ -52,9 +72,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
             <h4 className="text-sm font-semibold text-[#2B7FFF]">답변 내용</h4>
           </div>
           <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
-            <p className="text-sm text-[#1b1c1f] leading-relaxed">
-              {verbal_result.answer}
-            </p>
+            <p className="text-sm text-[#1b1c1f] leading-relaxed">{verbal_result.answer}</p>
           </div>
         </div>
 
@@ -64,7 +82,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
             <Brain size={18} className="text-[#2B7FFF]" />
             <h4 className="text-sm font-semibold text-[#2B7FFF]">AI 분석 결과</h4>
           </div>
-          
+
           <div className="space-y-4">
             {/* 상단 두 카드 - 답변 완성도, 불용어 사용 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -77,7 +95,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
                   {getQualityText(verbal_result.end_type as QualityScaleType)}
                 </p>
               </div>
-              
+
               <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <Target size={16} className="text-blue-500" />
@@ -123,18 +141,61 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
               <p className="text-xs text-gray-500 mt-2">{verbal_result.reason_context}</p>
             </div>
 
-            {/* 말하기 속도 - 가로 배치로 상단 우측 값 */}
-            <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Speech size={16} className="text-orange-500" />
-                  <span className="text-xs font-medium text-gray-600">말하기 속도</span>
-                </div>
-                <p className="text-sm font-semibold text-[#1b1c1f]">
-                  {getSpeedText(verbal_result.is_fast as SpeedType)}
-                </p>
+                         {/* 말하기 속도 */}
+             <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
+               <div className="flex items-center justify-between mb-2">
+                 <div className="flex items-center gap-2">
+                   <Speech size={16} className="text-orange-500" />
+                   <span className="text-xs font-medium text-gray-600">말하기 속도</span>
+                 </div>
+                 <p className="text-sm font-semibold text-[#1b1c1f]">
+                   {getSpeedText(verbal_result.is_fast as SpeedType)}
+                 </p>
+               </div>
+               <div className="text-right">
+                 <p className="text-xs text-gray-500">
+                   {verbal_result.syll_art} 음절/초 (SPS)
+                 </p>
+               </div>
+
+              {/* 음절 아티큘레이션 */}
+              <div className="mt-2">
+
+                                 {/* x축 구간 차트 */}
+                 <div className="w-full h-12 overflow-hidden">
+                   <ResponsiveContainer width="100%" height="100%">
+                     <ComposedChart data={[{ x: SPEED_CHART_CONFIG.X_MIN }, { x: SPEED_CHART_CONFIG.X_MAX }]} margin={{ top: 4, right: 12, bottom: 4, left: 12 }}>
+                       {/* 구간 배경 */}
+                       {SPEED_RANGES.map((r, idx) => (
+                         <ReferenceArea key={idx} x1={r.start} x2={r.end} y1={0} y2={1} ifOverflow="extendDomain" fill={r.color} fillOpacity={1} />
+                       ))}
+                       <XAxis
+                         type="number"
+                         dataKey="x"
+                         domain={[SPEED_CHART_CONFIG.X_MIN, SPEED_CHART_CONFIG.X_MAX]}
+                         tickCount={SPEED_CHART_CONFIG.TICK_COUNT}
+                         tickFormatter={(v) => v.toFixed(1)}
+                         axisLine={false}
+                         tickLine={false}
+                         height={24}
+                       />
+
+                       {/* 현재 값 마커 */}
+                       <ReferenceLine x={verbal_result.syll_art} stroke="#1F2937" strokeWidth={2} />
+                     </ComposedChart>
+                   </ResponsiveContainer>
+                 </div>
+
+                 {/* 범례 */}
+                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                   {SPEED_RANGES.map((r) => (
+                     <div key={r.label} className="flex items-center gap-1 text-[10px] text-gray-600">
+                       <span className="inline-block w-3 h-3 rounded-sm" style={{ background: r.color }} />
+                       <span>{r.label}</span>
+                     </div>
+                   ))}
+                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">음절 아티큘레이션: {verbal_result.syll_art}</p>
             </div>
 
             {/* AI 코멘트 - 맨 밑 */}
@@ -143,9 +204,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
                 <img src={chatGpt} alt="AI" className="w-4 h-4" />
                 <span className="text-xs font-semibold text-blue-600">AI 코멘트</span>
               </div>
-              <p className="text-sm text-[#1b1c1f] leading-relaxed">
-                {verbal_result.gpt_comment}
-              </p>
+              <p className="text-sm text-[#1b1c1f] leading-relaxed">{verbal_result.gpt_comment}</p>
             </div>
           </div>
         </div>

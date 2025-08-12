@@ -95,7 +95,7 @@ const ResultDetail: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                     activeTab === tab.id
                       ? 'text-[#2B7FFF] border-b-2 border-[#2B7FFF]'
                       : 'text-gray-500 hover:text-gray-700'
@@ -121,7 +121,7 @@ export default ResultDetail;
 
 // Mock 데이터
 const mockDetailData = {
-  "video_url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  "video_url": "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
   "verbal_result": {
     "answer": "저는 문제 해결 과정에서 끈기를 가지고 끝까지 해내는 성향이 강합니다. 왜냐하면 끈기를 가지고 끝까지 해내야 좋기 때문입니다. 그렇기 때문에 앞으로도 끈기를 가지고 모든 일에 임하겠습니다.",
     "stopwords": "NORMAL",
@@ -131,7 +131,7 @@ const mockDetailData = {
     "reason_context": "질문이 '본인의 강점'이었고, 답변이 주제에 부합하며 불필요한 내용이 없음.",
     "gpt_comment": "핵심 메시지가 분명하지만, 구체적인 사례를 덧붙이면 더 설득력 있는 답변이 될 수 있음.",
     "end_type": "OUTSTANDING",
-    "is_fast": "SLIGHTLY_FAST",
-    "syll_art": 4.96
+    "is_fast": "SLOW",
+    "syll_art": 3.2
   }
 };
