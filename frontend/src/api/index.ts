@@ -122,21 +122,21 @@ instance.interceptors.response.use(
     }
     return response;
   },
-  async (error) => {
-    console.error("API 응답 에러:", error.response?.status, error.response?.data);
+  // async (error) => {
+  //   console.error("API 응답 에러:", error.response?.status, error.response?.data);
     
-    if (error.response?.status === 401) {
-      console.error("401 Unauthorized - 토큰이 유효하지 않습니다.");
+  //   if (error.response?.status === 401) {
+  //     console.error("401 Unauthorized - 토큰이 유효하지 않습니다.");
       
-      // 자동 로그아웃 처리
-      const { logout } = useAuthStore.getState();
-      await logout();
+  //     // 자동 로그아웃 처리
+  //     const { logout } = useAuthStore.getState();
+  //     await logout();
       
-      // 로그인 페이지로 리다이렉트
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
+  //     // 로그인 페이지로 리다이렉트
+  //     window.location.href = '/login';
+  //   }
+  //   return Promise.reject(error);
+  // }
 );
 
 export default instance;
