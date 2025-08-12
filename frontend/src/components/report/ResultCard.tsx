@@ -1,8 +1,8 @@
 import React from 'react';
 import { ImageOff, Clock } from 'lucide-react';
-import type { ResultCardProps } from '@/types/result';
+import type { ReportCardProps } from '@/types/interviewReport';
 
-const ResultCard: React.FC<ResultCardProps> = ({
+const ResultCard: React.FC<ReportCardProps> = ({
   result,
   reportId,
   onResultClick

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ResultCard from './ResultCard';
-import type { CarouselNavigationProps } from '@/types/result';
+import type { CarouselNavigationProps } from '@/types/interviewReport';
 
 const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
   reportId,

@@ -7,9 +7,8 @@ import {
   SPEED_RANGES,
   SPEED_CHART_CONFIG,
   getSpeedRange,
-  type QualityScaleType,
-  type SpeedType,
 } from '@/lib/constants';
+import type { QualityScaleType, SpeedType } from '@/types/interviewReport';
 import chatGpt from '@/assets/images/chat-gpt.png';
 
 
@@ -21,7 +20,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-import type { VerbalResultProps } from '@/types/result';
+import type { VerbalResultProps } from '@/types/interviewReport';
 
 
 

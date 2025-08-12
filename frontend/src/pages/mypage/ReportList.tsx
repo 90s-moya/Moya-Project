@@ -2,15 +2,15 @@ import React from 'react';
 import MypageLayout from '@/layouts/MypageLayout';
 import { useNavigate } from 'react-router-dom';
 import { formatDate } from '@/util/date';
-import EmptyState from '@/components/mypage/result/EmptyState';
-import CarouselNavigation from '@/components/mypage/result/CarouselNavigation';
-import EditableTitle from '../../components/mypage/result/EditableTitle';
+import EmptyState from '@/components/report/EmptyState';
+import CarouselNavigation from '@/components/report/CarouselNavigation';
+import EditableTitle from '@/components/report/EditableTitle';
 import { getReportList } from '@/api/interviewApi';
-import type { ReportItem, ReportResultItem } from '@/types/result';
+import type { ReportList, ReportItem } from '@/types/interviewReport';
 
-const Result: React.FC = () => {
+const ReportList: React.FC = () => {
   const navigate = useNavigate();
-  const [reportList, setReportList] = React.useState<ReportItem[]>([]);
+  const [reportList, setReportList] = React.useState<ReportList[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -21,7 +21,7 @@ const Result: React.FC = () => {
         setLoading(true);
         setError(null);
         const data = await getReportList();
-        setReportList(data as ReportItem[]);
+        setReportList(data as ReportList[]);
       } catch (err) {
         console.error('리포트 목록 조회 실패:', err);
         setError('리포트 목록을 불러오는데 실패했습니다.');
@@ -36,7 +36,7 @@ const Result: React.FC = () => {
   // 제목 수정 핸들러
   const handleTitleChange = (reportId: string, newTitle: string) => {
     setReportList((prev) =>
-      prev.map((report: ReportItem) =>
+      prev.map((report: ReportList) =>
         report.report_id === reportId ? { ...report, title: newTitle } : report
       )
     );
@@ -71,7 +71,7 @@ const Result: React.FC = () => {
       ) : (
         /* 결과가 있을 때 */
         <div className="flex flex-col gap-12 w-full">
-          {reportList.map((report: ReportItem) => (
+          {reportList.map((report: ReportList) => (
             <div key={report.report_id} className="w-full my-6">
               {/* 리포트 헤더 */}
               <div className="flex items-center justify-between mb-2">
@@ -95,7 +95,7 @@ const Result: React.FC = () => {
                 reportId={report.report_id}
                 results={report.results}
                 onResultClick={(reportId, resultId) => {
-                  const result = report.results.find((r: ReportResultItem) => r.result_id === resultId);
+                  const result = report.results.find((r: ReportItem) => r.result_id === resultId);
                   handleResultClick(reportId, resultId, result?.question || '', report.title, result?.order || 0, result?.suborder || 0);
                 }}
               />
@@ -107,4 +107,4 @@ const Result: React.FC = () => {
   );
 };
 
-export default Result;
+export default ReportList;

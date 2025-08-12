@@ -7,15 +7,15 @@ export const getReportList = async () => {
   return res.data;
 };
 
-// 리포트 상세 조회
-export const getReportDetail = async (reportId: string) => {
-  const res = await api.get(`/v1/me/report/${reportId}`);
-  return res.data;
-};
-
 // 리포트 제목 수정
 export const updateReportTitle = async (reportId: string, title: string) => {
   const res = await api.patch(`/v1/me/report/${reportId}`, { title });
+  return res.data;
+};
+
+// 면접 결과 상세 조회
+export const getInterviewResultDetail = async (resultId: string) => {
+  const res = await api.get(`/v1/me/report/?resultId=${resultId}`);
   return res.data;
 };
 

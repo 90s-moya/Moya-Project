@@ -1,3 +1,5 @@
+import type { QualityScaleType, SpeedType, PostureStatusType, FaceStatusType, Rgb, ColorStop } from '../types/interviewReport';
+
 // 공통 등급 스케일 (답변 완성도 / 불용어 사용 공용)
 export const QUALITY_SCALE_MAP = {
   OUTSTANDING: '우수',
@@ -5,14 +7,9 @@ export const QUALITY_SCALE_MAP = {
   INADEQUATE: '미흡',
 } as const;
 
-export type QualityScaleType = keyof typeof QUALITY_SCALE_MAP;
-
 export const getQualityText = (type: QualityScaleType): string => {
   return QUALITY_SCALE_MAP[type] || String(type);
 };
-
-// SpeedType 정의 (SPEED_RANGES에서 추출)
-export type SpeedType = typeof SPEED_RANGES[number]['speedType'];
 
 // SPEED_RANGES를 기반으로 한 getSpeedText 함수
 export const getSpeedText = (type: SpeedType): string => {
@@ -59,7 +56,7 @@ export const SPEED_RANGES = [
     end: 4.0, 
     label: '조금 느림', 
     color: '#FEF3C7', // amber-100
-    speedType: 'SLIGHTLY_SLOW' as const
+    speedType: 'SLIGHTLY SLOW' as const
   },
   { 
     start: 4.0, 
@@ -73,7 +70,7 @@ export const SPEED_RANGES = [
     end: 5.2, 
     label: '조금 빠름', 
     color: '#DBEAFE', // blue-100
-    speedType: 'SLIGHTLY_FAST' as const
+    speedType: 'SLIGHTLY FAST' as const
   },
   { 
     start: 5.2, 
@@ -115,7 +112,7 @@ export const POSTURE_STATUS_MAP = {
   'Hands Above Shoulders': '불필요한 손동작',
 } as const;
 
-export type PostureStatusType = keyof typeof POSTURE_STATUS_MAP;
+
 
 export const getPostureStatusText = (status: PostureStatusType): string => {
   return POSTURE_STATUS_MAP[status] || String(status);
@@ -138,8 +135,6 @@ export const FACE_STATUS_MAP = {
   'fear': '두려움',
 } as const;
 
-export type FaceStatusType = keyof typeof FACE_STATUS_MAP;
-
 export const getFaceStatusText = (status: FaceStatusType): string => {
   return FACE_STATUS_MAP[status] || String(status);
 };
@@ -153,10 +148,6 @@ export const FACE_COLOR_MAP = {
 export const getFaceColor = (status: string): string => {
   return FACE_COLOR_MAP[status as FaceStatusType] || '#9CA3AF'; // gray-400 as default
 };
-
-// 히트맵 색상 팔레트 타입 정의
-export type Rgb = { r: number; g: number; b: number };
-export type ColorStop = { value: number; color: Rgb };
 
 // 시선 집중도 히트맵 기본 색상 팔레트
 export const DEFAULT_THERMAL_STOPS: ColorStop[] = [
@@ -175,4 +166,20 @@ export const buildGradientCss = (stops: ColorStop[]): string => {
   const parts = stops.map((s) => `rgb(${s.color.r}, ${s.color.g}, ${s.color.b}) ${Math.round(s.value * 100)}%`);
   return `linear-gradient(90deg, ${parts.join(', ')})`;
 };
+
+// 질문 순서 포맷 함수
+export const formatQuestionOrder = (order: number, suborder: number): string => {
+  if (suborder === 0) {
+    return `${order}번 질문`;
+  }
+  return `${order}-${suborder} 꼬리질문`;
+};
+
+// ResultDetail 페이지 탭 목록 상수
+export const RESULT_DETAIL_TABS = [
+  { id: 'verbal' as const, label: '답변 분석' },
+  { id: 'face' as const, label: '표정 분석' },
+  { id: 'posture' as const, label: '자세 분석' },
+  { id: 'eye' as const, label: '시선 분석' }
+] as const;
 

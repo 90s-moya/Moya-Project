@@ -12,9 +12,10 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { getFaceStatusText, getFaceColor, type FaceStatusType } from '@/lib/constants';
+import { getFaceStatusText, getFaceColor } from '@/lib/constants';
+import type { FaceStatusType } from '@/types/interviewReport';
 
-import type { FaceAnalysisProps } from '@/types/result';
+import type { FaceAnalysisProps } from '@/types/interviewReport';
 
 const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange }) => {
   // 프레임을 시간으로 변환 (30fps)

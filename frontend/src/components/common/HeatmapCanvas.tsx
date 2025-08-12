@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { DEFAULT_THERMAL_STOPS, type Rgb, type ColorStop } from '@/lib/constants';
+import { DEFAULT_THERMAL_STOPS } from '@/lib/constants';
+import type { Rgb, ColorStop } from '@/types/interviewReport';
 
 type HeatmapCanvasProps = {
   data: number[][];

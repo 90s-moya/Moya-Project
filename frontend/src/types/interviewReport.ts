@@ -1,7 +1,7 @@
-// Result 관련 모든 타입 정의
+// Interview Report 관련 모든 타입 정의
 
 // 기본 결과 항목 인터페이스
-export interface ReportResultItem {
+export interface ReportItem {
   result_id: string;
   created_at: string;
   status: string;
@@ -11,16 +11,16 @@ export interface ReportResultItem {
   thumbnail_url: string;
 }
 
-// 리포트 인터페이스
-export interface ReportItem {
+// 리포트 목록 인터페이스
+export interface ReportList {
   report_id: string;
   title: string;
-  results: ReportResultItem[];
+  results: ReportItem[];
 }
 
-// ResultCard 컴포넌트 Props
-export interface ResultCardProps {
-  result: ReportResultItem;
+// ReportCard 컴포넌트 Props
+export interface ReportCardProps {
+  result: ReportItem;
   reportId: string;
   onResultClick: (reportId: string, resultId: string) => void;
 }
@@ -28,7 +28,7 @@ export interface ResultCardProps {
 // CarouselNavigation 컴포넌트 Props
 export interface CarouselNavigationProps {
   reportId: string;
-  results: ReportResultItem[];
+  results: ReportItem[];
   onResultClick: (reportId: string, resultId: string) => void;
 }
 
@@ -40,6 +40,15 @@ export interface EditableTitleProps {
 }
 
 // 분석 결과 관련 인터페이스들
+
+// 분석 결과 상세조회 응답 데이터 타입
+export interface InterviewReportDetailResponse {
+  video_url?: string;
+  verbal_result?: VerbalResult;
+  face_result?: FaceResult;
+  posture_result?: PostureResult;
+}
+
 
 // 언어 분석 결과
 export interface VerbalResult {
@@ -110,3 +119,13 @@ export interface TabDefinition {
   id: TabType;
   label: string;
 }
+
+// Constants 관련 타입들
+export type QualityScaleType = 'OUTSTANDING' | 'NORMAL' | 'INADEQUATE';
+export type SpeedType = 'SLOW' | 'SLIGHTLY SLOW' | 'NORMAL' | 'SLIGHTLY FAST' | 'FAST';
+export type PostureStatusType = 'Good Posture' | 'Shoulders Uneven' | 'Hands Above Shoulders';
+export type FaceStatusType = 'sad' | 'fear';
+
+// 히트맵 색상 관련 타입
+export type Rgb = { r: number; g: number; b: number };
+export type ColorStop = { value: number; color: Rgb };

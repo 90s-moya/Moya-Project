@@ -12,9 +12,10 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { getPostureStatusText, getPostureColor, type PostureStatusType } from '@/lib/constants';
+import { getPostureStatusText, getPostureColor } from '@/lib/constants';
+import type { PostureStatusType } from '@/types/interviewReport';
 
-import type { PostureResultProps } from '@/types/result';
+import type { PostureResultProps } from '@/types/interviewReport';
 
 const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrameChange }) => {
   // 프레임을 시간으로 변환 (30fps)

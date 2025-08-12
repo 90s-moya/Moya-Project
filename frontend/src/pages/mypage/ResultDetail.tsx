@@ -1,11 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Header from '@/components/common/Header';
-import VerbalAnalysis from '@/components/mypage/result/detail/VerbalAnalysis';
-import FaceAnalysis from '@/components/mypage/result/detail/FaceAnalysis';
-import PostureAnalysis from '@/components/mypage/result/detail/PostureAnalysis';
-import GazeAnalysis from '@/components/mypage/result/detail/GazeAnalysis';
-import type { TabType, TabDefinition, ResultDetailState } from '@/types/result';
+import VerbalAnalysis from '@/components/report/result-detail/VerbalAnalysis';
+import FaceAnalysis from '@/components/report/result-detail/FaceAnalysis';
+import PostureAnalysis from '@/components/report/result-detail/PostureAnalysis';
+import GazeAnalysis from '@/components/report/result-detail/GazeAnalysis';
+import { getInterviewResultDetail } from '@/api/interviewApi';
+import type { TabType, ResultDetailState, InterviewReportDetailResponse } from '@/types/interviewReport';
+import { formatQuestionOrder, RESULT_DETAIL_TABS } from '@/lib/constants';
 
 const ResultDetail: React.FC = () => {
   const { reportId, resultId } = useParams<{ reportId: string; resultId: string }>();
@@ -13,17 +15,16 @@ const ResultDetail: React.FC = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<TabType>('verbal');
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // API 연동 상태
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reportData, setReportData] = useState<InterviewReportDetailResponse | null>(null);
 
   // state로 전달된 데이터들
   const { question, title, order, suborder } = (location.state as ResultDetailState) || {};
 
-  // 탭 목록
-  const tabs: TabDefinition[] = [
-    { id: 'verbal', label: '답변 분석' },
-    { id: 'face', label: '표정 분석' },
-    { id: 'posture', label: '자세 분석' },
-    { id: 'eye', label: '시선 분석' }
-  ];
+
 
   // 비디오 시간 조정 핸들러
   const handleFrameChange = (frame: number) => {
@@ -33,27 +34,76 @@ const ResultDetail: React.FC = () => {
     }
   };
 
-  // 순서 표시 포맷 함수
-  const formatOrder = (order: number, suborder: number) => {
-    if (suborder === 0) {
-      return `${order}번 질문`;
-    }
-    return `${order}-${suborder} 꼬리질문`;
-  };
+  // API 데이터 로드
+  useEffect(() => {
+    const fetchResultDetail = async () => {
+      if (!resultId) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getInterviewResultDetail(resultId);
+        setReportData(data);
+      } catch (err) {
+        console.error('결과 상세 조회 실패:', err);
+        setError('결과를 불러오는데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // 현재 활성 탭에 따른 컴포넌트 렌더링
+    fetchResultDetail();
+  }, [resultId]);
+
+
+
+  // 현재 활성 탭에 따른 컴포넌트 렌더링 (API 데이터 우선, fallback으로 mock 데이터 사용)
   const renderActiveComponent = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-500">분석 결과를 불러오고 있습니다...</div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-red-500">{error}</div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'verbal':
-        return <VerbalAnalysis verbal_result={mockDetailData.verbal_result} />;
+        return (
+          <VerbalAnalysis 
+            verbal_result={reportData?.verbal_result || mockDetailData.verbal_result} 
+          />
+        );
       case 'face':
-        return <FaceAnalysis face_result={mockDetailData.face_result} onFrameChange={handleFrameChange} />;
+        return (
+          <FaceAnalysis 
+            face_result={reportData?.face_result || mockDetailData.face_result} 
+            onFrameChange={handleFrameChange} 
+          />
+        );
       case 'posture':
-        return <PostureAnalysis posture_result={mockDetailData.posture_result} onFrameChange={handleFrameChange} />;
+        return (
+          <PostureAnalysis 
+            posture_result={reportData?.posture_result || mockDetailData.posture_result} 
+            onFrameChange={handleFrameChange} 
+          />
+        );
       case 'eye':
         return <GazeAnalysis />;
       default:
-        return <VerbalAnalysis verbal_result={mockDetailData.verbal_result} />;
+        return (
+          <VerbalAnalysis 
+            verbal_result={reportData?.verbal_result || mockDetailData.verbal_result} 
+          />
+        );
     }
   };
 
@@ -99,7 +149,7 @@ const ResultDetail: React.FC = () => {
               <div className="w-full max-w-lg aspect-[16/9] rounded-lg flex items-center justify-center overflow-hidden">
                 <video
                   ref={videoRef}
-                  src={mockDetailData.video_url}
+                  src={reportData?.video_url || mockDetailData.video_url}
                   controls
                   className="w-full h-full object-contain rounded-lg"
                 >
@@ -113,7 +163,7 @@ const ResultDetail: React.FC = () => {
               <div className="flex items-center gap-2 mb-3">
                 {order !== undefined && (
                   <div className="px-2 py-1 text-xs md:text-sm text-[#2B7FFF] font-medium bg-blue-50 border border-blue-200 rounded-md">
-                    {formatOrder(order, suborder || 0)}
+                    {formatQuestionOrder(order, suborder || 0)}
                   </div>
                 )}
               </div>
@@ -127,7 +177,7 @@ const ResultDetail: React.FC = () => {
           <div className="lg:flex-1 relative h-full">
             {/* 탭 네비게이션 */}
             <div className="flex border-b border-[#dedee4] mb-4">
-              {tabs.map((tab) => (
+              {RESULT_DETAIL_TABS.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
