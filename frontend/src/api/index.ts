@@ -127,9 +127,13 @@ instance.interceptors.response.use(
     
     if (error.response?.status === 401) {
       console.error("401 Unauthorized - 토큰이 유효하지 않습니다.");
-      // 필요시 자동 로그아웃 처리
-      // const { logout } = useAuthStore.getState();
-      // logout();
+      
+      // 자동 로그아웃 처리
+      const { logout } = useAuthStore.getState();
+      await logout();
+      
+      // 로그인 페이지로 리다이렉트
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
