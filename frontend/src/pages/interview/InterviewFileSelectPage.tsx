@@ -104,26 +104,28 @@ export default function InterviewFileSelectPage() {
       setLoading(true);
 
       // 토큰 만료 로그(옵션)
-      try {
-        const auth = localStorage.getItem("auth-storage");
-        const token = auth ? JSON.parse(auth).state.token : "";
-        const expired = (() => {
-          try {
-            const [, p] = token.split(".");
-            const { exp } = JSON.parse(atob(p));
-            return Date.now() >= exp * 1000;
-          } catch {
-            return true;
-          }
-        })();
-        console.log("[/v1/pdf] token expired?", expired);
-      } catch (e) {
-        console.log("[/v1/pdf] token parse error", e);
-      }
+      // try {
+      //   const auth = localStorage.getItem("auth-storage");
+      //   const token = auth ? JSON.parse(auth).state.token : "";
+      //   const expired = (() => {
+      //     try {
+      //       const [, p] = token.split(".");
+      //       const { exp } = JSON.parse(atob(p));
+      //       return Date.now() >= exp * 1000;
+      //     } catch {
+      //       return true;
+      //     }
+      //   })();
+      //   console.log("[/v1/pdf] token expired?", expired);
+      // } catch (e) {
+      //   console.log("[/v1/pdf] token parse error", e);
+      // }
 
       const extracted = await extractTextFromPdf(payload);
       console.log("extracted result:", extracted);
 
+      //if(extracted) localStorage.setItem("interviewSessionId", extracted.data.id);
+    
       navigate("/interview/modelist", {
         state: {
           ...payload,    // 원본 URL들
