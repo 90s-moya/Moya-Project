@@ -3,6 +3,7 @@
 import uuid
 from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.mysql import JSON as MySQLJSON
 from datetime import datetime
 
 from app.database import Base  # declarative_base()
@@ -29,7 +30,10 @@ class QuestionAnswerPair(Base):
     order = Column(Integer, nullable=False)
     sub_order = Column(Integer, nullable=False)
     question = Column(Text, nullable=False)
+    video_url = Column(Text, nullable=True)
 
+    posture_result = Column(MySQLJSON, nullable=True)
+    face_result = Column(MySQLJSON, nullable=True) 
     answer = Column(Text, nullable=True)
     stopwords = Column(Text, nullable=True)
     is_ended = Column(Boolean, nullable=True)
