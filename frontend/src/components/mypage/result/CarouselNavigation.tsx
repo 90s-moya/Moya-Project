@@ -1,22 +1,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ResultCard from './ResultCard';
-
-interface Result {
-  result_id: string;
-  created_at: string;
-  status: string;
-  order: number;
-  suborder: number;
-  question: string;
-  thumbnail_url: string;
-}
-
-interface CarouselNavigationProps {
-  reportId: string;
-  results: Result[];
-  onResultClick: (reportId: string, resultId: string) => void;
-}
+import type { CarouselNavigationProps } from '@/types/result';
 
 const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
   reportId,
@@ -111,7 +96,7 @@ const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
       <div className="relative overflow-x-hidden overflow-y-visible rounded-lg">
         {/* 페이드 그라데이션 효과 */}
         <div className="absolute left-0 top-0 w-8 h-full z-5 pointer-events-none opacity-50"></div>
-        <div className="absolute right-0 top-0 w-8 h-full bg-gradient-to-l from-white to-transparent z-5 pointer-events-none opacity-50"></div>
+        <div className="absolute right-0 top-0 w-16 h-full bg-gradient-to-l from-white via-white/80 to-transparent z-5 pointer-events-none"></div>
         {/* 이전 버튼 */}
         {canGoPrev && (
           <button

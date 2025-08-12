@@ -1,19 +1,6 @@
 import React from 'react';
 import { ImageOff, Clock } from 'lucide-react';
-
-interface ResultCardProps {
-  result: {
-    result_id: string;
-    created_at: string;
-    status: string;
-    order: number;
-    suborder: number;
-    question: string;
-    thumbnail_url: string;
-  };
-  reportId: string;
-  onResultClick: (reportId: string, resultId: string) => void;
-}
+import type { ResultCardProps } from '@/types/result';
 
 const ResultCard: React.FC<ResultCardProps> = ({
   result,
@@ -40,7 +27,7 @@ const ResultCard: React.FC<ResultCardProps> = ({
 
   return (
     <div
-      className={`relative bg-[#fafafc] border border-[#dedee4] rounded-lg overflow-hidden transition-all w-[240px] min-h-60 ${
+      className={`relative bg-[#fafafc] border border-[#dedee4] rounded-lg overflow-hidden transition-all w-[240px] min-h-68 ${
         result.status === 'IN_PROGRESS' 
           ? 'opacity-40' 
           : 'cursor-pointer hover:z-50 hover:shadow-lg hover:-translate-y-1'
@@ -83,7 +70,7 @@ const ResultCard: React.FC<ResultCardProps> = ({
             <div className="text-sm text-[#2B7FFF] font-medium mb-2">
               {formatOrder(result.order, result.suborder)}
             </div>
-            <p className="text-sm text-[#1b1c1f] leading-relaxed line-clamp-2">
+            <p className="text-sm text-[#1b1c1f] leading-relaxed line-clamp-3">
               Q. {result.question}
             </p>
           </div>

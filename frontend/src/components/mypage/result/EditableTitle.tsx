@@ -1,11 +1,6 @@
 import React, { useState } from 'react';
 import { Edit2, Check, X } from 'lucide-react';
-
-interface EditableTitleProps {
-  reportId: string;
-  title: string;
-  onTitleChange: (reportId: string, newTitle: string) => void;
-}
+import type { EditableTitleProps } from '@/types/result';
 
 const EditableTitle: React.FC<EditableTitleProps> = ({ reportId, title, onTitleChange }) => {
   const [isEditing, setIsEditing] = useState(false);

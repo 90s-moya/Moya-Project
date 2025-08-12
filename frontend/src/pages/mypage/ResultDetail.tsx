@@ -5,24 +5,25 @@ import VerbalAnalysis from '@/components/mypage/result/detail/VerbalAnalysis';
 import FaceAnalysis from '@/components/mypage/result/detail/FaceAnalysis';
 import PostureAnalysis from '@/components/mypage/result/detail/PostureAnalysis';
 import GazeAnalysis from '@/components/mypage/result/detail/GazeAnalysis';
+import type { TabType, TabDefinition, ResultDetailState } from '@/types/result';
 
 const ResultDetail: React.FC = () => {
   const { reportId, resultId } = useParams<{ reportId: string; resultId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'verbal' | 'face' | 'posture' | 'eye'>('verbal');
+  const [activeTab, setActiveTab] = useState<TabType>('verbal');
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // state로 전달된 question
-  const { question } = (location.state as { question?: string }) || {};
+  // state로 전달된 데이터들
+  const { question, title, order, suborder } = (location.state as ResultDetailState) || {};
 
   // 탭 목록
-  const tabs = [
+  const tabs: TabDefinition[] = [
     { id: 'verbal', label: '답변 분석' },
     { id: 'face', label: '표정 분석' },
     { id: 'posture', label: '자세 분석' },
     { id: 'eye', label: '시선 분석' }
-  ] as const;
+  ];
 
   // 비디오 시간 조정 핸들러
   const handleFrameChange = (frame: number) => {
@@ -30,6 +31,14 @@ const ResultDetail: React.FC = () => {
       const timeInSeconds = frame / 30; // 30fps 가정
       videoRef.current.currentTime = timeInSeconds;
     }
+  };
+
+  // 순서 표시 포맷 함수
+  const formatOrder = (order: number, suborder: number) => {
+    if (suborder === 0) {
+      return `${order}번 질문`;
+    }
+    return `${order}-${suborder} 꼬리질문`;
   };
 
   // 현재 활성 탭에 따른 컴포넌트 렌더링
@@ -73,17 +82,20 @@ const ResultDetail: React.FC = () => {
 
         {/* 본문: 좌측 질문+비디오, 우측 분석 결과 */}
         <div className="flex flex-col lg:flex-row flex-1 gap-8 max-w-6xl mx-auto w-full h-full px-6">
-          {/* 좌측: 질문 + 비디오 */}
+          {/* 좌측: 제목 + 비디오 + 질문 */}
           <div className="lg:flex-1 flex flex-col gap-6">
-            {/* 질문 */}
+            {/* 제목 섹션 */}
             <div>
-              <h2 className="md:text-2xl text-lg font-bold text-[#1b1c1f]">
-                Q. {question || '질문 정보가 없습니다.'}
+              <h2 className="md:text-2xl text-lg font-bold text-[#1b1c1f] mb-2">
+                AI 면접 리포트
               </h2>
+              <h3 className="md:text-base text-base text-gray-600">
+                {title || '제목 정보가 없습니다.'}
+              </h3>
             </div>
 
             {/* 비디오 */}
-            <div className="flex flex-col items-center justify-start">
+            <div className="flex flex-col items-center justify-start mb-4">
               <div className="w-full max-w-lg aspect-[16/9] rounded-lg flex items-center justify-center overflow-hidden">
                 <video
                   ref={videoRef}
@@ -94,6 +106,20 @@ const ResultDetail: React.FC = () => {
                   브라우저가 video 태그를 지원하지 않습니다.
                 </video>
               </div>
+            </div>
+
+            {/* 질문 */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                {order !== undefined && (
+                  <div className="px-2 py-1 text-xs md:text-sm text-[#2B7FFF] font-medium bg-blue-50 border border-blue-200 rounded-md">
+                    {formatOrder(order, suborder || 0)}
+                  </div>
+                )}
+              </div>
+              <p className="text-base text-[#1b1c1f] leading-relaxed">
+                Q. {question || '질문 정보가 없습니다.'}
+              </p>
             </div>
           </div>
 
@@ -108,7 +134,7 @@ const ResultDetail: React.FC = () => {
                   className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                     activeTab === tab.id
                       ? 'text-[#2B7FFF] border-b-2 border-[#2B7FFF]'
-                      : 'text-gray-500 hover:text-gray-700'
+                      : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
                   }`}
                 >
                   {tab.label}

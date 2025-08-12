@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, TrendingUp, BarChart3 } from 'lucide-react';
+import { Clock, UserRoundSearch, BarChart3 } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -14,21 +14,7 @@ import {
 } from 'recharts';
 import { getPostureStatusText, getPostureColor, type PostureStatusType } from '@/lib/constants';
 
-export interface PostureResultProps {
-  posture_result: {
-    timestamp: string;
-    total_frames: number;
-    frame_distribution: {
-      [key: number]: number;
-    };
-    detailed_logs: Array<{
-      label: string;
-      start_frame: number;
-      end_frame: number;
-    }>;
-  };
-  onFrameChange?: (frame: number) => void;
-}
+import type { PostureResultProps } from '@/types/result';
 
 const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrameChange }) => {
   // 프레임을 시간으로 변환 (30fps)
@@ -51,7 +37,7 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
       'Hands Above Shoulders': 1
     };
 
-    const data: any[] = [];
+    const data: { frame: number; posture: number }[] = [];
     const interval = 30; // 1초 단위 (30fps)
 
     for (let frame = firstStart; frame <= lastEnd; frame += interval) {
@@ -203,7 +189,7 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
         {/* 피드백 */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={18} className="text-[#2B7FFF]" />
+            <UserRoundSearch size={18} className="text-[#2B7FFF]" />
             <h4 className="text-sm font-semibold text-[#2B7FFF]">자세 피드백</h4>
           </div>
           {(() => {
@@ -216,17 +202,17 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
             if (goodPosturePercentage >= 70) {
               return (
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 shadow-sm">
-                  <p className="font-medium text-green-700 mb-2">좋은 자세를 잘 유지했어요! 👍</p>
-                  <p className="mt-1 text-gray-600">거의 모든 시간 동안 바른 자세를 유지하고 있어요.</p>
+                  <p className="text-sm font-medium text-green-700 mb-2">좋은 자세를 잘 유지했어요! 👍</p>
+                  <p className="mt-1 text-xs text-gray-600">거의 모든 시간 동안 바른 자세를 유지하고 있어요.</p>
                 </div>
               );
             } else {
               return (
                 <div className="bg-gradient-to-r from-red-50 to-rose-50 p-4 rounded-lg border border-red-200 shadow-sm">
-                  <p className="font-medium text-red-700 mb-2">자세 개선이 필요해요</p>
-                  <p>• 어깨를 균등하게 유지하고 한쪽으로 기울이지 않도록 주의하세요.</p>
-                  <p>• 답변을 할 때 나도 모르게 손을 올려 제스처를 하지 않는지 되짚어보세요.</p>
-                  <p>• 등을 곧게 펴고 시선은 정면을 향하도록 유지하세요.</p>
+                  <p className="text-sm font-medium text-red-700 mb-2">자세 개선이 필요해요</p>
+                  <p className="text-xs text-gray-600">• 어깨를 균등하게 유지하고 한쪽으로 기울이지 않도록 주의하세요.</p>
+                  <p className="text-xs text-gray-600">• 답변을 할 때 나도 모르게 손을 올려 제스처를 하지 않는지 되짚어보세요.</p>
+                  <p className="text-xs text-gray-600">• 등을 곧게 펴고 시선은 정면을 향하도록 유지하세요.</p>
                 </div>
               );
             }

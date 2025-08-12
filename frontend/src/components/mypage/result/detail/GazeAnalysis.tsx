@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye } from 'lucide-react';
 import testData from '@/test.json';
 import { DEFAULT_THERMAL_STOPS, buildGradientCss } from '@/lib/constants';

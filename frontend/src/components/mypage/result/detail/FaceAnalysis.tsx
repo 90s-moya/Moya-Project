@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, TrendingUp, BarChart3 } from 'lucide-react';
+import { Clock, UserRoundSearch, BarChart3 } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -14,19 +14,7 @@ import {
 } from 'recharts';
 import { getFaceStatusText, getFaceColor, type FaceStatusType } from '@/lib/constants';
 
-interface FaceAnalysisProps {
-  face_result: {
-    timestamp: string;
-    total_frames: number;
-    frame_distribution: Record<string, number>;
-    detailed_logs: Array<{
-      label: string;
-      start_frame: number;
-      end_frame: number;
-    }>;
-  };
-  onFrameChange?: (frame: number) => void;
-}
+import type { FaceAnalysisProps } from '@/types/result';
 
 const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange }) => {
   // 프레임을 시간으로 변환 (30fps)
@@ -48,7 +36,7 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
       'fear': 1
     };
 
-    const data: any[] = [];
+    const data: { frame: number; emotion: number }[] = [];
     const interval = 30; // 1초 단위 (30fps)
 
     for (let frame = firstStart; frame <= lastEnd; frame += interval) {
@@ -198,7 +186,7 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
         {/* 감정 피드백 */}
         <div>
           <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={18} className="text-[#2B7FFF]" />
+            <UserRoundSearch size={18} className="text-[#2B7FFF]" />
             <h4 className="text-sm font-semibold text-[#2B7FFF]">감정 피드백</h4>
           </div>
           {(() => {
@@ -211,22 +199,22 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
             if (fearPercentage >= 70) {
               return (
                 <div className="bg-gradient-to-r from-red-50 to-rose-50 p-4 rounded-lg border border-red-200 shadow-sm">
-                  <p className="font-medium text-red-700 mb-2">긴장감이 많이 보여요 😰</p>
-                  <p className="mt-1 text-gray-600">면접 중에 두려움이 많이 드러나고 있어요. 긴장을 풀고 자신감을 가져보세요.</p>
+                  <p className="text-sm font-medium text-red-700 mb-2">긴장감이 많이 보여요 😰</p>
+                  <p className="mt-1 text-xs text-gray-600">면접 중에 두려움이 많이 드러나고 있어요. 긴장을 풀고 자신감을 가져보세요.</p>
                 </div>
               );
             } else if (fearPercentage >= 30) {
               return (
                 <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200 shadow-sm">
-                  <p className="font-medium text-yellow-700 mb-2">적당한 긴장감이 있어요 😊</p>
-                  <p className="mt-1 text-gray-600">면접에 대한 긴장감이 적절히 나타나고 있어요. 자연스러운 모습입니다.</p>
+                  <p className="text-sm font-medium text-yellow-700 mb-2">적당한 긴장감이 있어요 😊</p>
+                  <p className="mt-1 text-xs text-gray-600">면접에 대한 긴장감이 적절히 나타나고 있어요. 자연스러운 모습입니다.</p>
                 </div>
               );
             } else {
               return (
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 shadow-sm">
-                  <p className="font-medium text-green-700 mb-2">자연스러운 표정을 잘 유지했어요! 😌</p>
-                  <p className="mt-1 text-gray-600">긴장감 없이 편안하고 자연스러운 표정을 보여주고 있어요.</p>
+                  <p className="text-sm font-medium text-green-700 mb-2">자연스러운 표정을 잘 유지했어요! 😌</p>
+                  <p className="mt-1 text-xs text-gray-600">긴장감 없이 편안하고 자연스러운 표정을 보여주고 있어요.</p>
                 </div>
               );
             }

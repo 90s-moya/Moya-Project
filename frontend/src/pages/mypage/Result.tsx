@@ -6,23 +6,7 @@ import EmptyState from '@/components/mypage/result/EmptyState';
 import CarouselNavigation from '@/components/mypage/result/CarouselNavigation';
 import EditableTitle from '../../components/mypage/result/EditableTitle';
 import { getReportList } from '@/api/interviewApi';
-
-// Types
-interface ReportResultItem {
-  result_id: string;
-  created_at: string;
-  status: string;
-  order: number;
-  suborder: number;
-  question: string;
-  thumbnail_url: string;
-}
-
-interface ReportItem {
-  report_id: string;
-  title: string;
-  results: ReportResultItem[];
-}
+import type { ReportItem, ReportResultItem } from '@/types/result';
 
 const Result: React.FC = () => {
   const navigate = useNavigate();
@@ -59,10 +43,10 @@ const Result: React.FC = () => {
   };
 
   // 결과 클릭 핸들러
-  const handleResultClick = (reportId: string, resultId: string, question: string) => {
+  const handleResultClick = (reportId: string, resultId: string, question: string, title: string, order: number, suborder: number) => {
     console.log('Navigate to result detail:', reportId, resultId);
     navigate(`/mypage/result/${reportId}/${resultId}`, {
-      state: { question }
+      state: { question, title, order, suborder }
     });
   };
 
@@ -70,7 +54,7 @@ const Result: React.FC = () => {
     <MypageLayout activeMenu="result">
       {/* 페이지 제목 */}
       <h2 className="text-2xl font-semibold text-[#2B7FFF] mb-8 leading-[1.4]">
-        AI 면접 결과
+        AI 면접 리포트
       </h2>
 
       {/* 로딩 중 */}
@@ -90,7 +74,7 @@ const Result: React.FC = () => {
           {reportList.map((report: ReportItem) => (
             <div key={report.report_id} className="w-full my-6">
               {/* 리포트 헤더 */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
                   <EditableTitle
                     reportId={report.report_id}
@@ -112,7 +96,7 @@ const Result: React.FC = () => {
                 results={report.results}
                 onResultClick={(reportId, resultId) => {
                   const result = report.results.find((r: ReportResultItem) => r.result_id === resultId);
-                  handleResultClick(reportId, resultId, result?.question || '');
+                  handleResultClick(reportId, resultId, result?.question || '', report.title, result?.order || 0, result?.suborder || 0);
                 }}
               />
             </div>

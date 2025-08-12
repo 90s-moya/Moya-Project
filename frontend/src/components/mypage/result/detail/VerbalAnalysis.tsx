@@ -21,20 +21,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-export interface VerbalResultProps {
-  verbal_result: {
-    answer: string;
-    stopwords: string;
-    is_ended: boolean;
-    reason_end: string;
-    context_matched: boolean;
-    reason_context: string;
-    gpt_comment: string;
-    end_type: string;
-    speech_label: string;
-    syll_art: number;
-  };
-}
+import type { VerbalResultProps } from '@/types/result';
 
 
 
@@ -178,6 +165,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
                          axisLine={false}
                          tickLine={false}
                          height={24}
+                         tick={{ fontSize: 12 }}
                        />
 
                        {/* 현재 값 마커 */}
@@ -187,9 +175,9 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
                  </div>
 
                  {/* 범례 */}
-                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                 <div className="mt-2 flex flex-wrap items-center gap-3">
                    {SPEED_RANGES.map((r) => (
-                     <div key={r.label} className="flex items-center gap-1 text-[10px] text-gray-600">
+                     <div key={r.label} className="flex items-center gap-1 mt-2 text-xs text-gray-600">
                        <span className="inline-block w-3 h-3 rounded-sm" style={{ background: r.color }} />
                        <span>{r.label}</span>
                      </div>
@@ -199,12 +187,14 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
             </div>
 
             {/* AI 코멘트 - 맨 밑 */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200 shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <img src={chatGpt} alt="AI" className="w-4 h-4" />
-                <span className="text-xs font-semibold text-blue-600">AI 종합 의견</span>
+            <div>
+              <div className="flex items-center gap-2 mb-4 mt-6">
+                <img src={chatGpt} alt="AI" className="w-[18px] h-[18px]" />
+                <h4 className="text-sm font-semibold text-[#2B7FFF]">AI 종합 의견</h4>
               </div>
-              <p className="text-sm text-[#1b1c1f] leading-relaxed">{verbal_result.gpt_comment}</p>
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200 shadow-sm">
+                <p className="text-sm text-[#1b1c1f] leading-relaxed">{verbal_result.gpt_comment}</p>
+              </div>
             </div>
           </div>
         </div>
