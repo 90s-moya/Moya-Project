@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import Header from "@/components/common/Header";
 import StudyBackToList from "@/components/study/StudyBackToList";
 import { useNavigate, useParams } from "react-router-dom";
@@ -8,6 +9,19 @@ import { deleteRoom, getRoomDetail, registerForRoom } from "@/api/studyApi";
 import type { StudyRoomDetail } from "@/types/study";
 import { useAuthStore } from "@/store/useAuthStore";
 import UserApi from "@/api/userApi";
+import dayjs from "dayjs";
+import {
+  FileText,
+  Users,
+  Calendar,
+  Tag,
+  User,
+  Clock,
+  AlertTriangle,
+  Trash2,
+  CheckCircle,
+  Info,
+} from "lucide-react";
 
 export default function StudyDetailPage() {
   const { roomId } = useParams();
@@ -15,7 +29,7 @@ export default function StudyDetailPage() {
   const [isMine, setIsMine] = useState(false);
 
   const navigate = useNavigate();
-  // 방 삭제 시 참고할 현재 사용자의 UUID
+  // 스터디 삭제 시 참고할 현재 사용자의 UUID
   const UUID = useAuthStore((state) => state.UUID);
 
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
@@ -35,7 +49,7 @@ export default function StudyDetailPage() {
     fetchUserInfo();
   }, []);
 
-  // 마운트 시 방 상세 조회 API 요청 보내기
+  // 마운트 시 스터디 상세 조회 API 요청 보내기
   useEffect(() => {
     // id가 undefined일 경우 return
     if (!roomId) {
@@ -45,18 +59,18 @@ export default function StudyDetailPage() {
     const requestRoomDetail = async (roomId: string) => {
       try {
         const data = await getRoomDetail(roomId);
-        // console.log("방 상세 조회 결과 : ", data);
+        // console.log("스터디 상세 조회 결과 : ", data);
 
         setRoomDetail(data);
       } catch (err) {
-        console.log("방 상세 조회 에러 발생 : ", err);
+        console.log("스터디 상세 조회 에러 발생 : ", err);
       }
     };
 
     requestRoomDetail(roomId);
   }, [roomId]);
 
-  // 방 상세 조회 시 이미 등록한 방인지 확인
+  // 스터디 상세 조회 시 이미 참여한 방인지 확인
   useEffect(() => {
     if (roomDetail?.joinUsers && userNickname) {
       const isRegistered = roomDetail.joinUsers.includes(userNickname);
@@ -64,7 +78,7 @@ export default function StudyDetailPage() {
     }
   }, [roomDetail, userNickname]);
 
-  // 방 삭제하는 함수
+  // 스터디 삭제하는 함수
   const handleDeleteRoom = async () => {
     if (!roomId) {
       return;
@@ -78,23 +92,23 @@ export default function StudyDetailPage() {
     try {
       const data = await deleteRoom(roomId);
 
-      console.log("방 삭제 완료!", data);
-      // 방 목록 페이지로 이동
+      console.log("스터디 삭제 완료!", data);
+      // 스터디 목록 페이지로 이동
       navigate(`/study`);
     } catch (err) {
-      console.error("방 삭제 에러 발생", err);
-      alert("방 삭제에 실패하였습니다.");
+      console.error("스터디 삭제 에러 발생", err);
+      alert("스터디 삭제에 실패하였습니다.");
     }
   };
 
-  // 방 상세 조회를 통해 받은 방장 ID와 현재 사용자의 ID가 같다면 삭제 버튼 활성화
+  // 스터디 상세 조회를 통해 받은 방장 ID와 현재 사용자의 ID가 같다면 삭제 버튼 활성화
   useEffect(() => {
     if (roomDetail?.masterInfo.masterId === UUID) {
       setIsMine(true);
     }
   }, [roomDetail, UUID]);
 
-  // 방 참여 등록 함수
+  // 스터디 참여 등록 함수
   const handleRegisterForRoom = async () => {
     try {
       if (!roomId) {
@@ -104,149 +118,250 @@ export default function StudyDetailPage() {
       }
 
       if (isAlreadyRegistered) {
-        alert("이미 등록한 방입니다.");
+        alert("이미 참여한 방입니다.");
         return;
       }
 
       const data = await registerForRoom(roomId);
-      console.log("방 참여 등록 성공:", data);
+      console.log("스터디 참여 등록 성공:", data);
 
       navigate(`/mypage/room`);
     } catch (error) {
-      console.error("방 등록 에러: ", error);
+      console.error("스터디 등록 에러: ", error);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#ffffff] text-[17px] leading-relaxed">
-      {/* 헤더 */}
-      <Header />
-      {/* 메인 */}
-      <main className="max-w-7xl mx-auto px-6 py-10 pt-[110px]">
-        {/* 이름 */}
-        <div className="flex items-center justify-between mb-10">
-          <div className="flex items-center space-x-3">
-            <h2 className="text-3xl font-bold text-[#1b1c1f]">
-              방 제목 : {roomDetail?.title}
-            </h2>
-          </div>
+    <div className="min-h-screen bg-white">
+      <Header scrollBg={false} />
+
+      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-[17px] leading-relaxed">
+        {/* Back to List */}
+        <StudyBackToList />
+
+        {/* Title Section */}
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">
+            스터디 상세보기
+          </h1>
+          <p className="text-[#4b4e57] text-lg">
+            스터디의 상세 정보를 확인하고 참여해보세요!
+          </p>
         </div>
 
-        {/* Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Left Column - Job Information */}
-          <div className="lg:col-span-2 space-y-10">
-            {/* Room Info */}
-            <div>
-              <h3 className="text-3xl font-semibold text-[#1b1c1f] mb-4">
-                방 정보
+        {/* 2단 레이아웃 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 좌측: 스터디 정보 */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* 스터디 제목 카드 */}
+            <Card className="p-8">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-[#1b1c1f]">
+                  {roomDetail?.title || "제목을 불러오는 중..."}
+                </h2>
+              </div>
+            </Card>
+
+            {/* 스터디 정보 카드 */}
+            <Card className="p-8">
+              <h3 className="text-xl font-bold text-[#1b1c1f] mb-6 flex items-center gap-2">
+                <Info className="w-5 h-5 text-[#2b7fff]" />
+                스터디 정보
               </h3>
-              <div className="space-y-4 text-lg text-[#1b1c1f]">
-                <div className="flex">
-                  <span className="w-24 text-[#6f727c] font-semibold">
-                    카테고리명
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Tag className="w-5 h-5 text-[#6f727c] flex-shrink-0" />
+                  <span className="text-[#6f727c] font-medium w-24 flex-shrink-0">
+                    카테고리
                   </span>
-                  <span className="text-xl">{roomDetail?.categoryName}</span>
+                  <span className="text-[#1b1c1f] font-semibold">
+                    {roomDetail?.categoryName}
+                  </span>
                 </div>
-                <div className="flex">
-                  <span className="w-28 text-[#6f727c] font-semibold">
-                    참여 중인 인원
+                <div className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-[#6f727c] flex-shrink-0" />
+                  <span className="text-[#6f727c] font-medium w-24 flex-shrink-0">
+                    참여 인원
                   </span>
-                  <span className="text-xl">
+                  <span className="text-[#1b1c1f] font-semibold">
                     {roomDetail?.joinUsers.length}명
                   </span>
                 </div>
-                <div className="flex items-start">
-                  <span className="w-24 text-[#6f727c] text-lg font-semibold">
-                    참여자 정보
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-[#6f727c] flex-shrink-0 mt-1" />
+                  <span className="text-[#6f727c] font-medium w-24 flex-shrink-0">
+                    생성일
                   </span>
-                  <div className="space-y-1 text-xl">
-                    {roomDetail?.joinUsers?.map((name, index) => {
-                      return <div key={index}>{name}</div>;
-                    })}
-                  </div>
-                </div>
-                <div className="flex">
-                  <span className="w-24 text-[#6f727c] text-lg font-semibold">
-                    생성 일시
-                  </span>
-                  <span className="text-xl">
+                  <span className="text-[#1b1c1f] font-semibold break-words">
                     {roomDetail?.openAt
                       ? formatDateTime(roomDetail.openAt)
                       : "일정 미정"}
                   </span>
                 </div>
-                <div className="flex">
-                  <span className="w-24 text-[#6f727c] text-lg font-semibold">
-                    마감 일시
+                <div className="flex items-start gap-3">
+                  <Clock className="w-5 h-5 text-[#6f727c] flex-shrink-0 mt-1" />
+                  <span className="text-[#6f727c] font-medium w-24 flex-shrink-0">
+                    마감일
                   </span>
-                  <span className="text-xl">
+                  <span className="text-[#1b1c1f] font-semibold break-words">
                     {roomDetail?.expiredAt
                       ? formatDateTime(roomDetail.expiredAt)
                       : "일정 미정"}
                   </span>
                 </div>
               </div>
-            </div>
+            </Card>
 
-            {/* Description */}
-            <div>
-              {/* <h3 className="text-4xl font-semibold text-[#1b1c1f] mb-4">상세 설명</h3> */}
-              <div className="space-y-6 text-[17px] text-[#404249]">
-                <div>
-                  <h3 className="font-bold text-3xl mb-2">내용</h3>
-                  <p>{roomDetail?.body}</p>
-                </div>
+            {/* 참여자 정보 카드 */}
+            <Card className="p-8">
+              <h3 className="text-xl font-bold text-[#1b1c1f] mb-6 flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#2b7fff]" />
+                참여자 목록
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {roomDetail?.joinUsers?.map((name, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg"
+                  >
+                    <User className="w-4 h-4 text-[#2b7fff]" />
+                    <span className="text-[#1b1c1f] font-medium">{name}</span>
+                  </div>
+                ))}
               </div>
-            </div>
+            </Card>
+
+            {/* 상세 설명 카드 */}
+            <Card className="p-8">
+              <h3 className="text-xl font-bold text-[#1b1c1f] mb-6 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#2b7fff]" />
+                상세 설명
+              </h3>
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <p className="text-[#404249] leading-relaxed whitespace-pre-wrap">
+                  {roomDetail?.body || "상세 설명이 없습니다."}
+                </p>
+              </div>
+            </Card>
           </div>
 
-          {/* Right Column - Company Info */}
-          <div>
-            <h3 className="text-2xl font-semibold text-[#1b1c1f] mb-4">
-              방장 정보
-            </h3>
-            <div className="space-y-4 text-base">
-              <div className="flex">
-                <span className="w-28 text-[#6f727c] text-xl">방장명</span>
-                <span className="text-[#1b1c1f] text-xl">
-                  {roomDetail?.masterInfo.nickname}
-                </span>
+          {/* 우측: 방장 정보 및 액션 */}
+          <div className="space-y-6">
+            {/* 방장 정보 카드 */}
+            <Card className="p-6">
+              <h3 className="text-xl font-bold text-[#1b1c1f] mb-6 flex items-center gap-2">
+                <User className="w-5 h-5 text-[#2b7fff]" />
+                방장 정보
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#6f727c] font-medium">방장명</span>
+                  <span className="text-[#1b1c1f] font-semibold">
+                    {roomDetail?.masterInfo.nickname}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#6f727c] font-medium">
+                    스터디 생성 횟수
+                  </span>
+                  <span className="text-[#1b1c1f] font-semibold">
+                    {roomDetail?.masterInfo.makeRoomCnt}회
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[#6f727c] font-medium">가입일</span>
+                  <span className="text-[#1b1c1f] font-semibold">
+                    {roomDetail?.masterInfo.createdAt
+                      ? (() => {
+                          const parsed = dayjs(roomDetail.masterInfo.createdAt);
+                          if (!parsed.isValid()) return "정보 없음";
+
+                          const now = dayjs();
+                          const diffDays = now.diff(parsed, "day");
+
+                          return `${parsed.format(
+                            "YYYY년 M월 D일"
+                          )} (+${diffDays}일)`;
+                        })()
+                      : "정보 없음"}
+                  </span>
+                </div>
               </div>
-              <div className="flex">
-                <span className="w-28 text-[#6f727c] text-xl">
-                  방 생성 횟수
-                </span>
-                <span className="text-[#1b1c1f] text-xl">
-                  {roomDetail?.masterInfo.makeRoomCnt}회
-                </span>
+            </Card>
+
+            {/* 액션 버튼들 */}
+            <Card className="p-6">
+              <div className="space-y-4">
+                <Button
+                  onClick={handleRegisterForRoom}
+                  disabled={isAlreadyRegistered}
+                  className={`w-full py-4 text-lg font-semibold rounded-lg transition-all duration-200 ${
+                    isAlreadyRegistered
+                      ? "bg-green-100 text-green-700 cursor-not-allowed"
+                      : "bg-[#2b7fff] hover:bg-blue-600 text-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    {isAlreadyRegistered ? (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        이미 참여한 스터디
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-5 h-5" />
+                        스터디 등록하기
+                      </>
+                    )}
+                  </div>
+                </Button>
+
+                {/* 이미 참여한 경우 마이페이지로 이동 버튼 */}
+                {isAlreadyRegistered && (
+                  <Button
+                    onClick={() => navigate("/mypage/room")}
+                    className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <User className="w-5 h-5" />
+                      참여 스터디 목록
+                    </div>
+                  </Button>
+                )}
+
+                {isMine && (
+                  <Button
+                    onClick={handleDeleteRoom}
+                    className="w-full bg-red-500 hover:bg-red-600 text-white py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <Trash2 className="w-5 h-5" />
+                      스터디 삭제하기
+                    </div>
+                  </Button>
+                )}
               </div>
-              <div className="flex">
-                <span className="w-28 text-[#6f727c] text-xl">회원 가입일</span>
-                <span className="text-[#1b1c1f] text-xl">
-                  {roomDetail?.masterInfo.createdAt
-                    ? formatDateTime(roomDetail?.masterInfo.createdAt)
-                    : "가입일 불러오기 실패"}
-                </span>
-              </div>
-            </div>
-            <Button
-              onClick={handleRegisterForRoom}
-              disabled={isAlreadyRegistered}
-              className="w-full bg-[#2b7fff] hover:bg-[#3758f9] text-white py-7 text-lg rounded-lg mt-5"
-            >
-              {isAlreadyRegistered ? "이미 등록함" : "방 등록하기"}
-            </Button>
-            <StudyBackToList />
-            <div className="flex justify-end">
-              <Button
-                disabled={!isMine}
-                onClick={handleDeleteRoom}
-                className="w-30 bg-red-500 hover:bg-red-700 text-white py-7 text-lg rounded-lg mt-5"
-              >
-                방 삭제하기
-              </Button>
-            </div>
+            </Card>
+
+            {/* 안내 카드 */}
+            <Card className="p-6 bg-blue-50 border-blue-200">
+              <h3 className="text-lg font-bold text-[#1b1c1f] mB-0 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-[#2b7fff]" />
+                안내
+              </h3>
+              <ul className="space-y-2 text-sm text-[#4b4e57]">
+                <li className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#2b7fff] rounded-full mt-2 flex-shrink-0"></span>
+                  <span>
+                    스터디 참여 목록은 마이페이지에서 확인할 수 있습니다
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-1.5 h-1.5 bg-[#2b7fff] rounded-full mt-2 flex-shrink-0"></span>
+                  <span>스터디 진행 시 배려와 존중을 해주세요</span>
+                </li>
+              </ul>
+            </Card>
           </div>
         </div>
       </main>
