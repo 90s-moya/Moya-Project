@@ -9,6 +9,7 @@ import { deleteRoom, getRoomDetail, registerForRoom } from "@/api/studyApi";
 import type { StudyRoomDetail } from "@/types/study";
 import { useAuthStore } from "@/store/useAuthStore";
 import UserApi from "@/api/userApi";
+import dayjs from "dayjs";
 import {
   FileText,
   Users,
@@ -69,7 +70,7 @@ export default function StudyDetailPage() {
     requestRoomDetail(roomId);
   }, [roomId]);
 
-  // 스터디 상세 조회 시 이미 등록한 방인지 확인
+  // 스터디 상세 조회 시 이미 참여한 방인지 확인
   useEffect(() => {
     if (roomDetail?.joinUsers && userNickname) {
       const isRegistered = roomDetail.joinUsers.includes(userNickname);
@@ -117,7 +118,7 @@ export default function StudyDetailPage() {
       }
 
       if (isAlreadyRegistered) {
-        alert("이미 등록한 방입니다.");
+        alert("이미 참여한 방입니다.");
         return;
       }
 
@@ -272,19 +273,15 @@ export default function StudyDetailPage() {
                   <span className="text-[#1b1c1f] font-semibold">
                     {roomDetail?.masterInfo.createdAt
                       ? (() => {
-                          const createdAt = new Date(
-                            roomDetail.masterInfo.createdAt
-                          );
-                          const now = new Date();
-                          const diffTime = Math.abs(
-                            now.getTime() - createdAt.getTime()
-                          );
-                          const diffDays = Math.ceil(
-                            diffTime / (1000 * 60 * 60 * 24)
-                          );
-                          return `${formatDateTime(
-                            roomDetail.masterInfo.createdAt
-                          )} (+${diffDays}d)`;
+                          const parsed = dayjs(roomDetail.masterInfo.createdAt);
+                          if (!parsed.isValid()) return "정보 없음";
+
+                          const now = dayjs();
+                          const diffDays = now.diff(parsed, "day");
+
+                          return `${parsed.format(
+                            "YYYY년 M월 D일"
+                          )} (+${diffDays}일)`;
                         })()
                       : "정보 없음"}
                   </span>
@@ -308,7 +305,7 @@ export default function StudyDetailPage() {
                     {isAlreadyRegistered ? (
                       <>
                         <CheckCircle className="w-5 h-5" />
-                        이미 등록한 스터디
+                        이미 참여한 스터디
                       </>
                     ) : (
                       <>
@@ -318,6 +315,19 @@ export default function StudyDetailPage() {
                     )}
                   </div>
                 </Button>
+
+                {/* 이미 참여한 경우 마이페이지로 이동 버튼 */}
+                {isAlreadyRegistered && (
+                  <Button
+                    onClick={() => navigate("/mypage/room")}
+                    className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <User className="w-5 h-5" />
+                      참여 스터디 목록
+                    </div>
+                  </Button>
+                )}
 
                 {isMine && (
                   <Button
@@ -342,7 +352,9 @@ export default function StudyDetailPage() {
               <ul className="space-y-2 text-sm text-[#4b4e57]">
                 <li className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-[#2b7fff] rounded-full mt-2 flex-shrink-0"></span>
-                  <span>방을 등록하면 마이페이지에서 확인할 수 있습니다</span>
+                  <span>
+                    스터디 참여 목록은 마이페이지에서 확인할 수 있습니다
+                  </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-[#2b7fff] rounded-full mt-2 flex-shrink-0"></span>
