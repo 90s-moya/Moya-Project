@@ -7,6 +7,6 @@ import java.util.List;
 import java.util.UUID;
 
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
-    @Query("select f from Feedback f where f.receiver.id = :userId and f.room.id = :roomId")
-    List<Feedback> findByUserIdAndRoomId(UUID userId, UUID roomId);
+    @Query("select f from Feedback f where f.receiver.id = :userId")
+    List<Feedback> findByUserId(UUID userId);
 }

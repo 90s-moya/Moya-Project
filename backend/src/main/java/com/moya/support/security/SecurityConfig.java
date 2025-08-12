@@ -83,14 +83,14 @@ public class SecurityConfig {
         http
             .httpBasic(AbstractHttpConfigurer::disable);
 
-        // 인증 없이 접근을 허용할 API endpoint를 requestMatchers 안에 설정하세요 ex) 로그인과 상관없이 보이는 조회 API 등등
+        // 인증 없이 접근을 허용할 API endpoint를 requestMatchers 안에 설정하세요 ex) 로그인과 상관없이 보이는 조회 API 등
         http
             .authorizeHttpRequests((auth) -> auth
                 .requestMatchers(
                         "v1/auth/*",
                     "/evaluate",
                     "/v1/otp",
-                    "/v1/otp-check",
+                    "/v1/otp/check",
                     "/v1/auth/login",
                     "/v1/auth/signup",
                     "/v1/user/find-username",
@@ -99,8 +99,6 @@ public class SecurityConfig {
                     "/v1/user/random",
                     "/v1/user/check-nickname",
                     "/v1/room/*",
-                        "/v1/room-member/*",
-                        "/ws",
                     "/css/**").permitAll()
                     .requestMatchers("v1/docs",
                             "/v1/docs/**").authenticated()

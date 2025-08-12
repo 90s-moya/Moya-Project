@@ -26,6 +26,4 @@ public class RoomMember extends BaseEntity {
     private User user_id;
     @Column
     private boolean is_master;
-    // 화면 녹화 저장을 위한 video_url 추가
-    private String video_url;
 }

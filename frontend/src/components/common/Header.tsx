@@ -14,7 +14,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isLogin, logout } = useAuthStore();
 
-  // console.log("Header - isLogin:", isLogin);
+  console.log("Header - isLogin:", isLogin);
 
   useEffect(() => {
     if (!scrollBg) return;
