@@ -93,12 +93,14 @@ export default function InterviewFileSelectPage() {
 
   // 다음 단계 전송
   const handleNext = async () => {
+    //const resumUrl = toFileUrl(selected.resumeUrl)
     const payload = {
-      resumeUrl: safe(selected.resumeUrl),
-      portfolioUrl: safe(selected.portfolioUrl),
-      coverletterUrl: safe(selected.coverletterUrl),
+      resumeUrl: selected.resumeUrl?.trim() ?? "",
+      portfolioUrl: selected.portfolioUrl?.trim() ?? "",
+      coverletterUrl: selected.coverletterUrl?.trim() ?? "",
     };
-    console.log("==================dkjfdkfj",payload);
+    
+    //console.log("==================dkjfdkfj",payload);
 
     try {
       setLoading(true);
@@ -128,7 +130,6 @@ export default function InterviewFileSelectPage() {
     
       navigate("/interview/modelist", {
         state: {
-          ...payload,    // 원본 URL들
           ...extracted,  // resumeText / portfolioText / coverletterText
         },
       });
