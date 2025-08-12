@@ -32,7 +32,7 @@ class QuestionAnswerPairRead(QuestionAnswerPairBase):
 # Evaluation session
 class EvaluationSessionBase(BaseModel):
     user_id: UUID4
-    summary: Optional[str] = None
+    title:str
 
 class EvaluationSessionCreate(EvaluationSessionBase):
     pass
