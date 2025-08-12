@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Header from '@/components/common/Header';
 import VerbalAnalysis from '@/components/mypage/result/detail/VerbalAnalysis';
@@ -11,6 +11,7 @@ const ResultDetail: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState<'verbal' | 'facial' | 'posture' | 'eye'>('verbal');
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // state로 전달된 question
   const { question } = (location.state as { question?: string }) || {};
@@ -23,6 +24,14 @@ const ResultDetail: React.FC = () => {
     { id: 'eye', label: '시선 분석' }
   ] as const;
 
+  // 비디오 시간 조정 핸들러
+  const handleFrameChange = (frame: number) => {
+    if (videoRef.current) {
+      const timeInSeconds = frame / 30; // 30fps 가정
+      videoRef.current.currentTime = timeInSeconds;
+    }
+  };
+
   // 현재 활성 탭에 따른 컴포넌트 렌더링
   const renderActiveComponent = () => {
     switch (activeTab) {
@@ -31,7 +40,7 @@ const ResultDetail: React.FC = () => {
       case 'facial':
         return <FacialAnalysis />;
       case 'posture':
-        return <PostureAnalysis />;
+        return <PostureAnalysis posture_result={mockDetailData.posture_result} onFrameChange={handleFrameChange} />;
       case 'eye':
         return <EyeAnalysis />;
       default:
@@ -77,6 +86,7 @@ const ResultDetail: React.FC = () => {
             <div className="flex flex-col items-center justify-start">
               <div className="w-full max-w-lg aspect-[16/9] rounded-lg flex items-center justify-center overflow-hidden">
                 <video
+                  ref={videoRef}
                   src={mockDetailData.video_url}
                   controls
                   className="w-full h-full object-contain rounded-lg"
@@ -131,7 +141,39 @@ const mockDetailData = {
     "reason_context": "질문이 '본인의 강점'이었고, 답변이 주제에 부합하며 불필요한 내용이 없음.",
     "gpt_comment": "핵심 메시지가 분명하지만, 구체적인 사례를 덧붙이면 더 설득력 있는 답변이 될 수 있음.",
     "end_type": "OUTSTANDING",
-    "is_fast": "SLOW",
+    "speech_label": "SLOW",
     "syll_art": 3.2
+  },
+  "posture_result": {
+    "timestamp": "2025-08-05T11:08:59.549094",
+    "total_frames": 577,
+    "frame_distribution": {
+      "Good Posture": "284",
+      "Shoulders Uneven": "231",
+      "Hands Above Shoulders": "100"
+    },
+    "detailed_logs": [
+      {
+        "label": "Good Posture",
+        "start_frame": 0,
+        "end_frame": 120
+      },
+      {
+        "label": "Shoulders Uneven",
+        "start_frame": 121,
+        "end_frame": 350
+      },
+      {
+        "label": "Hands Above Shoulders",
+        "start_frame": 351,
+        "end_frame": 450
+      },
+      {
+        "label": "Good Posture",
+        "start_frame": 451,
+        "end_frame": 700
+      }
+    ]
   }
-};
+}
+

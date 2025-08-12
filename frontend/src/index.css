@@ -135,3 +135,14 @@
 button {
   cursor: pointer;
 }
+
+/* Recharts 스타일 */
+.recharts-surface {
+  outline: none !important;
+  border: none !important;
+}
+
+.recharts-wrapper {
+  outline: none !important;
+  border: none !important;
+}

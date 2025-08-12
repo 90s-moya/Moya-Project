@@ -31,7 +31,7 @@ export interface VerbalResultProps {
     reason_context: string;
     gpt_comment: string;
     end_type: string;
-    is_fast: string;
+    speech_label: string;
     syll_art: number;
   };
 }
@@ -149,7 +149,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
                    <span className="text-xs font-medium text-gray-600">말하기 속도</span>
                  </div>
                  <p className="text-sm font-semibold text-[#1b1c1f]">
-                   {getSpeedText(verbal_result.is_fast as SpeedType)}
+                   {getSpeedText(verbal_result.speech_label as SpeedType)}
                  </p>
                </div>
                <div className="text-right">
@@ -202,7 +202,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <img src={chatGpt} alt="AI" className="w-4 h-4" />
-                <span className="text-xs font-semibold text-blue-600">AI 코멘트</span>
+                <span className="text-xs font-semibold text-blue-600">AI 종합 의견</span>
               </div>
               <p className="text-sm text-[#1b1c1f] leading-relaxed">{verbal_result.gpt_comment}</p>
             </div>

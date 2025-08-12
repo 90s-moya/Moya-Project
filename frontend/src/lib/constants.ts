@@ -108,3 +108,27 @@ export const getSpeedType = (value: number): SpeedType => {
   return range.speedType;
 };
 
+// 자세 상태 매핑
+export const POSTURE_STATUS_MAP = {
+  'Good Posture': '바른 자세',
+  'Shoulders Uneven': '자세 틀어짐',
+  'Hands Above Shoulders': '불필요한 손동작',
+} as const;
+
+export type PostureStatusType = keyof typeof POSTURE_STATUS_MAP;
+
+export const getPostureStatusText = (status: PostureStatusType): string => {
+  return POSTURE_STATUS_MAP[status] || String(status);
+};
+
+// 자세 상태별 색상 매핑
+export const POSTURE_COLOR_MAP = {
+  'Good Posture': '#10B981', // green-500
+  'Shoulders Uneven': '#F59E0B', // yellow-500
+  'Hands Above Shoulders': '#EF4444', // red-500
+} as const;
+
+export const getPostureColor = (status: string): string => {
+  return POSTURE_COLOR_MAP[status as PostureStatusType] || '#6B7280'; // gray-500 as default
+};
+
