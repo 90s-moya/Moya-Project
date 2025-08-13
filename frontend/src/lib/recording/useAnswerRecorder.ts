@@ -6,7 +6,15 @@ import { sendVideoUpload } from "@/api/interviewApi";
 
 const extFromMime = (mt: string) =>
   mt.includes('webm') ? 'webm' : mt.includes('ogg') ? 'ogg' : 'wav';
-
+interface ImageCapture {
+  track: MediaStreamTrack;
+  grabFrame(): Promise<ImageBitmap>;
+  takePhoto?(photoSettings?: any): Promise<Blob>;
+}
+declare var ImageCapture: {
+  prototype: ImageCapture;
+  new (videoTrack: MediaStreamTrack): ImageCapture;
+};
 export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionKey; maxDurationSec?: number; }) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -25,6 +33,62 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
   const videoRecorderRef = useRef<MediaRecorder | null>(null);
   const videoChunksRef = useRef<Blob[]>([]);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
+
+  // 썸네일 추가
+  const thumbBlobRef = useRef<Blob | null>(null);
+
+  // 썸네일 함수
+  const captureThumbFromStream = async (stream: MediaStream): Promise<Blob | null> => {
+  const track = stream.getVideoTracks()[0];
+  if (!track) return null;
+
+  // A. ImageCapture 지원 시 우선 사용
+  try {
+    // @ts-ignore
+    if (window.ImageCapture && typeof (window as any).ImageCapture === 'function') {
+      // @ts-ignore
+      const cap = new ImageCapture(track);
+      const bitmap: ImageBitmap = await cap.grabFrame();
+
+      const s = track.getSettings();
+      const w = (s.width as number) ?? bitmap.width;
+      const h = (s.height as number) ?? bitmap.height;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d')!.drawImage(bitmap, 0, 0, w, h);
+
+      return await new Promise<Blob | null>(res =>
+        canvas.toBlob(b => res(b), 'image/jpeg', 0.9)
+      );
+    }
+  } catch {}
+
+  // B. 폴백: <video>에 스트림 바인딩 후 원본 크기로 캡처
+  return await new Promise<Blob | null>((resolve, reject) => {
+    const v = document.createElement('video');
+    v.muted = true;
+    v.playsInline = true;
+    // @ts-ignore
+    v.srcObject = stream;
+
+    v.onloadedmetadata = async () => {
+      try {
+        await v.play().catch(() => {});
+        const w = v.videoWidth, h = v.videoHeight;
+        if (!w || !h) return reject(new Error('영상 크기 확인 실패'));
+
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d')!.drawImage(v, 0, 0, w, h);
+        c.toBlob(b => resolve(b), 'image/jpeg', 0.9);
+      } catch (err) { reject(err as Error); }
+    };
+    v.onerror = () => reject(new Error('video load error'));
+  });
+};
+
 
 
   const stop = useCallback(() => {
@@ -48,8 +112,27 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
         frameRate: { ideal: 30, max: 30 },
       }
       });
+      // 썸네일
+      const vtrack = stream.getVideoTracks()[0];
+      try {
+        await vtrack.applyConstraints({
+          width: { exact: 960 },
+          height: { exact: 540 },
+          frameRate: { ideal: 30, max: 30 },
+        });
+      } catch { /* 미지원이면 협상된 값 사용 */ }
+
+
     // 비디오 값
     setVideoStream(stream);
+
+   // 시작 시점 썸네일 캡쳐
+    try {
+      thumbBlobRef.current = await captureThumbFromStream(stream);
+    } catch {
+      thumbBlobRef.current = null;
+    }
+
     // 오디오 전용
     const audioOnly = new MediaStream(stream.getAudioTracks());
     const mr = new MediaRecorder(audioOnly);
@@ -106,18 +189,6 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
             return;
           }
           
-          // 다운로드용
-          // const vname = `answer_video_${key.sessionId}_o${key.order}_s${key.subOrder}_${Date.now()}.webm`;
-          // const url = URL.createObjectURL(vblob);
-
-          // const a = document.createElement('a');
-          // a.href = url;
-          // a.download = vname;
-          // document.body.appendChild(a);
-          // a.click();
-          // a.remove();
-          // setTimeout(() => URL.revokeObjectURL(url), 10_000);
-          
           const file = new File([vblob],
             `${key.order}_${key.subOrder}.webm`,
             {type:vmime}
@@ -127,7 +198,16 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
           formData.append("file", file);
           formData.append("interviewSessionId", localStorage.getItem("interviewSessionId") ?? "");
           formData.append("order", String(key.order));
-          formData.append("subOrder", String(key.subOrder))
+          formData.append("subOrder", String(key.subOrder));
+          const thumb = thumbBlobRef.current;
+          if (thumb) {
+            const thumbFile = new File(
+              [thumb],
+              `${key.order}_${key.subOrder}.jpg`,
+              { type: "image/jpeg" }
+            );
+            formData.append("thumbnail", thumbFile)
+          }
 
           // 동영상 전송 후 url return
           const urls = await sendVideoUpload(formData);
