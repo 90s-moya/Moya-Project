@@ -29,7 +29,7 @@ export default function MicControlPanel({ stream }: Props) {
         disabled={!track}
         className="flex items-center gap-1 text-white hover:text-white/80 transition disabled:opacity-50"
       >
-        {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+        {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
       </button>
     </div>
   );

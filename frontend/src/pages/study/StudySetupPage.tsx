@@ -6,7 +6,6 @@ import {
   FileText,
   Video,
   Settings,
-  Info,
   CheckCircle,
   AlertCircle,
 } from "lucide-react";
@@ -197,7 +196,7 @@ export default function StudySetupPage() {
                     autoPlay
                     muted
                     playsInline
-                    className={`w-full h-full object-cover ${
+                    className={`w-full h-full object-cover transform scale-x-[-1] ${
                       isCameraOn ? "block" : "hidden"
                     }`}
                   />
