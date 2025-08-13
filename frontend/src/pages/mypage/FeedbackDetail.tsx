@@ -148,7 +148,7 @@ const FeedbackDetail: React.FC = () => {
               <div
                 className="h-full max-h-[calc(100vh-300px)] overflow-y-auto flex flex-col gap-4 pr-4"
               >
-                {[...feedbackData.feedbackList].reverse().map((fd, index) => {
+                {[...feedbackData.feedbackList].map((fd, index) => {
                   // 시간 계산: (createdAt - videoStart - 10초)
                   const open = dayjs(videoStart);
                   const created = dayjs(fd.createdAt);

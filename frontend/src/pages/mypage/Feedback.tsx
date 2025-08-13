@@ -101,7 +101,7 @@ const Feedback: React.FC = () => {
         </div>
       ) : (
         <div className="flex flex-col gap-6 w-full">
-          {studyList.slice().reverse().map((study) => (
+          {studyList.slice().map((study) => (
                          <div
                key={study.id}
                className="relative bg-[#fafafc] border border-[#dedee4] rounded-lg p-6 h-full flex flex-col justify-between min-h-[120px] text-[18px] cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 w-full"
