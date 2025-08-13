@@ -17,7 +17,6 @@ const Feedback: React.FC = () => {
       try {
         setLoading(true);
         const data = await getMyStudyRooms();
-        console.log('스터디 목록:', data);
         setStudyList(data);
       } catch (err) {
         console.error('스터디 목록 조회 실패:', err);
@@ -42,9 +41,8 @@ const Feedback: React.FC = () => {
     <MypageLayout activeMenu="feedback">
       {/* 페이지 제목 */}
       <h3 className="text-2xl font-semibold text-[#2B7FFF] mb-8 leading-[1.4]">
-        참여한 스터디 목록
+        면접 스터디 피드백
       </h3>
-
       {/* 참여한 스터디 리스트 */}
       {loading ? (
         <div className="w-full max-w-[880px] h-[360px] bg-[#FAFAFC] border border-[#EFEFF3] rounded-[10px] flex flex-col items-center justify-center">
@@ -115,7 +113,7 @@ const Feedback: React.FC = () => {
                </div>
                {/* 카테고리 태그 (왼쪽 하단) */}
                <span className="absolute bottom-4 left-6 text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
-                 {study.category}
+                 {study.categoryName}
                </span>
                {/* 참여한 시간 (오른쪽 하단) */}
                <span className="absolute bottom-4 right-6 text-sm text-gray-500">{formatCardDate(study.createdAt)}</span>

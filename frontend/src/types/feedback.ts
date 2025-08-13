@@ -6,7 +6,7 @@ export interface FeedbackRoom {
   body: string;
   maxUser: number;
   joinUser: number;
-  category: string;
+  categoryName: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,4 +15,16 @@ export interface FeedbackApiResponse {
   data: FeedbackRoom[];
   message: string;
   status: number;
+}
+
+export interface FeedbackItem {
+  fdId: string;
+  feedbackType: 'POSITIVE' | 'NEGATIVE';
+  message: string;
+  createdAt: string;
+}
+
+export interface FeedbackDetailResponse {
+  videoUrl: string;
+  feedbackList: FeedbackItem[];
 }
