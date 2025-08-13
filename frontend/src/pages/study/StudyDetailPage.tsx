@@ -190,7 +190,7 @@ export default function StudyDetailPage() {
                 <div className="flex items-start gap-3">
                   <Calendar className="w-5 h-5 text-[#6f727c] flex-shrink-0 mt-1" />
                   <span className="text-[#6f727c] font-medium w-24 flex-shrink-0">
-                    생성일
+                    시작 일시
                   </span>
                   <span className="text-[#1b1c1f] font-semibold break-words">
                     {roomDetail?.openAt
@@ -201,7 +201,7 @@ export default function StudyDetailPage() {
                 <div className="flex items-start gap-3">
                   <Clock className="w-5 h-5 text-[#6f727c] flex-shrink-0 mt-1" />
                   <span className="text-[#6f727c] font-medium w-24 flex-shrink-0">
-                    마감일
+                    종료 일시
                   </span>
                   <span className="text-[#1b1c1f] font-semibold break-words">
                     {roomDetail?.expiredAt
@@ -292,39 +292,24 @@ export default function StudyDetailPage() {
             {/* 액션 버튼들 */}
             <Card className="p-6">
               <div className="space-y-4">
-                <Button
-                  onClick={handleRegisterForRoom}
-                  disabled={isAlreadyRegistered}
-                  className={`w-full py-4 text-lg font-semibold rounded-lg transition-all duration-200 ${
-                    isAlreadyRegistered
-                      ? "bg-green-100 text-green-700 cursor-not-allowed"
-                      : "bg-[#2b7fff] hover:bg-blue-600 text-white"
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-2">
-                    {isAlreadyRegistered ? (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        이미 참여한 스터디
-                      </>
-                    ) : (
-                      <>
-                        <Users className="w-5 h-5" />
-                        스터디 등록하기
-                      </>
-                    )}
-                  </div>
-                </Button>
-
-                {/* 이미 참여한 경우 마이페이지로 이동 버튼 */}
-                {isAlreadyRegistered && (
+                {!isAlreadyRegistered ? (
+                  <Button
+                    onClick={handleRegisterForRoom}
+                    className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <Users className="w-5 h-5" />
+                      스터디 등록하기
+                    </div>
+                  </Button>
+                ) : (
                   <Button
                     onClick={() => navigate("/mypage/room")}
                     className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white py-4 text-lg font-semibold rounded-lg transition-all duration-200"
                   >
                     <div className="flex items-center justify-center gap-2">
                       <User className="w-5 h-5" />
-                      참여 스터디 목록
+                      등록한 스터디 목록 가기
                     </div>
                   </Button>
                 )}

@@ -107,7 +107,7 @@ export const registerForRoom = async (roomId: string) => {
 
 // 내가 등록한 방 목록 조회 함수
 export const getMyRegisteredRooms = async () => {
-  const res = await api.get("/v1/room/me");
+  const res = await api.get("/v1/room/me/todo");
 
   console.log("getMyRegisteredRooms의 res.data:", res.data);
 
