@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.services.report_service import list_reports_by_user, get_report_by_id,get_result_by_id,get_result_detail_by_id
+from app.services.report_service import list_reports_by_user, get_report_by_id,get_result_by_id,get_result_detail_by_id,get_result_detail_secure
 from pydantic import BaseModel
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -21,16 +21,18 @@ def get_report(report_id: str, db: Session = Depends(get_db)):
     return data
 
 # (신규) 단건 조회
-@router.get("/results/{result_id}", summary="리절트 단건 조회")
-def get_result(result_id: str, db: Session = Depends(get_db)):
-    data = get_result_by_id(db, result_id)
+@router.get("/{report_id}/results/{result_id}/detail", summary="리절트 상세(보안 검증)")
+def read_result_detail_secure(
+    report_id: str,
+    result_id: str,
+    user_id: str = Query(..., description="소유자 검증용 사용자 ID"),
+    db: Session = Depends(get_db),
+):
+    try:
+        data = get_result_detail_secure(db, report_id, result_id, user_id)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
     if not data:
-        raise HTTPException(status_code=404, detail="Result not found")
-    return data
-
-@router.get("/results/{result_id}/detail", summary="리절트 상세(비디오+분석 전체) 조회")
-def get_result_detail(result_id: str, db: Session = Depends(get_db)):
-    data = get_result_detail_by_id(db, result_id)
-    if not data:
+        # 존재 X 또는 report-result 불일치
         raise HTTPException(status_code=404, detail="Result not found")
     return data
