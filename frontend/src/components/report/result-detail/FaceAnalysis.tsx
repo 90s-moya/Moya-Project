@@ -28,6 +28,10 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
 
   // 점선 그래프용 데이터 생성
   const generateLineChartData = () => {
+    if (!face_result?.detailed_logs || face_result.detailed_logs.length === 0) {
+      return [];
+    }
+    
     const firstStart = face_result.detailed_logs[0]?.start_frame || 0;
     const lastEnd = face_result.detailed_logs[face_result.detailed_logs.length - 1]?.end_frame || 0;
 
@@ -56,6 +60,10 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
 
   // 원형 그래프용 데이터 생성
   const generatePieChartData = () => {
+    if (!face_result?.frame_distribution) {
+      return [];
+    }
+    
     return Object.entries(face_result.frame_distribution).map(([label, frames]) => ({
       name: getFaceStatusText(label as FaceStatusType),
       value: frames,
@@ -65,6 +73,17 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
 
   const lineChartData = generateLineChartData();
   const pieChartData = generatePieChartData();
+
+  // 데이터가 없는 경우 처리
+  if (!face_result || !face_result.detailed_logs || face_result.detailed_logs.length === 0) {
+    return (
+      <div className="bg-[#fafafc] border border-[#dedee4] rounded-lg p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-500">얼굴 분석 데이터가 없습니다.</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#fafafc] border border-[#dedee4] rounded-lg p-6">

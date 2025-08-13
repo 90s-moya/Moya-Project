@@ -14,8 +14,8 @@ export const updateReportTitle = async (reportId: string, title: string) => {
 };
 
 // 면접 결과 상세 조회
-export const getInterviewResultDetail = async (resultId: string) => {
-  const res = await api.get(`/v1/me/report/?resultId=${resultId}`);
+export const getInterviewResultDetail = async (reportId: string, resultId: string) => {
+  const res = await api.get(`/v1/me/report/${reportId}/result/${resultId}`);
   return res.data;
 };
 

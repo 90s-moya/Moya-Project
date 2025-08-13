@@ -37,12 +37,12 @@ const ResultDetail: React.FC = () => {
   // API 데이터 로드
   useEffect(() => {
     const fetchResultDetail = async () => {
-      if (!resultId) return;
+      if (!resultId || !reportId) return;
       
       try {
         setLoading(true);
         setError(null);
-        const data = await getInterviewResultDetail(resultId);
+        const data = await getInterviewResultDetail(reportId, resultId);
         setReportData(data);
       } catch (err) {
         console.error('결과 상세 조회 실패:', err);
@@ -53,7 +53,7 @@ const ResultDetail: React.FC = () => {
     };
 
     fetchResultDetail();
-  }, [resultId]);
+  }, [resultId, reportId]);
 
 
 
@@ -147,14 +147,23 @@ const ResultDetail: React.FC = () => {
             {/* 비디오 */}
             <div className="flex flex-col items-center justify-start mb-4">
               <div className="w-full max-w-lg aspect-[16/9] rounded-lg flex items-center justify-center overflow-hidden">
-                <video
-                  ref={videoRef}
-                  src={reportData?.video_url || mockDetailData.video_url}
-                  controls
-                  className="w-full h-full object-contain rounded-lg"
-                >
-                  브라우저가 video 태그를 지원하지 않습니다.
-                </video>
+                {reportData?.video_url ? (
+                  <video
+                    ref={videoRef}
+                    src={reportData.video_url}
+                    controls
+                    className="w-full h-full object-contain rounded-lg"
+                  >
+                    브라우저가 video 태그를 지원하지 않습니다.
+                  </video>
+                ) : (
+                  <div className="w-full h-full bg-gray-100 rounded-lg flex items-center justify-center">
+                    <div className="text-gray-500 text-center">
+                      <div className="text-sm mb-2">비디오가 없습니다</div>
+                      <div className="text-xs">녹화된 영상이 제공되지 않았습니다</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

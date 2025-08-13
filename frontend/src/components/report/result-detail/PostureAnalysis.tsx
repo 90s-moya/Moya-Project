@@ -28,6 +28,10 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
 
   // 점선 그래프용 데이터 생성
   const generateLineChartData = () => {
+    if (!posture_result?.detailed_logs || posture_result.detailed_logs.length === 0) {
+      return [];
+    }
+    
     const firstStart = posture_result.detailed_logs[0]?.start_frame || 0;
     const lastEnd = posture_result.detailed_logs[posture_result.detailed_logs.length - 1]?.end_frame || 0;
 
@@ -57,6 +61,10 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
 
   // 원형 그래프용 데이터 생성
   const generatePieChartData = () => {
+    if (!posture_result?.frame_distribution) {
+      return [];
+    }
+    
     return Object.entries(posture_result.frame_distribution).map(([label, frames]) => ({
       name: getPostureStatusText(label as PostureStatusType),
       value: frames,
@@ -66,6 +74,17 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
 
   const lineChartData = generateLineChartData();
   const pieChartData = generatePieChartData();
+
+  // 데이터가 없는 경우 처리
+  if (!posture_result || !posture_result.detailed_logs || posture_result.detailed_logs.length === 0) {
+    return (
+      <div className="bg-[#fafafc] border border-[#dedee4] rounded-lg p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-gray-500">자세 분석 데이터가 없습니다.</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#fafafc] border border-[#dedee4] rounded-lg p-6">
