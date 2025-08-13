@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Webcam from "react-webcam"
 import { Button } from "@/components/ui/button"
 import { useNavigate } from "react-router-dom"
 import Header from "@/components/common/Header"
+import ReadyModal from "@/components/interview/ReadyModal"
+
 
 enum TestStatus {
   NotStarted,
@@ -12,6 +14,43 @@ enum TestStatus {
   Completed
 }
 
+
+function CountdownOverlay({
+  seconds,
+  onDone,
+}: {
+  seconds: number
+  onDone: () => void
+}) {
+  const [left, setLeft] = useState(seconds)
+
+  useEffect(() => {
+    setLeft(seconds)
+    const id = setInterval(() => {
+      setLeft(v => (v <= 1 ? 0 : v - 1))
+    }, 1000)
+
+    return () => clearInterval(id)
+  }, [seconds])
+
+  // 완료는 렌더 이후에만 콜백
+  useEffect(() => {
+    if (left === 0) onDone()
+  }, [left, onDone])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div
+        aria-live="assertive"
+        className="text-white text-[100px] md:text-[120px] font-bold leading-none select-none"
+      >
+        {left}
+      </div>
+    </div>
+  )
+}
+
+/** ====== 환경설정 페이지 ====== */
 export default function InterviewSetupPage() {
   const webcamRef = useRef<Webcam>(null)
   const [testStatus, setTestStatus] = useState<TestStatus>(TestStatus.NotStarted)
@@ -20,9 +59,12 @@ export default function InterviewSetupPage() {
   const [cameraReady, setCameraReady] = useState(false)
   const [micLabel, setMicLabel] = useState("")
   const [cameraLabel, setCameraLabel] = useState("")
+  const [readyOpen, setReadyOpen] = useState(false)
+  const [countdownOn, setCountdownOn] = useState(false)
+
   const navigate = useNavigate()
 
-  // ✅ 완료 조건 모니터링
+  // 완료 조건 모니터링
   useEffect(() => {
     if (micReady && cameraReady) {
       setTestStatus(TestStatus.Completed)
@@ -62,8 +104,9 @@ export default function InterviewSetupPage() {
 
       const checkVolume = () => {
         analyser.getByteFrequencyData(dataArray)
-        const avg = dataArray.reduce((a, b) => a + b) / dataArray.length
+        const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length
         setMicLevel(avg)
+        // 임계치: 15 이상이면 마이크 감지로 판단
         setMicReady(avg > 15)
         requestAnimationFrame(checkVolume)
       }
@@ -72,9 +115,30 @@ export default function InterviewSetupPage() {
     })
   }
 
-  const handleStartInterview = () => {
-    navigate("/interview")
+  // 준비 안내 열기 (오디오 자동재생 정책 우회용 사용자 클릭 시점)
+  const openReady = () => {
+    if (testStatus !== TestStatus.Completed) return
+    try {
+      // @ts-ignore
+      if (window?.webAudioCtx && window.webAudioCtx.state === "suspended") {
+        // @ts-ignore
+        window.webAudioCtx.resume()
+      }
+    } catch {}
+    setReadyOpen(true)
   }
+
+  // 안내에서 "시작" 클릭 → 카운트다운 시작
+  const handleReadyStart = () => {
+    setReadyOpen(false)
+    setCountdownOn(true)
+  }
+
+  // 카운트다운 완료 → 면접 화면으로 이동
+  const handleCountdownDone = useCallback(() => {
+    setCountdownOn(false)
+    navigate("/interview", { state: { audioUnlocked: true } })
+  }, [navigate])
 
   return (
     <div className="min-h-screen bg-gray-100 py-10 px-4 mt-20">
@@ -123,7 +187,7 @@ export default function InterviewSetupPage() {
             </div>
 
             <div className="text-sm text-gray-700">
-              마이크 측정을 위해<br />평소 말하듯이 텍스트를 읽어주세요!
+              마이크 측정을 위해<br />평소 말하듯이 텍스트를 읽어주세요
             </div>
             <textarea
               className="w-full border rounded p-2 text-sm"
@@ -142,6 +206,7 @@ export default function InterviewSetupPage() {
               테스트하기
             </Button>
           )}
+
           {testStatus === TestStatus.Completed && (
             <>
               <Button
@@ -151,7 +216,7 @@ export default function InterviewSetupPage() {
                 테스트 다시하기
               </Button>
               <Button
-                onClick={handleStartInterview}
+                onClick={openReady}
                 className="px-6 py-2 text-white bg-blue-500 hover:bg-blue-600"
               >
                 면접 시작하기
@@ -162,6 +227,16 @@ export default function InterviewSetupPage() {
 
         <div className="text-center mt-6 text-gray-600 text-lg font-medium">3/4</div>
       </div>
+
+      {/* 준비 안내 모달 & 카운트다운 */}
+      <ReadyModal
+        open={readyOpen}
+        onClose={() => setReadyOpen(false)}
+        onStart={handleReadyStart}
+      />
+      {countdownOn && (
+        <CountdownOverlay seconds={3} onDone={handleCountdownDone} />
+      )}
     </div>
   )
 }

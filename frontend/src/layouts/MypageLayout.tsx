@@ -25,7 +25,7 @@ const MypageLayout: React.FC<MypageLayoutProps> = ({ children, activeMenu }) => 
         <Sidebar activeMenu={activeMenu} onNavigate={handleSidebarNavigation} />
 
         {/* 메인 콘텐츠 영역 (모바일: 하단, 데스크톱: 우측) */}
-        <main className="flex-1 md:ml-12 px-8 md:pt-12">
+        <main className="flex-1 md:ml-12 px-8 md:pt-12 md:min-w-[600px]">
           {children}
         </main>
       </div>
