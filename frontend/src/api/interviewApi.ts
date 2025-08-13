@@ -58,6 +58,12 @@ export const extractTextFromPdf = async (
   throw new Error(`PDF extract failed: ${res.status}`);
 };
 
+// === 비디오 업로드 ===
+export async function sendVideoUpload(formData:FormData){
+  const res = await api.post("v1/interview-video", formData)
+  return res;
+}
+
 // ===== Followup 오디오 업로드 =====
 // 요구사항: 저장 불필요, form-data 전송만 /api/v1/followup
 export async function sendFollowupAudio(params: {
