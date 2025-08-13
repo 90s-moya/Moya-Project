@@ -50,7 +50,7 @@ const GazeAnalysis: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Eye size={18} className="text-[#2B7FFF]" />
-            <h4 className="text-sm font-semibold text-[#2B7FFF]">시선 분포도</h4>
+            <h4 className="text-sm font-semibold text-[#2B7FFF]">시선 추적 히트맵</h4>
           </div>
 
           <div className="bg-white p-4 pt-8 rounded-lg border border-[#dedee4] shadow-sm" ref={containerRef}>
