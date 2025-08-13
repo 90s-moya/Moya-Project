@@ -23,7 +23,7 @@ sys.path.insert(0, str(FACE_DIR))
 
 from Face_Resnet.model import load_model
 
-CKPT_PATH = None
+CKPT_PATH = str(FACE_DIR / "best_model.pt")
 CLASS_NAMES = ["angry","disgust","fear","happy","sad","surprise","neutral"]
 
 _preprocess = transforms.Compose([

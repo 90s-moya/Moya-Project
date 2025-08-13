@@ -11,24 +11,27 @@ from functools import lru_cache
 from typing import Callable, Optional, Any, Dict
 
 
-# === repo 루트 / Gaze_TR_pro 경로 등록 ===
-ROOT = Path(__file__).resolve().parents[2]       # repo 루트 (ai-server 기준)
-GAZE_DIR = ROOT / "Gaze_TR_pro"
+# === Gaze_TR_pro 경로 등록 ===
+# gaze_service.py는 ai-server/app/services/ 에 있고
+# Gaze_TR_pro는 ai-server/Gaze_TR_pro/ 에 있음
+# 따라서 parents[2]로 ai-server 디렉토리로 이동한 후 Gaze_TR_pro 찾기
+AI_SERVER_ROOT = Path(__file__).resolve().parents[2]  # ai-server 디렉토리
+GAZE_DIR = AI_SERVER_ROOT / "Gaze_TR_pro"
 sys.path.append(str(GAZE_DIR))
 
 # 이 중에서 먼저 발견되는 모듈/함수를 엔트리로 사용
 ENTRY_MODULES = [
-    "simple_gaze_test",  # 가장 유력 (파일명 보였음)
-    "test_setup",        # 보였음
-    "gazetr_cam",
-    "cam",
+    "gaze_wrapper",      # 외부 서비스용 래퍼 모듈 (우선)
+    "gaze_tracking",     # 시선 추적 메인 모듈
+    "gaze_calibration",  # 캘리브레이션 모듈
+    "run_simple_gui",    # 실행기
 ]
 ENTRY_FUNCS = [
-    "run_gaze_once",
-    "run_once",
-    "run",
+    "infer_gaze",        # gaze_wrapper.infer_gaze (메인 함수)
+    "run_gaze_once",     # gaze_wrapper.run_gaze_once
+    "process_video_file", # gaze_wrapper.process_video_file
     "main",
-    "predict",
+    "run",
 ]
 
 
@@ -62,16 +65,14 @@ def get_gaze_runtime(calib_path: Optional[str] = None) -> Dict[str, Any]:
     """
     런타임 준비 (캘리브 파일 등). 필요 없으면 그대로 둬도 됨.
     """
-    # 기본 캘리브 경로 추정 (있으면 사용)
-    default_calib_dir = GAZE_DIR / "calib"
+    # 시선 추적 캘리브레이션 파일 찾기 (calibration_data 폴더에서)
+    default_calib_dir = GAZE_DIR / "calibration_data"
     default_calib = None
     if default_calib_dir.exists():
-        # json, npz, yaml 등 하나 골라서 사용 (원하는 규칙으로 바꾸세요)
-        for ext in (".json", ".npz", ".yaml", ".yml"):
-            cand = next(default_calib_dir.glob(f"*{ext}"), None)
-            if cand:
-                default_calib = str(cand)
-                break
+        # JSON 캘리브레이션 파일만 찾기 (시선 추적용)
+        cand = next(default_calib_dir.glob("*.json"), None)
+        if cand:
+            default_calib = str(cand)
 
     return {
         "ready": True,
@@ -83,9 +84,20 @@ def get_gaze_runtime(calib_path: Optional[str] = None) -> Dict[str, Any]:
 def _call_entry(fn: Callable[..., Any], input_path: str, calib_path: Optional[str]) -> Any:
     """
     엔트리 함수 시그니처가 제각각일 수 있으니, 흔한 패턴들을 순서대로 시도.
-    필요한 경우 아래 케이스를 추가하세요.
+    gaze_wrapper.infer_gaze(video_path, calib_path) 시그니처를 우선으로 한다.
     """
-    # 가장 흔한 케이스들
+    # gaze_wrapper 모듈의 표준 시그니처
+    try:
+        return fn(video_path=input_path, calib_path=calib_path)
+    except TypeError:
+        pass
+
+    try:
+        return fn(video_path=input_path)
+    except TypeError:
+        pass
+
+    # 다른 일반적인 케이스들
     try:
         return fn(input_path=input_path, calib_path=calib_path)
     except TypeError:
@@ -97,21 +109,11 @@ def _call_entry(fn: Callable[..., Any], input_path: str, calib_path: Optional[st
         pass
 
     try:
-        return fn(video_path=input_path, calib_path=calib_path)
-    except TypeError:
-        pass
-
-    try:
-        return fn(video_path=input_path)
-    except TypeError:
-        pass
-
-    try:
         return fn(input_path, calib_path)
     except TypeError:
         pass
 
-    # 마지막으로 인자 없이 동작(모듈 내부에서 경로를 읽는)하는 경우
+    # 마지막으로 인자 없이 동작하는 경우
     return fn()
 
 
