@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import com.moya.interfaces.api.room.request.CreateRoomRequest;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -62,9 +63,15 @@ public class RoomController {
     }
 
     // 내 면접 스터디 방 조회
-    @GetMapping("/me")
-    public List<RoomInfoCommand> getMyRoom(@AuthenticationPrincipal CustomUserDetails user) {
-        return roomService.getMyRooms(user.getUserId());
+    @GetMapping("/me/{status}")
+    public ResponseEntity<?> getMyRoom(@AuthenticationPrincipal CustomUserDetails user, @PathVariable String status) {
+        List<RoomInfoCommand> roomList = null;
+
+        if(status.equals("done")) roomList = roomService.getMyDoneRooms(user.getUserId());
+        else if(status.equals("todo")) roomList = roomService.getMyTodoRooms(user.getUserId());
+        else return ResponseEntity.badRequest().body("잘못된 형식의 요청입니다. url 값을 확인해주세요");
+
+        return ResponseEntity.ok(roomList);
     }
 
     // 면접 스터디 방 서류 조회
