@@ -71,13 +71,14 @@ public class InterviewService {
 
     public InterviewVideoCommand createInterviewVideo(UploadInterviewVideoRequest request, String folder) throws IOException{
         MultipartFile file = request.getFile();
-        String videoUrl = fileStorageService.saveOther(file, folder);
+        MultipartFile thumbnail = request.getThumbnail();
+        String videoUrl = fileStorageService.saveOther(file, "video");
         System.out.println(videoUrl);
         // 썸네일
-        String thumbnail = "1";
+        String thumbnailUrl = fileStorageService.saveOther(file, "thumbnail");
 
         return InterviewVideoCommand.builder()
-                .ThumbnailUrl(thumbnail)
+                .ThumbnailUrl(thumbnailUrl)
                 .videoUrl(videoUrl)
                 .build();
     }
