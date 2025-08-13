@@ -59,14 +59,6 @@ public class SecurityConfig {
         return new CorsFilter(source);
     }
 
-    // 시큐리티 설정을 비활성화 - 커스텀설정으로 변경
-    private static final String[] PERMIT_ALL_PATTERNS = {
-            "/token/**",
-            "/v1/auth/**",
-            "/v1/user/check/email",
-            "/css/**"
-    };
-
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
@@ -100,10 +92,14 @@ public class SecurityConfig {
                     "/v1/user/check-nickname",
                     "/v1/room/*",
                         "/v1/room-member/*",
+                        "/v1/interview-video",
                         "/ws",
                     "/css/**").permitAll()
                     .requestMatchers("v1/docs",
-                            "/v1/docs/**").authenticated()
+                            "/v1/docs/**",
+                            "/v1/followup",
+                            "/v1/pdf",
+                            "/v1/me/report/**").authenticated()
                     .anyRequest().authenticated()
             );
 

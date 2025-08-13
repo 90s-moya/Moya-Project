@@ -13,20 +13,21 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/v1/pdf")
 @RequiredArgsConstructor
 public class PDFController {
+
     private final PDFService pdfService;
+
+    // 여러 PDF를 합쳐서 FastAPI(/v1/prompt-start)로 전달
     @PostMapping
     public ResponseEntity<String> selectPDFTextBatch(
             @AuthenticationPrincipal CustomUserDetails user,
-            @Valid @RequestBody PDFRequest request
+            @RequestBody PDFRequest request
     ) {
         String userId = user.getUserId().toString();
-
-        String merged = pdfService.getTextBatch (
+        return pdfService.getTextBatch(
                 userId,
                 request.getResumeUrl(),
                 request.getPortfolioUrl(),
                 request.getCoverletterUrl()
         );
-        return ResponseEntity.ok(merged);
     }
 }
