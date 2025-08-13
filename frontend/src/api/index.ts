@@ -5,7 +5,7 @@ import UserApi from "./userApi";
 // Axios 인스턴스 생성
 const instance = axios.create({
   baseURL: import.meta.env.VITE_API_URL, // 개발용 API 요청 공통 URL
-  timeout: 10000,
+  timeout: 100000,
   withCredentials: true,
 });
 
