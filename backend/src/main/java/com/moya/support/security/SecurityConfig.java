@@ -92,6 +92,7 @@ public class SecurityConfig {
                     "/v1/user/check-nickname",
                     "/v1/room/*",
                         "/v1/room-member/*",
+                        "/v1/interview-video",
                         "/ws",
                     "/css/**").permitAll()
                     .requestMatchers("v1/docs",

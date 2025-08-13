@@ -30,6 +30,16 @@ public class FileStorageService {
 
         return fullPath.toString();
     }
+
+    public String saveVideo(MultipartFile file) throws IOException {
+        String fileName = Objects.requireNonNull(file.getOriginalFilename(), "파일명이 없습니다.");
+        Path fullPath = Paths.get(filePath, "video", fileName);
+        Files.createDirectories(fullPath.getParent());
+        Files.write(fullPath, file.getBytes());
+
+        return fullPath.toString();
+    }
+
     public void delete(String fullFilePath) {
         try {
             Path path = Paths.get(fullFilePath);
