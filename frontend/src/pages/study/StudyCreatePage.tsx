@@ -35,7 +35,8 @@ export default function StudyCreatePage() {
   } = useForm<CreateFormData>();
 
   // 로컬 상태
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null); // DatePicker용
+  const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(null); // 시작 시간용
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(null); // 종료 시간용
   const [category, setCategory] = useState<Category[]>([]); // 카테고리 목록
   const navigate = useNavigate(); // 페이지 이동
   const watchedValues = watch(); // 실시간 폼 값 감시
@@ -55,9 +56,21 @@ export default function StudyCreatePage() {
     requestCategory();
   }, []);
 
-  // 날짜 선택 핸들러
-  const handleDateChange = (date: Date | null) => {
-    setSelectedDate(date);
+  // 시작 시간 선택 핸들러
+  const handleStartDateChange = (date: Date | null) => {
+    setSelectedStartDate(date);
+    if (date) {
+      // dayjs를 사용하여 9시간을 더하고 ISO 문자열로 변환
+      const isoString = dayjs(date).add(9, "hour").toISOString();
+      setValue("open_at", isoString);
+    } else {
+      setValue("open_at", "");
+    }
+  };
+
+  // 종료 시간 선택 핸들러
+  const handleEndDateChange = (date: Date | null) => {
+    setSelectedEndDate(date);
     if (date) {
       // dayjs를 사용하여 9시간을 더하고 ISO 문자열로 변환
       const isoString = dayjs(date).add(9, "hour").toISOString();
@@ -69,19 +82,10 @@ export default function StudyCreatePage() {
 
   // 폼 데이터 제출 함수
   const onSubmit = async (formData: CreateFormData) => {
-    // 스터디 생성 일시 생성
-    const open_at = dayjs().add(9, "hour").toISOString();
-
-    // 사용자가 입력한 formData에 openAt 추가
-    const fullData: CreateFormData = {
-      ...formData,
-      open_at,
-    };
-
-    // console.log("요청 시 사용되는 formData는 다음과 같습니다.", fullData);
+    // console.log("요청 시 사용되는 formData는 다음과 같습니다.", formData);
 
     try {
-      await createRoom(fullData);
+      await createRoom(formData);
 
       // console.log("방 생성 API 요청에 대한 응답 : ", data);
       navigate("/mypage/room");
@@ -185,24 +189,24 @@ export default function StudyCreatePage() {
                   )}
                 </div>
 
-                {/* 스터디 마감 일시 */}
+                {/* 스터디 시작 일시 */}
                 <div className="space-y-3">
                   <Label
-                    htmlFor="expiredAt"
+                    htmlFor="openAt"
                     className="text-xl font-bold text-[#1b1c1f] flex items-center gap-2"
                   >
                     <Calendar className="w-5 h-5 text-[#2b7fff]" />
-                    스터디 마감 일시
+                    스터디 시작 일시
                   </Label>
                   <div className="relative group">
                     <DatePicker
-                      selected={selectedDate}
-                      onChange={handleDateChange}
+                      selected={selectedStartDate}
+                      onChange={handleStartDateChange}
                       showTimeSelect
                       timeFormat="HH:mm"
                       timeIntervals={15}
                       dateFormat="yyyy년 MM월 dd일 HH:mm"
-                      placeholderText="날짜와 시간을 선택해주세요"
+                      placeholderText="시작 날짜와 시간을 선택해주세요"
                       minDate={dayjs().add(1, "hour").toDate()}
                       className="w-full border border-[#dedee4] rounded-lg px-6 py-5 text-base focus:border-[#2b7fff] focus:outline-none transition-colors cursor-pointer"
                       wrapperClassName="w-full"
@@ -210,8 +214,69 @@ export default function StudyCreatePage() {
                       popperPlacement="bottom-start"
                       customInput={
                         <Input
+                          {...register("open_at", {
+                            required: "시작 일시는 필수입니다",
+                          })}
+                          className="text-base px-6 py-5 focus:outline-none transition-all duration-200 cursor-pointer border-[#dedee4] focus:ring-0 custom-focus group-hover:border-[#2b7fff]/50"
+                          style={{
+                            fontSize: "16px", // 모바일에서 줌 방지
+                            minHeight: "60px",
+                          }}
+                        />
+                      }
+                    />
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-6 pointer-events-none">
+                      <svg
+                        className="w-6 h-6 text-[#6f727c] group-hover:text-[#2b7fff] transition-colors duration-200"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                  {errors.open_at && (
+                    <p className="text-red-500 text-sm">
+                      {errors.open_at.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* 스터디 종료 일시 */}
+                <div className="space-y-3">
+                  <Label
+                    htmlFor="expiredAt"
+                    className="text-xl font-bold text-[#1b1c1f] flex items-center gap-2"
+                  >
+                    <Calendar className="w-5 h-5 text-[#2b7fff]" />
+                    스터디 종료 일시
+                  </Label>
+                  <div className="relative group">
+                    <DatePicker
+                      selected={selectedEndDate}
+                      onChange={handleEndDateChange}
+                      showTimeSelect
+                      timeFormat="HH:mm"
+                      timeIntervals={15}
+                      dateFormat="yyyy년 MM월 dd일 HH:mm"
+                      placeholderText="종료 날짜와 시간을 선택해주세요"
+                      minDate={
+                        selectedStartDate || dayjs().add(1, "hour").toDate()
+                      }
+                      className="w-full border border-[#dedee4] rounded-lg px-6 py-5 text-base focus:border-[#2b7fff] focus:outline-none transition-colors cursor-pointer"
+                      wrapperClassName="w-full"
+                      popperClassName="z-50"
+                      popperPlacement="bottom-start"
+                      customInput={
+                        <Input
                           {...register("expired_at", {
-                            required: "마감 일시는 필수입니다",
+                            required: "종료 일시는 필수입니다",
                           })}
                           className="text-base px-6 py-5 focus:outline-none transition-all duration-200 cursor-pointer border-[#dedee4] focus:ring-0 custom-focus group-hover:border-[#2b7fff]/50"
                           style={{
@@ -319,16 +384,18 @@ export default function StudyCreatePage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#6f727c]">생성일</span>
+                    <span className="text-[#6f727c]">시작일시</span>
                     <span className="text-[#1b1c1f] font-medium">
-                      {dayjs().format("MM/DD HH:mm")}
+                      {selectedStartDate
+                        ? dayjs(selectedStartDate).format("MM/DD HH:mm")
+                        : "설정 예정"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#6f727c]">만료일</span>
+                    <span className="text-[#6f727c]">종료일시</span>
                     <span className="text-[#1b1c1f] font-medium">
-                      {selectedDate
-                        ? dayjs(selectedDate).format("MM/DD HH:mm")
+                      {selectedEndDate
+                        ? dayjs(selectedEndDate).format("MM/DD HH:mm")
                         : "설정 예정"}
                     </span>
                   </div>
@@ -343,10 +410,6 @@ export default function StudyCreatePage() {
                 스터디 생성 안내
               </h3>
               <ul className="space-y-2 text-sm text-[#4b4e57]">
-                <li className="flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 bg-[#2b7fff] rounded-full mt-2 flex-shrink-0"></span>
-                  <span>스터디 생성 후 즉시 모집이 시작됩니다</span>
-                </li>
                 <li className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-[#2b7fff] rounded-full mt-2 flex-shrink-0"></span>
                   <span>최대 참여 인원은 2~6명 사이로 설정해주세요</span>

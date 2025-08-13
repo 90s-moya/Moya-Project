@@ -14,7 +14,7 @@ const StudyRoom: React.FC = () => {
   const [sortOption, setSortOption] = useState<SortOption>("latest");
   const navigate = useNavigate();
 
-  // 참여한 방 목록 조회
+  // 등록한 방 목록 조회
   useEffect(() => {
     const fetchRegisteredRooms = async () => {
       try {
@@ -48,9 +48,9 @@ const StudyRoom: React.FC = () => {
   }, [registeredRooms, sortOption]);
 
   // 룸 상세 페이지로 이동 핸들러
-  const handleRoomClick = (roomId: string) => {
-    navigate(`/study/detail/${roomId}`);
-  };
+  // const handleRoomClick = (roomId: string) => {
+  //   navigate(`/study/detail/${roomId}`);
+  // };
 
   // 참여하기 버튼 클릭 핸들러 (이벤트 전파 방지)
   const handleJoinRoom = (e: React.MouseEvent, roomId: string) => {
@@ -68,7 +68,7 @@ const StudyRoom: React.FC = () => {
       {/* 페이지 제목과 정렬 옵션 */}
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-2xl font-semibold text-[#2B7FFF] leading-[1.4]">
-          참여 면접 스터디 목록
+          등록한 스터디 목록
         </h3>
 
         {/* 정렬 드롭다운 */}
@@ -117,16 +117,16 @@ const StudyRoom: React.FC = () => {
             </div>
             {/* 메시지 텍스트 */}
             <p className="text-center text-[#6F727C] font-semibold text-base leading-[1.875] mb-3">
-              참여한 스터디 방이 없어요.
+              등록한 스터디 방이 없어요.
               <br />
-              면접 스터디를 생성하고 참여해보세요!
+              면접 스터디를 생성하거나 등록하고 참여해보세요!
             </p>
             {/* 면접 스터디 하러가기 버튼 */}
             <button
               onClick={() => navigate("/study")}
               className="bg-[#2B7FFF] hover:bg-[#1E6FE8] text-white px-4 py-2 rounded-[10px] text-sm font-semibold leading-[1.714] transition-colors h-10"
             >
-              면접 스터디 하러가기
+              면접 스터디 목록으로 가기
             </button>
           </div>
         </div>
@@ -135,7 +135,7 @@ const StudyRoom: React.FC = () => {
           {sortedRooms.map((room) => (
             <div
               key={room.id}
-              onClick={() => handleRoomClick(room.id)}
+              // onClick={() => handleRoomClick(room.id)}
               className="relative bg-[#fafafc] border border-[#dedee4] rounded-lg p-6 h-full flex flex-col justify-between min-h-[120px] text-[18px] transition-all hover:shadow-lg hover:-translate-y-1 w-full cursor-pointer"
             >
               <div>
