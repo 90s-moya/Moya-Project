@@ -1,5 +1,8 @@
 package com.moya.service.interview;
 
+import com.moya.interfaces.api.interview.request.UploadInterviewVideoRequest;
+import com.moya.service.interview.command.InterviewVideoCommand;
+import com.moya.support.file.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -22,6 +25,7 @@ public class InterviewService {
     private String pythonPath;
 
     private final RestTemplate restTemplate;
+    private final FileStorageService fileStorageService;
 
     public Map<String, Object> followupQuestion(
             UUID sessionId, int order, int subOrder, MultipartFile audio
@@ -63,5 +67,18 @@ public class InterviewService {
                 Map.class
         );
         return resp.getBody();
+    }
+
+    public InterviewVideoCommand createInterviewVideo(UploadInterviewVideoRequest request) throws IOException{
+        MultipartFile file = request.getFile();
+        String videoUrl = fileStorageService.saveVideo(file);
+        System.out.println(videoUrl);
+        // 썸네일
+        String thumbnail = "1";
+
+        return InterviewVideoCommand.builder()
+                .ThumbnailUrl(thumbnail)
+                .videoUrl(videoUrl)
+                .build();
     }
 }

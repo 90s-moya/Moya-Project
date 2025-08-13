@@ -1,15 +1,15 @@
 package com.moya.interfaces.api.interview;
 
+import com.moya.interfaces.api.interview.request.UploadInterviewVideoRequest;
+import com.moya.interfaces.api.room.request.UploadVideoRequest;
 import com.moya.service.interview.InterviewService;
+import com.moya.service.interview.command.InterviewVideoCommand;
 import com.moya.support.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -35,4 +35,18 @@ public class InterviewController {
                 interviewService.followupQuestion(sessionId, order, subOrder, audio);
         return ResponseEntity.ok(result);
     }
+    @PostMapping(value="/v1/interview-video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<InterviewVideoCommand> uploadInterviewVideo(@ModelAttribute UploadInterviewVideoRequest uploadInterviewRequest) throws IOException{
+        System.out.println("들어옴?");
+        MultipartFile file = uploadInterviewRequest.getFile();
+//        if (file == null || file.isEmpty()) {
+//            return ResponseEntity.badRequest().body("파일이 비어있습니다");
+//        }
+        // 비디오 파일 저장
+        InterviewVideoCommand fileUrls = interviewService.createInterviewVideo(uploadInterviewRequest);
+
+
+        return ResponseEntity.ok(fileUrls);
+    }
+
 }
