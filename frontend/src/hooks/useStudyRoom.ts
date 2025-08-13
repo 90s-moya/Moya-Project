@@ -40,6 +40,97 @@ export function useStudyRoom() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
 
+  // 참가자 상태 변경 시 자동 저장
+  useEffect(() => {
+    if (participants.length > 0 && roomId) {
+      const participantsToSave = participants.map((p) => ({
+        id: p.id,
+        isLocal: p.isLocal,
+        // stream은 저장할 수 없으므로 제외
+      }));
+      localStorage.setItem(
+        `room-${roomId}-participants`,
+        JSON.stringify(participantsToSave)
+      );
+    }
+  }, [participants, roomId]);
+
+  // 방 입장 시 저장된 참가자 정보 복구
+  useEffect(() => {
+    if (!roomId) return;
+
+    const savedParticipants = localStorage.getItem(
+      `room-${roomId}-participants`
+    );
+    if (savedParticipants) {
+      try {
+        const parsed = JSON.parse(savedParticipants);
+        console.log("저장된 참가자 정보 복구:", parsed);
+
+        // peerManager가 준비된 후에 재연결 시도
+        const attemptReconnect = () => {
+          if (peerManagerRef.current) {
+            parsed.forEach((participant: { id: string; isLocal?: boolean }) => {
+              if (!participant.isLocal && participant.id !== myIdRef.current) {
+                console.log(`저장된 참가자와 재연결 시도: ${participant.id}`);
+                peerManagerRef.current?.createConnectionWith(participant.id);
+              }
+            });
+          } else {
+            // peerManager가 아직 준비되지 않았다면 잠시 후 다시 시도
+            setTimeout(attemptReconnect, 100);
+          }
+        };
+
+        attemptReconnect();
+      } catch (error) {
+        console.error("저장된 참가자 정보 파싱 실패:", error);
+        localStorage.removeItem(`room-${roomId}-participants`);
+      }
+    }
+  }, [roomId]);
+
+  // 페이지 새로고침 시 처리
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (participants.length > 0 && roomId) {
+        const participantsToSave = participants.map((p) => ({
+          id: p.id,
+          isLocal: p.isLocal,
+        }));
+        localStorage.setItem(
+          `room-${roomId}-participants`,
+          JSON.stringify(participantsToSave)
+        );
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (
+        document.visibilityState === "hidden" &&
+        participants.length > 0 &&
+        roomId
+      ) {
+        const participantsToSave = participants.map((p) => ({
+          id: p.id,
+          isLocal: p.isLocal,
+        }));
+        localStorage.setItem(
+          `room-${roomId}-participants`,
+          JSON.stringify(participantsToSave)
+        );
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [participants, roomId]);
+
   // 참가자별 서류 매핑 함수
   const getParticipantDocs = (participantId: string) => {
     console.log("getParticipantDocs 호출됨 - participantId:", participantId);
@@ -194,9 +285,14 @@ export function useStudyRoom() {
     signalingRef.current?.close();
   };
 
-  // 방 나가기
+  // 방 나가기 (수정)
   const handleLeaveRoom = async () => {
     console.log("disconnection video", localStream);
+
+    // 저장된 참가자 정보 삭제
+    if (roomId) {
+      localStorage.removeItem(`room-${roomId}-participants`);
+    }
 
     await stopRecordingAndUpload();
     cleanUpMediaAndConnections();
@@ -219,7 +315,7 @@ export function useStudyRoom() {
     requestDocs();
   }, []);
 
-  // WebRTC 연결 설정
+  // WebRTC 연결 설정 (수정)
   useEffect(() => {
     if (signalingRef.current) return;
 
