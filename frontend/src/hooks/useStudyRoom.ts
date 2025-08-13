@@ -41,7 +41,7 @@ export function useStudyRoom() {
   const signalingRef = useRef<SignalingClient | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
-  const d = "";
+  const videoStartRef = useRef<string | null>(null);
 
   // 참가자 상태 변경 시 자동 저장
   useEffect(() => {
@@ -227,6 +227,7 @@ export function useStudyRoom() {
       const d = new Date();
       const ms = d.getTime() - d.getTimezoneOffset() * 60_000; // 로컬 오프셋 보정
       const localDateTime = new Date(ms).toISOString().slice(0, 19);
+      videoStartRef.current = localDateTime;
       console.log(localDateTime);
                 
           
@@ -260,7 +261,7 @@ export function useStudyRoom() {
             formData.append("file", file);
             if (!roomId) return;
             formData.append("roomId", roomId);
-            formData.append("videoStart", d);
+            formData.append("videoStart", videoStartRef.current ??"");
             console.log("ghkrdls=========", formData)
 
             await uploadVideo(formData);
