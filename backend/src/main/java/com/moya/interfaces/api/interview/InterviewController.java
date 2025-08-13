@@ -36,12 +36,12 @@ public class InterviewController {
         return ResponseEntity.ok(result);
     }
     @PostMapping(value="/v1/interview-video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<InterviewVideoCommand> uploadInterviewVideo(@ModelAttribute UploadInterviewVideoRequest uploadInterviewRequest) throws IOException{
+    public ResponseEntity<?> uploadInterviewVideo(@ModelAttribute UploadInterviewVideoRequest uploadInterviewRequest) throws IOException{
         System.out.println("들어옴?");
         MultipartFile file = uploadInterviewRequest.getFile();
-//        if (file == null || file.isEmpty()) {
-//            return ResponseEntity.badRequest().body("파일이 비어있습니다");
-//        }
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body("파일이 비어있습니다");
+        }
         // 비디오 파일 저장
         InterviewVideoCommand fileUrls = interviewService.createInterviewVideo(uploadInterviewRequest);
 
