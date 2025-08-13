@@ -11,6 +11,8 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // 비디오 추가
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
 
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -30,8 +32,12 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
 
   const start = useCallback(async () => {
     setError(null);
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mr = new MediaRecorder(stream);
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    // 비디오 값
+    setVideoStream(stream);
+    // 오디오 전용
+    const audioOnly = new MediaStream(stream.getAudioTracks());
+    const mr = new MediaRecorder(audioOnly);
     chunksRef.current = [];
 
     mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
@@ -67,6 +73,7 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
       } finally {
         abortRef.current = null;
         stream.getTracks().forEach((t) => t.stop());
+        setVideoStream(null)
       }
     };
 
@@ -86,5 +93,5 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
     if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
   }, []);
 
-  return { start, stop, isRecording, seconds, error };
+  return { start, stop, isRecording, seconds, error, videoStream };
 }

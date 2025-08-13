@@ -63,6 +63,7 @@ export default function InterviewScreen() {
             <h3 className="text-lg font-semibold mb-4">Q. {questionText}</h3>
             <img src={aiCharacter} alt="AI 면접관" className="object-contain max-h-full" />
           </div>
+          
 
           {/* 녹음 컨트롤: sessionId/order/subOrder 기준으로 저장·업로드 */}
           <div className="w-full max-w-3xl">
