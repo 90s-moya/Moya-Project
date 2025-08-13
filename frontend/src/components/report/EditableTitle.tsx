@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Edit2, Check, X } from 'lucide-react';
+import { updateReportTitle } from '@/api/interviewApi';
 import type { EditableTitleProps } from '@/types/interviewReport';
 
 const EditableTitle: React.FC<EditableTitleProps> = ({ reportId, title, onTitleChange }) => {
@@ -14,8 +15,7 @@ const EditableTitle: React.FC<EditableTitleProps> = ({ reportId, title, onTitleC
   const handleSave = async () => {
     try {
       // API 호출로 제목 수정
-      // await updateReportTitle(reportId, editTitle);
-      console.log('제목 수정:', reportId, editTitle);
+      await updateReportTitle(reportId, editTitle);
       
       // 부모 상태 업데이트
       onTitleChange(reportId, editTitle);
@@ -23,6 +23,8 @@ const EditableTitle: React.FC<EditableTitleProps> = ({ reportId, title, onTitleC
     } catch (error) {
       console.error('제목 수정 실패:', error);
       setEditTitle(title); // 원래 제목으로 복원
+      // 에러 처리 - 사용자에게 알림
+      alert('제목 수정에 실패했습니다. 다시 시도해주세요.');
     }
   };
 

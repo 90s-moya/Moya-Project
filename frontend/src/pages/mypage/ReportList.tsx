@@ -35,6 +35,7 @@ const ReportList: React.FC = () => {
 
   // 제목 수정 핸들러
   const handleTitleChange = (reportId: string, newTitle: string) => {
+    // API 호출이 성공한 경우에만 로컬 상태 업데이트
     setReportList((prev) =>
       prev.map((report: ReportList) =>
         report.report_id === reportId ? { ...report, title: newTitle } : report
