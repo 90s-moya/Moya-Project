@@ -9,7 +9,7 @@ export const getReportList = async () => {
 
 // 리포트 제목 수정
 export const updateReportTitle = async (reportId: string, title: string) => {
-  const res = await api.patch(`/v1/me/report/${reportId}/title`, { title });
+  const res = await api.post(`/v1/me/report/${reportId}/title`, { title });
   return res.data;
 };
 

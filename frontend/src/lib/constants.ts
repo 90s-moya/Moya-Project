@@ -183,3 +183,31 @@ export const RESULT_DETAIL_TABS = [
   { id: 'eye' as const, label: '시선 분석' }
 ] as const;
 
+// 시선 분포 패턴 매핑
+export const GAZE_DISTRIBUTION_MAP = {
+  'concentrated': '집중형',
+  'distributed': '분산형',
+  'scattered': '산재형',
+  '중앙 집중': '집중형'
+} as const;
+
+export const getGazeDistributionText = (distribution: string): string => {
+  return GAZE_DISTRIBUTION_MAP[distribution as keyof typeof GAZE_DISTRIBUTION_MAP] || String(distribution);
+};
+
+// 시선 분석 원형 그래프 데이터 생성 함수
+export const generateGazePieChartData = (centerGazePercentage: number, peripheralGazePercentage: number) => {
+  return [
+    {
+      name: '중앙 시선',
+      value: centerGazePercentage,
+      color: '#2B7FFF'
+    },
+    {
+      name: '주변 시선',
+      value: peripheralGazePercentage,
+      color: '#E5E7EB'
+    }
+  ];
+};
+

@@ -8,6 +8,7 @@ import GazeAnalysis from '@/components/report/result-detail/GazeAnalysis';
 import { getInterviewResultDetail } from '@/api/interviewApi';
 import type { TabType, ResultDetailState, InterviewReportDetailResponse } from '@/types/interviewReport';
 import { formatQuestionOrder, RESULT_DETAIL_TABS } from '@/lib/constants';
+import testData from '@/test.json';
 
 const ResultDetail: React.FC = () => {
   const { reportId, resultId } = useParams<{ reportId: string; resultId: string }>();
@@ -96,8 +97,15 @@ const ResultDetail: React.FC = () => {
             onFrameChange={handleFrameChange} 
           />
         );
-      case 'eye':
-        return <GazeAnalysis />;
+             case 'eye':
+         return (
+           <GazeAnalysis 
+             center_gaze_percentage={reportData?.gaze_result?.center_gaze_percentage || 75}
+             peripheral_gaze_percentage={reportData?.gaze_result?.peripheral_gaze_percentage || 25}
+             gaze_distribution={reportData?.gaze_result?.gaze_distribution || 'concentrated'}
+             heatmap_data={testData.heatmap_data}
+           />
+         );
       default:
         return (
           <VerbalAnalysis 

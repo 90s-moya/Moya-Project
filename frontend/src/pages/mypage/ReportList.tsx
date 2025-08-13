@@ -6,11 +6,11 @@ import EmptyState from '@/components/report/EmptyState';
 import CarouselNavigation from '@/components/report/CarouselNavigation';
 import EditableTitle from '@/components/report/EditableTitle';
 import { getReportList } from '@/api/interviewApi';
-import type { ReportList, ReportItem } from '@/types/interviewReport';
+import type { ReportListData, ReportItemData } from '@/types/interviewReport';
 
 const ReportList: React.FC = () => {
   const navigate = useNavigate();
-  const [reportList, setReportList] = React.useState<ReportList[]>([]);
+  const [reportList, setReportList] = React.useState<ReportListData[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -21,7 +21,7 @@ const ReportList: React.FC = () => {
         setLoading(true);
         setError(null);
         const data = await getReportList();
-        setReportList(data as ReportList[]);
+        setReportList(data as ReportListData[]);
       } catch (err) {
         console.error('리포트 목록 조회 실패:', err);
         setError('리포트 목록을 불러오는데 실패했습니다.');
@@ -37,7 +37,7 @@ const ReportList: React.FC = () => {
   const handleTitleChange = (reportId: string, newTitle: string) => {
     // API 호출이 성공한 경우에만 로컬 상태 업데이트
     setReportList((prev) =>
-      prev.map((report: ReportList) =>
+      prev.map((report: ReportListData) =>
         report.report_id === reportId ? { ...report, title: newTitle } : report
       )
     );
@@ -72,7 +72,7 @@ const ReportList: React.FC = () => {
       ) : (
         /* 결과가 있을 때 */
         <div className="flex flex-col gap-12 w-full">
-          {reportList.map((report: ReportList) => (
+          {reportList.map((report: ReportListData) => (
             <div key={report.report_id} className="w-full my-6">
               {/* 리포트 헤더 */}
               <div className="flex items-center justify-between mb-2">
@@ -95,10 +95,10 @@ const ReportList: React.FC = () => {
               <CarouselNavigation
                 reportId={report.report_id}
                 results={report.results}
-                onResultClick={(reportId, resultId) => {
-                  const result = report.results.find((r: ReportItem) => r.result_id === resultId);
-                  handleResultClick(reportId, resultId, result?.question || '', report.title, result?.order || 0, result?.suborder || 0);
-                }}
+                                 onResultClick={(reportId, resultId) => {
+                   const result = report.results.find((r: ReportItemData) => r.result_id === resultId);
+                   handleResultClick(reportId, resultId, result?.question || '', report.title, result?.order || 0, result?.suborder || 0);
+                 }}
               />
             </div>
           ))}

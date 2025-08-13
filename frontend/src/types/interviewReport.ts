@@ -1,7 +1,7 @@
 // Interview Report 관련 모든 타입 정의
 
 // 기본 결과 항목 인터페이스
-export interface ReportItem {
+export interface ReportItemData {
   result_id: string;
   created_at: string;
   status: string;
@@ -12,15 +12,15 @@ export interface ReportItem {
 }
 
 // 리포트 목록 인터페이스
-export interface ReportList {
+export interface ReportListData {
   report_id: string;
   title: string;
-  results: ReportItem[];
+  results: ReportItemData[];
 }
 
 // ReportCard 컴포넌트 Props
 export interface ReportCardProps {
-  result: ReportItem;
+  result: ReportItemData;
   reportId: string;
   onResultClick: (reportId: string, resultId: string) => void;
 }
@@ -28,7 +28,7 @@ export interface ReportCardProps {
 // CarouselNavigation 컴포넌트 Props
 export interface CarouselNavigationProps {
   reportId: string;
-  results: ReportItem[];
+  results: ReportItemData[];
   onResultClick: (reportId: string, resultId: string) => void;
 }
 
@@ -47,6 +47,7 @@ export interface InterviewReportDetailResponse {
   verbal_result?: VerbalResult;
   face_result?: FaceResult;
   posture_result?: PostureResult;
+  gaze_result?: GazeResult;
 }
 
 
@@ -86,6 +87,13 @@ export interface FaceResult {
     start_frame: number;
     end_frame: number;
   }>;
+}
+
+// 시선 분석 결과
+export interface GazeResult {
+  center_gaze_percentage: number;
+  peripheral_gaze_percentage: number;
+  gaze_distribution: string;
 }
 
 // 분석 컴포넌트 Props들
