@@ -75,7 +75,7 @@ public class InterviewService {
         String videoUrl = fileStorageService.saveOther(file, "video");
         System.out.println(videoUrl);
         // 썸네일
-        String thumbnailUrl = fileStorageService.saveOther(file, "thumbnail");
+        String thumbnailUrl = fileStorageService.saveOther(thumbnail, "thumbnail");
 
         return InterviewVideoCommand.builder()
                 .ThumbnailUrl(thumbnailUrl)
