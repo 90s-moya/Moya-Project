@@ -125,7 +125,7 @@ def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every:
     """
     업로드된 동영상 바이트 -> 샘플링/분석 -> JSON 리포트 반환
 
-    반환 포맷(segments 모드 기준)
+    반환 포맷
     {
       "timestamp": ISO8601,
       "total_frames": int,                # 원본에서 읽은 총 프레임 수(스킵 포함)
