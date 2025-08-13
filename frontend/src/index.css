@@ -122,6 +122,17 @@
   }
 }
 
+/* Prevent layout shift when vertical scrollbar appears */
+@layer base {
+  @supports (scrollbar-gutter: stable) {
+    html { scrollbar-gutter: stable; }
+  }
+  @supports not (scrollbar-gutter: stable) {
+    /* Fallback for older browsers */
+    html { overflow-y: scroll; }
+  }
+}
+
 /* globals.css 또는 app/globals.css */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
@@ -134,6 +145,23 @@
 
 button {
   cursor: pointer;
+}
+
+/* Recharts 스타일 */
+.recharts-surface {
+  outline: none !important;
+  border: none !important;
+}
+
+.recharts-wrapper {
+  outline: none !important;
+  border: none !important;
+}
+
+/* 원형 그래프 퍼센트 라벨 색상 */
+.recharts-pie-label-text {
+  fill: #6B7280 !important;
+  font-size: 13px !important;
 }
 
 /* 커스텀 포커스 스타일 */
