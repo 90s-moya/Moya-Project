@@ -40,7 +40,7 @@ public class RoomMemberService {
         // 현재는 프론트에서 줄여 보냄 -> 추후 필요시 로직 추가 예정
 
         // 파일 저장 path
-        String filePath = fileStorageService.save(file);
+        String filePath = fileStorageService.saveOther(file, "study");
 
         // DB에 저장
         roomMemberRepository.saveVideo(userId, roomId, filePath);

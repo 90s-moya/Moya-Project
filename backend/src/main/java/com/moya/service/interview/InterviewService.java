@@ -69,9 +69,9 @@ public class InterviewService {
         return resp.getBody();
     }
 
-    public InterviewVideoCommand createInterviewVideo(UploadInterviewVideoRequest request) throws IOException{
+    public InterviewVideoCommand createInterviewVideo(UploadInterviewVideoRequest request, String folder) throws IOException{
         MultipartFile file = request.getFile();
-        String videoUrl = fileStorageService.saveVideo(file);
+        String videoUrl = fileStorageService.saveOther(file, folder);
         System.out.println(videoUrl);
         // 썸네일
         String thumbnail = "1";
