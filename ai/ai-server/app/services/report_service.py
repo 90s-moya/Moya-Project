@@ -173,3 +173,18 @@ def get_result_detail_secure(db: Session, report_id: str, result_id: str, user_i
         "posture_result": _maybe_load_json(getattr(r, "posture_result", None)),
         "face_result": _maybe_load_json(getattr(r, "face_result", None)),
     }
+def update_report_title(db: Session, report_id: str, new_title: str) -> bool:
+    """
+    보고서(EvaluationSession)의 타이틀만 수정하는 함수
+    :param db: SQLAlchemy Session
+    :param report_id: EvaluationSession.id
+    :param new_title: 변경할 타이틀
+    :return: True(성공) / False(대상 없음)
+    """
+    s = db.query(EvaluationSession).filter(EvaluationSession.id == report_id).first()
+    if not s:
+        return False
+
+    s.title = new_title
+    db.commit()
+    return True
