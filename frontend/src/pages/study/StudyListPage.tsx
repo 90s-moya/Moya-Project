@@ -46,18 +46,18 @@ export default function StudyListPage() {
   // 현재 날짜
   const now = new Date();
 
-  // 마감일이 지나지 않은 스터디만 필터링
+  // 종료일이 지나지 않은 스터디만 필터링
   const activeRooms = rooms.filter((room) => {
-    if (!room.expiredAt) return true; // 마감일이 없는 경우 포함
-    return new Date(room.expiredAt) > now; // 마감일이 현재보다 미래인 경우만 포함
+    if (!room.expiredAt) return true; // 종료일이 없는 경우 포함
+    return new Date(room.expiredAt) > now; // 종료일이 현재보다 미래인 경우만 포함
   });
 
-  // 최신순으로 정렬된 rooms
+  // 최신순으로 정렬된 rooms (시작 시간 기준)
   const recentSortedRooms = [...activeRooms].sort(
     (a, b) => new Date(b.openAt).getTime() - new Date(a.openAt).getTime()
   );
 
-  // 마감순으로 정렬된 rooms
+  // 종료순으로 정렬된 rooms
   const deadlineSortedRooms = [...activeRooms].sort(
     (a, b) => new Date(a.expiredAt).getTime() - new Date(b.expiredAt).getTime()
   );
@@ -72,16 +72,16 @@ export default function StudyListPage() {
   // 더보기 버튼 관련 변수
   const hasMore = visibleCount < sortedRooms.length;
 
-  // 긴급 모집 스터디 필터링 및 정렬 (마감일이 지나지 않은 것만)
+  // 긴급 모집 스터디 필터링 및 정렬 (종료일이 지나지 않은 것만)
   const urgentRooms = activeRooms
     .filter((room) => room.maxUser - room.joinUser === 1) // 참여 인원 차이가 1인 방만
     .sort((a, b) => {
-      // 마감일이 없는 스터디는 가장 후순위
+      // 종료일이 없는 스터디는 가장 후순위
       if (!a.expiredAt && !b.expiredAt) return 0;
       if (!a.expiredAt) return 1;
       if (!b.expiredAt) return -1;
 
-      // 마감일이 가까운 순서로 정렬
+      // 종료일이 가까운 순서로 정렬
       const aTimeLeft = new Date(a.expiredAt).getTime() - now.getTime();
       const bTimeLeft = new Date(b.expiredAt).getTime() - now.getTime();
 
@@ -109,17 +109,16 @@ export default function StudyListPage() {
 
       <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-[17px] leading-relaxed">
         {/* Title Section */}
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">
-            면접 스터디 모집
-          </h1>
-          <p className="text-[#4b4e57] text-lg">
-            회원님에게 맞는 면접 스터디를 찾아보세요!
-          </p>
-        </div>
+        <div className="mb-10 flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">
+              면접 스터디 모집
+            </h1>
+            <p className="text-[#4b4e57] text-lg">
+              회원님에게 맞는 면접 스터디를 찾아보세요!
+            </p>
+          </div>
 
-        {/* Quick Actions */}
-        <div className="mb-8 flex justify-end">
           <Button
             onClick={() => navigate("/study/create")}
             className="bg-[#2b7fff] hover:bg-blue-600 text-white font-semibold text-lg rounded-lg px-6 py-6 flex items-center gap-2"
@@ -135,10 +134,10 @@ export default function StudyListPage() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-[#1b1c1f] mb-2 flex items-center gap-2">
                 <AlertTriangle className="w-6 h-6 text-[#2b7fff]" />
-                긴급 모집 중인 스터디
+                모집 인원이 얼마 안 남았어요!
               </h2>
               <p className="text-[#4b4e57] text-lg">
-                마감이 임박한 스터디를 놓치지 마세요!
+                면접 스터디를 빠르게 할 수 있는 기회를 놓치지 마세요
               </p>
             </div>
 
@@ -176,15 +175,15 @@ export default function StudyListPage() {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-[#1b1c1f] mb-2 flex items-center gap-2">
               <Users className="w-6 h-6 text-[#2b7fff]" />
-              전체 스터디 목록
+              시작 시간이 얼마 안 남았어요 !
             </h2>
             <p className="text-[#4b4e57] text-lg">
-              다양한 면접 스터디를 둘러보고 참여해보세요!
+              다양한 면접 스터디를 둘러보고 얼른 참여해보세요
             </p>
           </div>
 
           {/* Sorting Tabs */}
-          <div className="flex space-x-8 mb-8">
+          {/* <div className="flex space-x-8 mb-8">
             <button
               onClick={() => {
                 setActiveTab("deadline");
@@ -197,7 +196,7 @@ export default function StudyListPage() {
               }`}
             >
               <Clock className="w-5 h-5" />
-              마감순
+              종료순
             </button>
             <button
               onClick={() => {
@@ -211,9 +210,9 @@ export default function StudyListPage() {
               }`}
             >
               <Calendar className="w-5 h-5" />
-              최신순
+              시작순
             </button>
-          </div>
+          </div> */}
 
           {/* Study Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-[16px]">

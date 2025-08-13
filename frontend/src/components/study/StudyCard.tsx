@@ -15,7 +15,7 @@ export default function StudyCard({
 }: StudyRoom & { isCarousel?: boolean }) {
   const navigate = useNavigate();
 
-  // 마감일이 지났는지 확인
+  // 종료일이 지났는지 확인
   const isExpired = expiredAt ? new Date(expiredAt) < new Date() : false;
 
   return (
@@ -48,13 +48,13 @@ export default function StudyCard({
             <span className="text-[#1b1c1f] font-medium">{categoryName}</span>
           </div>
           <div className="flex justify-between text-base">
-            <span className="text-[#6f727c]">생성일</span>
+            <span className="text-[#6f727c]">시작일시</span>
             <span className="text-[#1b1c1f] font-medium">
               {formatDateTime(openAt)}
             </span>
           </div>
           <div className="flex justify-between text-base">
-            <span className="text-[#6f727c]">만료일</span>
+            <span className="text-[#6f727c]">종료일시</span>
             <span
               className={`font-medium ${
                 isExpired ? "text-red-500" : "text-[#1b1c1f]"
