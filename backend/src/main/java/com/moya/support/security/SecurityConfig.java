@@ -97,7 +97,8 @@ public class SecurityConfig {
                     .requestMatchers("v1/docs",
                             "/v1/docs/**",
                             "/v1/followup",
-                            "/v1/pdf").authenticated()
+                            "/v1/pdf",
+                            "/v1/me/report/**").authenticated()
                     .anyRequest().authenticated()
             );
 

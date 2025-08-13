@@ -5,6 +5,7 @@ package com.moya.interfaces.api.report;
 import com.moya.infras.report.ReportDto;
 import com.moya.infras.report.ResultDetailResponse;
 import com.moya.infras.report.ResultDto;
+import com.moya.infras.report.TitleUpdateDto;
 import com.moya.service.report.ReportService;
 import com.moya.support.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
@@ -51,5 +52,14 @@ public class ReportController {
     ) {
         var body = reportService.fetchResultDetail(reportId, resultId, user.getUserId().toString());
         return ResponseEntity.ok(body);
+    }
+    @PostMapping("/{reportId}/title")
+    public ResponseEntity<TitleUpdateDto> updateReportTitle(
+            @PathVariable String reportId,
+            @AuthenticationPrincipal CustomUserDetails user,
+            @RequestBody TitleUpdateRequest body
+    ) {
+        TitleUpdateDto dto = reportService.updateReportTitle(reportId, user.getUserId().toString(), body.getTitle());
+        return ResponseEntity.ok(dto);
     }
 }

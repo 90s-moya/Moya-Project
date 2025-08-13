@@ -8,6 +8,8 @@ import java.util.NoSuchElementException;
 import com.moya.infras.report.ReportDto;
 import com.moya.infras.report.ResultDetailResponse;
 import com.moya.infras.report.ResultDto;
+import com.moya.infras.report.TitleUpdateDto;
+import com.moya.interfaces.api.report.TitleUpdateRequest;
 import com.moya.interfaces.api.report.UserIdRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -28,7 +30,6 @@ public class ReportService {
         this.restTemplate = restTemplate;
     }
 
-    /** FastAPI: POST /reports  (body: {"user_id": "..."} ), 응답: List<ReportDto> */
     public List<ReportDto> fetchReportsByUser(String userId) {
         URI uri = URI.create(pythonPath + "/reports");
 
@@ -79,6 +80,29 @@ public class ReportService {
             throw new org.springframework.security.access.AccessDeniedException("Forbidden");
         } catch (HttpClientErrorException.NotFound e) {  // 404: reportId-resultId 불일치 또는 없음
             throw new java.util.NoSuchElementException("Result not found");
+        }
+    }
+    public TitleUpdateDto updateReportTitle(String reportId, String userId, String newTitle) {
+        // POST /reports/{report_id}/title?user_id={userId}
+        URI uri = URI.create(pythonPath + "/reports/" + reportId + "/title?user_id=" + userId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        TitleUpdateRequest body = new TitleUpdateRequest(newTitle);
+        HttpEntity<TitleUpdateRequest> req = new HttpEntity<>(body, headers);
+
+        try {
+            ResponseEntity<TitleUpdateDto> resp = restTemplate.exchange(
+                    uri, HttpMethod.POST, req, TitleUpdateDto.class
+            );
+            return resp.getBody();
+        } catch (HttpClientErrorException.Forbidden e) {
+            throw new org.springframework.security.access.AccessDeniedException("Forbidden");
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new NoSuchElementException("Report not found");
+        } catch (HttpClientErrorException.BadRequest e) {
+            throw new IllegalArgumentException("Invalid title");
         }
     }
 }
