@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
 import { getDocsInRoom, uploadVideo } from "@/api/studyApi";
+// 날짜 처리
+import dayjs from "dayjs";
 
 type Participant = {
   id: string;
@@ -39,6 +41,7 @@ export function useStudyRoom() {
   const signalingRef = useRef<SignalingClient | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const d = "";
 
   // 참가자 상태 변경 시 자동 저장
   useEffect(() => {
@@ -221,6 +224,13 @@ export function useStudyRoom() {
       };
 
       recorder.start();
+      const d = new Date();
+      const ms = d.getTime() - d.getTimezoneOffset() * 60_000; // 로컬 오프셋 보정
+      const localDateTime = new Date(ms).toISOString().slice(0, 19);
+      console.log(localDateTime);
+                
+          
+
       console.log("녹화 시작");
     } catch (error) {
       console.error("녹화 시작 실패:", error);
@@ -250,6 +260,8 @@ export function useStudyRoom() {
             formData.append("file", file);
             if (!roomId) return;
             formData.append("roomId", roomId);
+            formData.append("videoStart", d);
+            console.log("ghkrdls=========", formData)
 
             await uploadVideo(formData);
           }
