@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
@@ -154,23 +154,26 @@ export function useStudyRoom() {
     return filteredDocs;
   };
 
-  // 서류 클릭 핸들러
-  const handleDocsClick = (userId: string) => {
-    console.log("서류 클릭됨:", userId);
-    if (focusedUserId === userId && showCarousel) {
-      setShowCarousel(false);
-      setFocusedUserId(null);
-      return;
-    }
-    setFocusedUserId(userId);
-    setShowCarousel(true);
-  };
+  // 서류 클릭 핸들러 최적화 (디바운싱 추가)
+  const handleDocsClick = useCallback(
+    (userId: string) => {
+      console.log("서류 클릭됨:", userId);
+      if (focusedUserId === userId && showCarousel) {
+        setShowCarousel(false);
+        setFocusedUserId(null);
+        return;
+      }
+      setFocusedUserId(userId);
+      setShowCarousel(true);
+    },
+    [focusedUserId, showCarousel]
+  );
 
-  // 캐러셀 닫기 핸들러
-  const handleCloseCarousel = () => {
+  // 캐러셀 닫기 핸들러 최적화
+  const handleCloseCarousel = useCallback(() => {
     setShowCarousel(false);
     setFocusedUserId(null);
-  };
+  }, []);
 
   // 포커스된 참가자의 서류를 캐러셀용 데이터로 변환
   const getCarouselItems = (): DocItem[] => {

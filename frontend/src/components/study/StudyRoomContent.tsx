@@ -52,8 +52,10 @@ export default function StudyRoomContent({
     return (
       <div
         key={participant.id}
-        className={`w-full aspect-video transition-all duration-300 ${
-          isFocused ? "col-span-2 row-span-2" : ""
+        className={`w-full aspect-video ${
+          isFocused
+            ? "col-span-2 row-span-2 transition-[grid-column,grid-row] duration-200"
+            : "transition-[grid-column,grid-row] duration-200"
         }`}
       >
         <VideoTile
@@ -72,7 +74,7 @@ export default function StudyRoomContent({
     <div className="h-full pt-[50px] px-4">
       {/* 포커스 모드일 때: 왼쪽 포커스된 비디오 + 오른쪽 서류 */}
       {focusedUserId ? (
-        <div className="flex gap-4 h-full">
+        <div className="flex gap-4 h-full animate-in fade-in duration-200">
           {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
           <div className="w-1/2 h-[68vh]">
             {participants
@@ -102,7 +104,7 @@ export default function StudyRoomContent({
       ) : (
         /* 일반 모드: 그리드 레이아웃 (참가자 수 기반 반응형) */
         <div
-          className={`grid gap-4 h-full transition-[grid-template-columns] duration-300`}
+          className="grid gap-4 h-full animate-in fade-in duration-200"
           style={{
             gridTemplateColumns: `repeat(${getGridColumns(
               participants.length

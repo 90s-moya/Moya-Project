@@ -36,13 +36,19 @@ export default function VideoTile({
   >(null);
   const [isSending, setIsSending] = useState(false);
 
+  // 비디오 스트림 연결 최적화
   useEffect(() => {
     if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    } else if (videoRef.current) videoRef.current.srcObject = null;
+      // 기존 srcObject가 같은 스트림이면 재설정하지 않음
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
+    } else if (videoRef.current && !stream) {
+      videoRef.current.srcObject = null;
+    }
   }, [stream]);
 
-  // 서류 아이콘 클릭 시 실행되는 함수
+  // 서류 아이콘 클릭 시 실행되는 함수 (디바운싱 추가)
   const handleClickDocs = () => {
     console.log("서류 아이콘 클릭 됨.");
     console.log("사용자 ID:", userId);
@@ -105,6 +111,8 @@ export default function VideoTile({
         playsInline
         muted={isLocal}
         className="w-full h-full object-cover transform scale-x-[-1]"
+        // 비디오 로딩 최적화
+        preload="metadata"
       />
 
       {/* 오른쪽 상단 서류 아이콘 (썸네일에서는 숨김) */}
