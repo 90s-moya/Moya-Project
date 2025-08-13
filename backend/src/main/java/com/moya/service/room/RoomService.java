@@ -112,10 +112,19 @@ public class RoomService {
         return makedRoom.getId();
     }
 
+    // 내가 속한 완료된 면접 스터디 조회
+    @Transactional
+    public List<RoomInfoCommand> getMyDoneRooms(UUID user_id){
+        List<Room> myRooms = roomRepository.findMyDoneRoom(user_id);
+        return myRooms.stream().map(room->{
+            int count = roomMemberRepository.countByRoom(room.getId());
+            return RoomInfoCommand.from(room, count);
+        }).toList();
+    }    
     // 내가 속한 면접 스터디 조회
     @Transactional
-    public List<RoomInfoCommand> getMyRooms(UUID user_id){
-        List<Room> myRooms = roomRepository.findMyRoom(user_id);
+    public List<RoomInfoCommand> getMyTodoRooms(UUID user_id){
+        List<Room> myRooms = roomRepository.findMyTodoRoom(user_id);
         return myRooms.stream().map(room->{
             int count = roomMemberRepository.countByRoom(room.getId());
             return RoomInfoCommand.from(room, count);
