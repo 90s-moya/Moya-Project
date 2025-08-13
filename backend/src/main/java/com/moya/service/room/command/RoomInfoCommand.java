@@ -17,6 +17,7 @@ public class RoomInfoCommand {
     private int joinUser;
     private LocalDateTime expiredAt;
     private LocalDateTime openAt;
+    private LocalDateTime createdAt;
     private String categoryName;
     private LocalDateTime videoStart;
 
@@ -29,6 +30,7 @@ public class RoomInfoCommand {
                 .joinUser(joinMemberCount)
                 .expiredAt(room.getExpiredAt())
                 .openAt(room.getOpenAt())
+                .createdAt(room.getCreatedAt())
                 .categoryName(room.getCategoryId().getName())
                 .build();
     }
