@@ -69,7 +69,7 @@ export default function StudyRoomContent({
   };
 
   return (
-    <div className="h-full pt-[60px] px-4">
+    <div className="h-full pt-[50px] px-4">
       {/* 포커스 모드일 때: 왼쪽 포커스된 비디오 + 오른쪽 서류 */}
       {focusedUserId ? (
         <div className="flex gap-4 h-full">
