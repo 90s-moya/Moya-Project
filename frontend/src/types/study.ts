@@ -2,6 +2,7 @@ export type StudyRoom = {
   body: string;
   categoryName: string;
   conversation: string;
+  createdAt: string;
   expiredAt: string;
   id: string;
   maxUser: number;
