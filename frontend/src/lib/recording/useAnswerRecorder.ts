@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useInterviewAnswerStore } from '@/store/interviewAnswerStore';
 import { type QuestionKey, type AnswerItem } from '@/types/interview';
 import { sendFollowupAudio } from '@/api/interviewApi';
+import { sendVideoUpload } from "@/api/interviewApi";
 
 const extFromMime = (mt: string) =>
   mt.includes('webm') ? 'webm' : mt.includes('ogg') ? 'ogg' : 'wav';
@@ -39,7 +40,14 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
 
   const start = useCallback(async () => {
     setError(null);
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      audio: true,
+      video: {
+        width: { ideal: 960, max: 960 },
+        height: { ideal: 540, max: 540 },
+        frameRate: { ideal: 30, max: 30 },
+      }
+      });
     // 비디오 값
     setVideoStream(stream);
     // 오디오 전용
@@ -121,7 +129,9 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
           formData.append("order", String(key.order));
           formData.append("subOrder", String(key.subOrder))
 
-          
+          // 동영상 전송 후 url return
+          const urls = await sendVideoUpload(formData);
+          console.log("==========비디오 레츠고 ======", urls);
 
 
           // 카메라 끄기
