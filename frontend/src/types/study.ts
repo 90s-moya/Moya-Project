@@ -76,6 +76,7 @@ export type MyRegisteredRoom = {
   categoryName: string;
   title: string;
   body: string;
+  createdAt: string;
   joinUser: number;
   maxUser: number;
   openAt: string;
