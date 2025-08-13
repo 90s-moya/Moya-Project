@@ -33,8 +33,11 @@ const Feedback: React.FC = () => {
   // 참여한 시간 포맷: YYYY/MM/DD HH:mm
   const formatCardDate = (dateString: string) => {
     const parsed = dayjs(dateString);
-    if (!parsed.isValid()) return '';
-    return parsed.format('YYYY/MM/DD HH:mm');
+    if (!parsed.isValid()) {
+      return '';
+    }
+    const formatted = parsed.format('YYYY/MM/DD HH:mm');
+    return formatted;
   };
 
   return (
@@ -98,11 +101,11 @@ const Feedback: React.FC = () => {
         </div>
       ) : (
         <div className="flex flex-col gap-6 w-full">
-          {studyList.map((study) => (
+          {studyList.slice().reverse().map((study) => (
                          <div
                key={study.id}
                className="relative bg-[#fafafc] border border-[#dedee4] rounded-lg p-6 h-full flex flex-col justify-between min-h-[120px] text-[18px] cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 w-full"
-               onClick={() => navigate(`/mypage/feedback/${study.id}`, { state: { title: study.title, createdAt: study.createdAt } })}
+               onClick={() => navigate(`/mypage/feedback/${study.id}`, { state: { title: study.title } })}
              >
                <div>
                  <div className="mb-2">
@@ -116,7 +119,7 @@ const Feedback: React.FC = () => {
                  {study.categoryName}
                </span>
                {/* 참여한 시간 (오른쪽 하단) */}
-               <span className="absolute bottom-4 right-6 text-sm text-gray-500">{formatCardDate(study.createdAt)}</span>
+               <span className="absolute bottom-4 right-6 text-sm text-gray-500">{formatCardDate(study.openAt)}</span>
              </div>
           ))}
         </div>

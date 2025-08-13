@@ -13,17 +13,16 @@ const FeedbackDetail: React.FC = () => {
   const location = useLocation();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // state로 전달된 title, open_at
-  const { title, open_at } = (location.state as { title?: string; open_at?: string }) || {};
+  // state로 전달된 title
+  const { title } = (location.state as { title?: string; }) || {};
 
   // API 데이터 상태
   const [feedbackData, setFeedbackData] = React.useState<FeedbackDetailResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // open_at이 없으면 현재 시간 기준값 사용
-  const openAt = open_at || dayjs().format('YYYY-MM-DDTHH:mm:ss');
-
+  // videoStart 시간 (API 응답에서 받아옴)
+  const videoStart = feedbackData?.videoStart || dayjs().format('YYYY-MM-DDTHH:mm:ss');
   // API로 피드백 상세 데이터 조회
   React.useEffect(() => {
     const fetchFeedbackDetail = async () => {
@@ -49,8 +48,8 @@ const FeedbackDetail: React.FC = () => {
 
   // 피드백 카드 클릭 시 이동 함수
   const handleFeedbackClick = (createdAt: string) => {
-    const open = dayjs(openAt);
-    console.log(openAt, dayjs(createdAt));
+    const open = dayjs(videoStart);
+    console.log(videoStart, dayjs(createdAt));
     const created = dayjs(createdAt);
     let seek = created.diff(open, 'second') - 10;
     console.log(seek);
@@ -149,9 +148,9 @@ const FeedbackDetail: React.FC = () => {
               <div
                 className="h-full max-h-[calc(100vh-300px)] overflow-y-auto flex flex-col gap-4 pr-4"
               >
-                {feedbackData.feedbackList.map((fd, index) => {
-                  // 시간 계산: (createdAt - open_at - 10초)
-                  const open = dayjs(openAt);
+                {[...feedbackData.feedbackList].reverse().map((fd, index) => {
+                  // 시간 계산: (createdAt - videoStart - 10초)
+                  const open = dayjs(videoStart);
                   const created = dayjs(fd.createdAt);
                   let timeInSeconds = created.diff(open, 'second') - 10;
                   if (timeInSeconds < 0) timeInSeconds = 0;
