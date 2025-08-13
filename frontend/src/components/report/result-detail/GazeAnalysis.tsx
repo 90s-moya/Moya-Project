@@ -61,7 +61,7 @@ const GazeAnalysis: React.FC = () => {
             ) : Array.isArray(heatmap) && heatmap.length > 0 ? (
               <>
                 <div className="flex justify-center">
-                  <div className="w-fit border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="w-fit border border-gray-300 rounded-sm overflow-hidden">
                     <HeatmapCanvas 
                       data={heatmap}
                       containerWidth={containerWidth}

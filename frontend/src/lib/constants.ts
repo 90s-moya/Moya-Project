@@ -151,12 +151,12 @@ export const getFaceColor = (status: string): string => {
 
 // 시선 집중도 히트맵 기본 색상 팔레트
 export const DEFAULT_THERMAL_STOPS: ColorStop[] = [
-  { value: 0.0,  color: { r: 250, g: 252, b: 255 } }, // 거의 흰색 (아무것도 없는 곳)
-  { value: 0.1,  color: { r: 220, g: 235, b: 245 } }, // 연한 회색-파랑 (가장 낮은 집중도)
-  { value: 0.25, color: { r: 70,  g: 130, b: 255 } }, // 파랑
-  { value: 0.45, color: { r: 0,   g: 180, b: 200 } }, // 청록
-  { value: 0.65, color: { r: 50,  g: 220, b: 50  } }, // 초록
-  { value: 0.8,  color: { r: 255, g: 200, b: 0   } }, // 노랑
+  { value: 0.0,  color: { r: 173, g: 216, b: 230 } }, // 연한 하늘색 (아무것도 없는 곳)
+  { value: 0.15, color: { r: 135, g: 206, b: 235 } }, // 조금 진한 하늘색 (가장 낮은 집중도)
+  { value: 0.3,  color: { r: 70,  g: 130, b: 255 } }, // 파랑
+  { value: 0.5,  color: { r: 0,   g: 180, b: 200 } }, // 청록
+  { value: 0.7,  color: { r: 50,  g: 220, b: 50  } }, // 초록
+  { value: 0.85, color: { r: 255, g: 200, b: 0   } }, // 노랑
   { value: 0.95, color: { r: 255, g: 100, b: 30  } }, // 주황
   { value: 1.0,  color: { r: 220, g: 20,  b: 20  } }, // 진한 빨강 (최고 집중)
 ];

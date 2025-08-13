@@ -161,7 +161,13 @@ const HeatmapCanvas: React.FC<HeatmapCanvasProps> = ({
       const row = normalizedData[y];
       for (let x = 0; x < cols; x += 1) {
         const raw = row[x] || 0;
-        if (raw <= cutoff) continue;
+        
+        if (raw <= cutoff) {
+          // 값이 0인 부분을 더 연한 회색으로 표시
+          ctx.fillStyle = 'rgba(240, 240, 240, 0.3)';
+          ctx.fillRect(x * internalCell, y * internalCell, internalCell, internalCell);
+          continue;
+        }
 
         const ratioGamma = Math.pow(raw, Math.max(0.01, gamma));
         const alpha = Math.min(1, Math.max(0, alphaMin + (alphaMax - alphaMin) * ratioGamma));
