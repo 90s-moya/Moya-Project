@@ -75,13 +75,15 @@ export function useStudyRoom() {
           if (peerManagerRef.current) {
             parsed.forEach((participant: { id: string; isLocal?: boolean }) => {
               if (!participant.isLocal && participant.id !== myIdRef.current) {
-                console.log(`저장된 참가자와 재연결 시도: ${participant.id}`);
-                peerManagerRef.current?.createConnectionWith(participant.id);
+                console.log(`재연결 시도: ${participant.id}`);
+                // 약간의 지연 추가 (연결 충돌 방지)
+                setTimeout(() => {
+                  peerManagerRef.current?.createConnectionWith(participant.id);
+                }, Math.random() * 1000); // 0-1초 랜덤 지연
               }
             });
           } else {
-            // peerManager가 아직 준비되지 않았다면 잠시 후 다시 시도
-            setTimeout(attemptReconnect, 100);
+            setTimeout(attemptReconnect, 200); // 100ms → 200ms로 증가
           }
         };
 
