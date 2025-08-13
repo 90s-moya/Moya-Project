@@ -101,7 +101,7 @@ instance.interceptors.response.use(
           if (item.fileUrl && !item.fileUrl.startsWith('http')) {
             const updatedItem = {
               ...item,
-              fileUrl: `${import.meta.env.VITE_API_URL}${item.fileUrl}`
+              fileUrl: `${import.meta.env.VITE_FILE_URL}${item.fileUrl}`
             };
             console.log('처리 후 item:', updatedItem);
             return updatedItem;
