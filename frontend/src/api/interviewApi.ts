@@ -62,16 +62,16 @@ export const extractTextFromPdf = async (
 // 요구사항: 저장 불필요, form-data 전송만 /api/v1/followup
 export async function sendFollowupAudio(params: {
   sessionId: string
-  order: number
+  order1: number
   subOrder: number
   audio: File
 
 }): Promise<void> {
-  const { sessionId, order, subOrder, audio } = params
+  const { sessionId, order1, subOrder, audio } = params
 
   const form = new FormData()
   form.append("session_id", sessionId)
-  form.append("order", String(order))
+  form.append("order", String(order1))
   form.append("sub_order", String(subOrder))
   form.append("audio", audio, audio.name)
 
@@ -86,9 +86,9 @@ export async function sendFollowupAudio(params: {
     validateStatus: () => true,
   })
   console.log("맞아 아니야 딱 말해 ",res)
-   const { currentOrder, currentSubOrder, question } = res.data;
-  localStorage.getItem("currentOrder") ?? "0", 10;
-  localStorage.getItem("currentSubOrder") ?? "0", 10;
-  localStorage.getItem("questions")
+   const { order, sub_order, question } = res.data;
+    localStorage.setItem("currentOrder", order) ?? "0", 10;
+    localStorage.setItem("currentSubOrder", sub_order) ?? "0", 10;
+    localStorage.setItem("questions", question)
 
 }

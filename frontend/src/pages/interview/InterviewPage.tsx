@@ -16,6 +16,7 @@ export default function InterviewScreen() {
   const [micLevel, setMicLevel] = useState(0)
 
   // 라우터 params에서 sessionId, location.state로 질문 메타 받기
+  // 하지만 이것도 localStorage^0^
   const sessionId = localStorage.getItem("interviewSessionId")
 
   // location.state에 { order, subOrder, text } 형태로 전달 받는다고 가정

@@ -54,7 +54,7 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
 
         await sendFollowupAudio({
           sessionId: key.sessionId,
-          order: key.order,
+          order1: key.order,
           subOrder: key.subOrder,
           audio: file,
         });
