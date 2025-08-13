@@ -18,6 +18,7 @@ public class RoomInfoCommand {
     private LocalDateTime expiredAt;
     private LocalDateTime openAt;
     private String categoryName;
+    private LocalDateTime videoStart;
 
     public static RoomInfoCommand from(Room room, int joinMemberCount) {
         return RoomInfoCommand.builder()

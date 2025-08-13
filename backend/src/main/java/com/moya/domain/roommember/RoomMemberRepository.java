@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,6 +26,6 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember, UUID> {
     RoomMember findByRoomIdAndUserId(UUID room_id, UUID user_id);
 
     @Modifying
-    @Query("UPDATE RoomMember rm set rm.video_url = :video_url where rm.room_id.id = :room_id and rm.user_id.id = :user_id")
-    void saveVideo(UUID user_id, UUID room_id, String video_url);
+    @Query("UPDATE RoomMember rm set rm.video_url = :video_url, rm.video_start = :video_start where rm.room_id.id = :room_id and rm.user_id.id = :user_id")
+    void saveVideo(UUID user_id, UUID room_id, String video_url, LocalDateTime video_start);
 }
