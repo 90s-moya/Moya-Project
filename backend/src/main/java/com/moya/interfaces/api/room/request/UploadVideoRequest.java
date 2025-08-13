@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Setter
@@ -11,4 +12,5 @@ import java.util.UUID;
 public class UploadVideoRequest {
     private MultipartFile file;
     private UUID roomId;
+    private LocalDateTime videoStart;
 }

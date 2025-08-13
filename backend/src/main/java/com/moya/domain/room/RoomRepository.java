@@ -14,6 +14,7 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
     JOIN RoomMember rm ON r.id = rm.room_id.id
     WHERE rm.user_id.id = :userId
     AND rm.video_url IS NOT NULL
+    ORDER BY r.createdAt desc
     """)
     List<Room> findMyDoneRoom(UUID userId);
 
@@ -25,6 +26,7 @@ public interface RoomRepository extends JpaRepository<Room, UUID> {
     JOIN RoomMember rm ON r.id = rm.room_id.id
     WHERE rm.user_id.id = :userId
     AND rm.video_url IS NULL
+    ORDER BY r.createdAt desc
     """)
     List<Room> findMyTodoRoom(UUID userId);
 }

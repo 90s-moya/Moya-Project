@@ -10,6 +10,7 @@ import java.util.UUID;
 @Getter
 public class UploadInterviewVideoRequest {
     private MultipartFile file;
+    private MultipartFile thumbnail;
     private UUID interviewSessionId;
     private String order;
     private String subOrder;

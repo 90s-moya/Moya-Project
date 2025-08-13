@@ -6,6 +6,8 @@ import com.moya.domain.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Builder
@@ -28,4 +30,6 @@ public class RoomMember extends BaseEntity {
     private boolean is_master;
     // 화면 녹화 저장을 위한 video_url 추가
     private String video_url;
+    // 화면 녹화 시작 시 시간
+    private LocalDateTime video_start;
 }

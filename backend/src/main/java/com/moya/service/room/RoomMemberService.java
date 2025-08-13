@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 
@@ -32,6 +33,7 @@ public class RoomMemberService {
     public String createVideo(UploadVideoRequest uploadRequest, UUID userId) throws IOException {
         UUID roomId = uploadRequest.getRoomId();
         MultipartFile file = uploadRequest.getFile();
+        LocalDateTime videoStart = uploadRequest.getVideoStart();
 
         // 존재하는 방인지 확인
         Room room = roomRepository.findById(roomId).orElseThrow(() -> new RuntimeException("존재하지 않는 방입니다."));
@@ -40,10 +42,10 @@ public class RoomMemberService {
         // 현재는 프론트에서 줄여 보냄 -> 추후 필요시 로직 추가 예정
 
         // 파일 저장 path
-        String filePath = fileStorageService.save(file);
+        String filePath = fileStorageService.saveOther(file, "study");
 
         // DB에 저장
-        roomMemberRepository.saveVideo(userId, roomId, filePath);
+        roomMemberRepository.saveVideo(userId, roomId, filePath, videoStart);
 
         return filePath;
     }

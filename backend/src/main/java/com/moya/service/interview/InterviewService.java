@@ -69,15 +69,16 @@ public class InterviewService {
         return resp.getBody();
     }
 
-    public InterviewVideoCommand createInterviewVideo(UploadInterviewVideoRequest request) throws IOException{
+    public InterviewVideoCommand createInterviewVideo(UploadInterviewVideoRequest request, String folder) throws IOException{
         MultipartFile file = request.getFile();
-        String videoUrl = fileStorageService.saveVideo(file);
+        MultipartFile thumbnail = request.getThumbnail();
+        String videoUrl = fileStorageService.saveOther(file, "video");
         System.out.println(videoUrl);
         // 썸네일
-        String thumbnail = "1";
+        String thumbnailUrl = fileStorageService.saveOther(thumbnail, "thumbnail");
 
         return InterviewVideoCommand.builder()
-                .ThumbnailUrl(thumbnail)
+                .ThumbnailUrl(thumbnailUrl)
                 .videoUrl(videoUrl)
                 .build();
     }

@@ -45,6 +45,7 @@ public class FeedbackService {
 
         FeedbackResultCommand feedbackResult = FeedbackResultCommand.builder()
                 .videoUrl(rm.getVideo_url())
+                .videoStart(rm.getVideo_start())
                 .feedbackList(feedbackList)
                 .build();
         return feedbackResult;

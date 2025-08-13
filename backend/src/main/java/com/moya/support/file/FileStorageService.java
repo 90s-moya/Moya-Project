@@ -31,9 +31,9 @@ public class FileStorageService {
         return fullPath.toString();
     }
 
-    public String saveVideo(MultipartFile file) throws IOException {
+    public String saveOther(MultipartFile file, String folder) throws IOException {
         String fileName = Objects.requireNonNull(file.getOriginalFilename(), "파일명이 없습니다.");
-        Path fullPath = Paths.get(filePath, "video", fileName);
+        Path fullPath = Paths.get(filePath, folder, fileName);
         Files.createDirectories(fullPath.getParent());
         Files.write(fullPath, file.getBytes());
 
