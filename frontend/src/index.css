@@ -125,7 +125,7 @@
 /* Prevent layout shift when vertical scrollbar appears */
 @layer base {
   @supports (scrollbar-gutter: stable) {
-    html { scrollbar-gutter: stable both-edges; }
+    html { scrollbar-gutter: stable; }
   }
   @supports not (scrollbar-gutter: stable) {
     /* Fallback for older browsers */
