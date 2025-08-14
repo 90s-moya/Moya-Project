@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from app.api import report_router   # 경로 맞는지 확인!
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.demo_router import router as demo_router
 app = FastAPI()
 # 전체 Origin 허용
 app.add_middleware(
@@ -48,6 +49,8 @@ async def compress_json_middleware(request, call_next):
 
 app.include_router(router, prefix="")  # or prefix="/api"
 app.include_router(report_router.router)
+app.include_router(demo_router,        prefix="/api",             tags=["demo"])
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]  # repo 루트
 FACE_DIR = PROJECT_ROOT / "Face_Resnet"
 GAZE_DIR = PROJECT_ROOT / "Gaze_TR_pro"
