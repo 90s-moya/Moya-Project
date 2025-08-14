@@ -154,7 +154,7 @@ export default function InterviewScreen() {
         <div className="mx-6 flex-1 text-center text-gray-900 text-lg md:text-xl font-medium truncate">
           {questionText}
         </div>
-        <div className="text-gray-800 font-extrabold tracking-tight">AI 기술면접</div>
+        <div className="text-gray-800 font-extrabold tracking-tight">AI 면접</div>
       </div>
 
       {/* 중앙 캔버스 */}
