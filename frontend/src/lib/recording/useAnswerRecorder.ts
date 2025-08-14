@@ -42,11 +42,9 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
   const track = stream.getVideoTracks()[0];
   if (!track) return null;
 
-  // A. ImageCapture 지원 시 우선 사용
+  // ImageCapture 지원 시 우선 사용
   try {
-    // @ts-ignore
     if (window.ImageCapture && typeof (window as any).ImageCapture === 'function') {
-      // @ts-ignore
       const cap = new ImageCapture(track);
       const bitmap: ImageBitmap = await cap.grabFrame();
 
