@@ -7,8 +7,22 @@ from app.api.routes import router
 import sys
 from pathlib import Path
 from app.api import report_router   # 경로 맞는지 확인!
-
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI()
+# 전체 Origin 허용
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],        # 모든 Origin 허용
+    allow_credentials=True,
+    allow_methods=["*"],        # 모든 HTTP 메서드 허용
+    allow_headers=["*"],        # 모든 헤더 허용
+)
+
+
+@app.get("/test")
+def test():
+    return {"msg": "CORS OK!"}
+
 
 # JSON 응답을 압축하도록 기본 설정
 @app.middleware("http")

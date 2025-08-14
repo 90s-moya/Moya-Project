@@ -507,7 +507,7 @@ async def analyze_complete_by_url(
     rel_video = to_files_relative(video_url)
     rel_thumb = to_files_relative(thumbnail_url)
 
-    qa = save_results_to_qa(db, qa, video_url=video_url, thumbnail_url=thumbnail_url, result=out)
+    qa = save_results_to_qa(db, qa, video_url=rel_video, thumbnail_url=rel_thumb, result=out)
 
 
     # (5) 응답
