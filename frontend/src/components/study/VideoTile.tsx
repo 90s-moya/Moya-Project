@@ -36,38 +36,105 @@ export default function VideoTile({
     "POSITIVE" | "NEGATIVE" | null
   >(null);
   const [isSending, setIsSending] = useState(false);
-  const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isCameraOn, setIsCameraOn] = useState(!isLocal); // 로컬은 true, 원격은 false로 시작
 
-  // 카메라 상태 감지
+  // 카메라 상태 감지 (개선된 버전)
   useEffect(() => {
+    console.log(
+      `[VideoTile] 스트림 상태 확인 - userId: ${userId}, stream:`,
+      stream
+    );
+
     if (!stream) {
-      setIsCameraOn(false);
-      return;
+      console.log(`[VideoTile] ${userId}: 스트림 없음, 2초 후 재확인`);
+      // 원격 사용자만 지연 처리 (로컬은 즉시 OFF)
+      if (isLocal) {
+        setIsCameraOn(false);
+        return;
+      }
+
+      // 원격 사용자는 스트림이 없어도 즉시 OFF로 설정하지 않고 잠시 대기
+      const delayTimeout = setTimeout(() => {
+        if (!stream) {
+          console.log(
+            `[VideoTile] ${userId}: 2초 후에도 스트림 없음, 카메라 OFF`
+          );
+          setIsCameraOn(false);
+        }
+      }, 2000);
+
+      return () => clearTimeout(delayTimeout);
     }
 
     const videoTracks = stream.getVideoTracks();
+    console.log(`[VideoTile] ${userId}: 비디오 트랙 수:`, videoTracks.length);
 
     if (videoTracks.length === 0) {
+      console.log(`[VideoTile] ${userId}: 비디오 트랙 없음, 카메라 OFF`);
       setIsCameraOn(false);
       return;
     }
 
     const videoTrack = videoTracks[0];
-    setIsCameraOn(videoTrack.enabled);
+    console.log(
+      `[VideoTile] ${userId}: 트랙 상태 - enabled: ${videoTrack.enabled}, readyState: ${videoTrack.readyState}`
+    );
+
+    // 스트림이 있으면 즉시 카메라 ON (원격 사용자의 연결 지연 해결)
+    if (!isLocal) {
+      console.log(`[VideoTile] ${userId}: 원격 스트림 수신, 즉시 카메라 ON`);
+      setIsCameraOn(true);
+    } else {
+      // 로컬은 enabled 기준으로 판단
+      setIsCameraOn(videoTrack.enabled);
+    }
 
     // 트랙 상태 변경 감지
-    const handleTrackEnded = () => setIsCameraOn(false);
-    const handleTrackMute = () => setIsCameraOn(false);
-    const handleTrackUnmute = () => setIsCameraOn(videoTrack.enabled);
+    const handleTrackEnded = () => {
+      console.log(`[VideoTile] ${userId}: 트랙 종료됨`);
+      setIsCameraOn(false);
+    };
+
+    const handleTrackMute = () => {
+      console.log(`[VideoTile] ${userId}: 트랙 음소거됨`);
+      setIsCameraOn(false);
+    };
+
+    const handleTrackUnmute = () => {
+      console.log(`[VideoTile] ${userId}: 트랙 음소거 해제됨`);
+      setIsCameraOn(videoTrack.enabled);
+    };
 
     videoTrack.addEventListener("ended", handleTrackEnded);
     videoTrack.addEventListener("mute", handleTrackMute);
     videoTrack.addEventListener("unmute", handleTrackUnmute);
 
-    // 주기적으로 트랙 상태 확인 (일부 브라우저에서 이벤트가 발생하지 않을 수 있음)
-    const checkInterval = setInterval(() => {
-      setIsCameraOn(videoTrack.enabled && videoTrack.readyState === "live");
-    }, 1000);
+    // 주기적으로 트랙 상태 확인 (로컬/원격 구분)
+    const checkInterval = setInterval(
+      () => {
+        const isEnabled = videoTrack.enabled;
+        const isLive = videoTrack.readyState === "live";
+
+        let shouldBeOn;
+        if (isLocal) {
+          // 로컬: enabled 상태가 중요
+          shouldBeOn = isEnabled;
+        } else {
+          // 원격: 더 관대한 조건 (연결 상태 고려)
+          shouldBeOn = isEnabled; // 원격은 enabled만 체크 (readyState는 불안정)
+        }
+
+        console.log(
+          `[VideoTile] ${userId} (${
+            isLocal ? "local" : "remote"
+          }): 주기적 체크 - enabled: ${isEnabled}, readyState: ${
+            videoTrack.readyState
+          }, shouldBeOn: ${shouldBeOn}`
+        );
+        setIsCameraOn(shouldBeOn);
+      },
+      isLocal ? 1000 : 5000
+    ); // 로컬은 1초, 원격은 5초 간격
 
     return () => {
       videoTrack.removeEventListener("ended", handleTrackEnded);
@@ -75,7 +142,7 @@ export default function VideoTile({
       videoTrack.removeEventListener("unmute", handleTrackUnmute);
       clearInterval(checkInterval);
     };
-  }, [stream]);
+  }, [stream, userId, isLocal]);
 
   // 비디오 스트림 연결 최적화
   useEffect(() => {
