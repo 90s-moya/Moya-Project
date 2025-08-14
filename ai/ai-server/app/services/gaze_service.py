@@ -39,8 +39,14 @@ def get_tracker(screen_width=1920, screen_height=1080, window_width=1344, window
     global _tracker_instance
     if _tracker_instance is None:
         if GazeTracker is None:
-            raise ImportError("GazeTracker not available")
-        _tracker_instance = GazeTracker(screen_width, screen_height, window_width, window_height)
+            raise ImportError("GazeTracker module not available - check Gaze_TR_pro installation")
+        
+        try:
+            _tracker_instance = GazeTracker(screen_width, screen_height, window_width, window_height)
+            print(f"[DEBUG] GazeTracker initialized: {type(_tracker_instance)}")
+        except Exception as e:
+            print(f"[ERROR] Failed to initialize GazeTracker: {e}")
+            raise ImportError(f"Failed to create GazeTracker instance: {e}")
     return _tracker_instance
 
 
@@ -180,6 +186,19 @@ def infer_gaze(
     print(f"[DEBUG] use_localstorage: {use_localstorage}")
     
     try:
+        # Gaze 모듈 사용 가능성 체크
+        if GazeTracker is None:
+            print("[WARNING] GazeTracker module not available, returning mock result")
+            return {
+                "ok": False,
+                "error": "Gaze tracking module not available",
+                "calibration_status": {
+                    "loaded": False,
+                    "source": "none",
+                    "message": "GazeTracker module import failed"
+                }
+            }
+            
         tracker = get_tracker()
         calibration_loaded = False
         calibration_source = "none"
@@ -215,16 +234,31 @@ def infer_gaze(
         if not calibration_loaded:
             print("[WARNING] No calibration data found. Using default mapping.")
 
+        # 비디오 파일 형식 추정
+        if video_bytes.startswith(b'RIFF') and b'WEBP' in video_bytes[:50]:
+            suffix = ".webm"
+        else:
+            suffix = ".mp4"
+            
         # 비디오 임시 파일 저장
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(video_bytes)
             input_path = tmp.name
 
         try:
-            print(f"[DEBUG] Starting video processing with tracker...")
+            print(f"[DEBUG] Starting video processing with tracker (file: {input_path})...")
+            
+            # GazeTracker가 제대로 초기화되었는지 확인
+            if not hasattr(tracker, 'process_video_file'):
+                raise AttributeError("GazeTracker에 process_video_file 메서드가 없습니다")
+                
             result = tracker.process_video_file(input_path)
             print(f"[DEBUG] Tracker result type: {type(result)}")
-            print(f"[DEBUG] Tracker result: {result}")
+            
+            # 결과가 None이거나 빈 값인 경우 처리
+            if result is None:
+                print("[WARNING] Gaze tracking returned None result")
+                result = {"error": "No gaze tracking result"}
             
             final_result = {
                 "ok": True,
@@ -236,13 +270,26 @@ def infer_gaze(
                                else "No calibration applied - using default mapping"
                 }
             }
-            print(f"[DEBUG] Final gaze result: {final_result}")
+            print(f"[DEBUG] Final gaze result prepared")
             return final_result
+            
+        except Exception as e:
+            print(f"[ERROR] Gaze tracking failed: {str(e)}")
+            return {
+                "ok": False,
+                "error": f"Gaze tracking failed: {str(e)}",
+                "calibration_status": {
+                    "loaded": calibration_loaded,
+                    "source": calibration_source
+                }
+            }
         finally:
             try:
-                os.remove(input_path)
-            except Exception:
-                pass
+                if os.path.exists(input_path):
+                    os.remove(input_path)
+                    print(f"[DEBUG] Cleaned up temp file: {input_path}")
+            except Exception as e:
+                print(f"[WARNING] Failed to clean up temp file: {e}")
 
     except Exception as e:
         print(f"[DEBUG] infer_gaze exception: {e}")
