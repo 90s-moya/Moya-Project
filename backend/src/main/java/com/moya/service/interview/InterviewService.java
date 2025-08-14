@@ -115,7 +115,8 @@ public class InterviewService {
                         device,
                         stride,
                         returnPoints,
-                        calibDataJson
+                        calibDataJson,
+                        thumbnailUrl
                 );
             } else {
                 System.err.println("[analyze] skip: order/subOrder parse 실패 (order="
@@ -139,7 +140,8 @@ public class InterviewService {
             String device,
             int stride,
             boolean returnPoints,
-            String calibDataJson
+            String calibDataJson,
+            String thumbnailUrl
     ) {
         try {
             String resolved = toAbsoluteUrl(videoUrl); // 안전차원으로 한 번 더 보정
@@ -156,6 +158,10 @@ public class InterviewService {
             body.add("device",        new HttpEntity<>(device, text));
             body.add("stride",        new HttpEntity<>(String.valueOf(stride), text));
             body.add("return_points", new HttpEntity<>(String.valueOf(returnPoints), text));
+            if (thumbnailUrl != null && !thumbnailUrl.isBlank()) {
+                body.add("thumbnail_url", new HttpEntity<>(thumbnailUrl, text));
+            }
+
             if (calibDataJson != null && !calibDataJson.isBlank()) {
                 HttpHeaders jsonHeaders = new HttpHeaders();
                 jsonHeaders.setContentType(MediaType.APPLICATION_JSON);
