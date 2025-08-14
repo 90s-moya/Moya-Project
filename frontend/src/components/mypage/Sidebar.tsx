@@ -7,7 +7,7 @@ interface SidebarProps {
 
 const menuItems = [
   { key: "userinfo", label: "회원정보" },
-  { key: "resume", label: "이력서 / 포트폴리오 / 자기소개서" },
+  { key: "resume", label: "서류 관리" },
   { key: "result", label: "모의 면접 결과" },
   { key: "feedback", label: "면접 스터디 피드백" },
   { key: "studyRoom", label: "면접 스터디 등록 목록" },
