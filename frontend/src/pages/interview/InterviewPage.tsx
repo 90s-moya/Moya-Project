@@ -2,12 +2,11 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Mic, MicOff, Settings } from "lucide-react"
+import { Mic, MicOff, Settings, Loader2 } from "lucide-react"
 import aiCharacter from "@/assets/images/ai-character.png"
 import { useAnswerRecorder } from "@/lib/recording/useAnswerRecorder"
 import AnswerRecorder from "@/components/interview/AnswerRecorder"
 import { type QuestionKey } from "@/types/interview"
-
 
 export default function InterviewScreen() {
   const [isMicOn, setIsMicOn] = useState(true)
@@ -15,6 +14,7 @@ export default function InterviewScreen() {
   const [isWebcamVisible, setIsWebcamVisible] = useState(true)
   const [isAnswerPhase, setIsAnswerPhase] = useState(false)
   const [isAIspeaking, setIsAIspeaking] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const microphoneRef = useRef<MediaStreamAudioSourceNode | null>(null)
@@ -33,10 +33,11 @@ export default function InterviewScreen() {
   const [nonce, setNonce] = useState(0)
   useEffect(() => { setNonce(n => n + 1) }, [questionText])
 
-  // 질문이 바뀌면 답변 단계/웹캠 상태 리셋
+  // 질문이 바뀌면 답변 단계/웹캠/로딩 상태 리셋
   useEffect(() => {
     setIsAnswerPhase(false)
     setIsWebcamVisible(true)
+    setIsSubmitting(false) // 다음 질문 렌더링 시 로딩 해제 및 버튼 재활성화
   }, [questionText])
 
   const keyInfo: QuestionKey = useMemo(
@@ -52,7 +53,15 @@ export default function InterviewScreen() {
     seconds: recSeconds,
     error: recError,
     videoStream
-  } = useAnswerRecorder({ key: keyInfo })
+  } = useAnswerRecorder({ 
+    key: keyInfo,
+    onUploadComplete: () => setIsSubmitting(false)
+  })
+
+  // keyInfo가 바뀔 때마다 로딩 상태 리셋 (질문 변경 시)
+  useEffect(() => {
+    setIsSubmitting(false)
+  }, [keyInfo.sessionId, keyInfo.order, keyInfo.subOrder])
 
   // 마이크 레벨 표시
   useEffect(() => {
@@ -60,7 +69,6 @@ export default function InterviewScreen() {
       setMicLevel(0)
       return
     }
-
     const startMicrophone = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -71,14 +79,11 @@ export default function InterviewScreen() {
         const audioContext = audioContextRef.current
         const analyser = audioContext.createAnalyser()
         analyser.fftSize = 256
-
         const microphone = audioContext.createMediaStreamSource(stream)
         microphoneRef.current = microphone
         microphone.connect(analyser)
-
         const bufferLength = analyser.frequencyBinCount
         const dataArray = new Uint8Array(bufferLength)
-
         const updateVolume = () => {
           if (!isMicOn || !isAnswerPhase) return
           analyser.getByteFrequencyData(dataArray)
@@ -88,14 +93,13 @@ export default function InterviewScreen() {
           requestAnimationFrame(updateVolume)
         }
         updateVolume()
-      } catch (error) {
+      } catch {
         const id = setInterval(() => {
           if (isMicOn && isAnswerPhase) setMicLevel(Math.random() * 100)
         }, 100)
         return () => clearInterval(id)
       }
     }
-
     startMicrophone()
     return () => {
       if (microphoneRef.current) microphoneRef.current.disconnect()
@@ -107,7 +111,6 @@ export default function InterviewScreen() {
 
   const startAnswerPhase = useCallback(() => {
     setIsAnswerPhase(true)
-    // 실제 녹음 시작은 AnswerRecorder가 ttsFinished=true를 받고 내부 타이머로 처리
   }, [])
 
   // 질문 표시 후 8초 뒤 답변 단계로 전환
@@ -121,7 +124,7 @@ export default function InterviewScreen() {
     return () => clearTimeout(timer)
   }, [questionText, startAnswerPhase])
 
-  // 표시용 시간/진행률 계산
+  // 표시용 시간/진행률
   const TOTAL = 60
   const elapsed = Math.min(recSeconds, TOTAL)
   const timeLeft = Math.max(0, TOTAL - elapsed)
@@ -133,8 +136,16 @@ export default function InterviewScreen() {
     return `${m}:${s}`
   }
 
+  // 한 번만 작동하도록 가드 + 로딩 오버레이 표시
+  const handleStopClick = () => {
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    stop() // onstop에서 업로드 수행
+    // 라우팅으로 화면 전환되면 언마운트되며 오버레이 자동 해제
+  }
+
   return (
-    <div className="h-screen bg-white relative overflow-hidden">
+    <div className="h-screen bg-white relative overflow-hidden" aria-busy={isSubmitting}>
       {/* 상단 바 */}
       <div className="w-full py-5 px-8 flex items-center justify-between">
         <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 bg-blue-100 text-blue-700 font-semibold shadow-sm">
@@ -156,7 +167,6 @@ export default function InterviewScreen() {
               </div>
             </div>
 
-            {/* 중앙 내부 하단 진행 표시 */}
             {isAnswerPhase && (
               <div className="mt-4 w-[68%] lg:w-[64%] max-w-[720px] mx-auto">
                 <div className="flex items-center justify-between text-white/90 mb-2">
@@ -199,13 +209,11 @@ export default function InterviewScreen() {
       {/* 하단 고정 컨트롤 바 */}
       <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur shadow-[0_-10px_28px_rgba(0,0,0,0.08)]">
         <div className="max-w-6xl mx-auto px-8 py-5 flex items-center justify-between gap-6">
-          {/* 좌측: 답변 시간(남은) */}
           <div className="text-gray-700 text-sm">
             답변 시간
             <div className="text-2xl font-extrabold text-gray-900 mt-1">{formatTime(timeLeft)}</div>
           </div>
 
-          {/* 중앙: 전체 진행 바 */}
           <div className="flex-1 max-w-3xl">
             <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
               <span>진행 시간</span>
@@ -221,37 +229,48 @@ export default function InterviewScreen() {
             </div>
           </div>
 
-          {/* 우측: 마이크/설정/녹음 종료 */}
           <div className="flex items-center gap-4">
             <div
               className={`w-12 h-12 rounded-full grid place-items-center shadow ring-1 ${isMicOn ? "bg-blue-500 text-white ring-blue-500/50" : "bg-gray-200 text-gray-600 ring-gray-300"}`}
-              onClick={toggleMic}
+              onClick={!isSubmitting ? toggleMic : undefined}
               role="button"
+              aria-disabled={isSubmitting}
             >
               {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
             </div>
             <div className="w-12 h-12 rounded-full grid place-items-center shadow bg-gray-100 text-gray-700 ring-1 ring-gray-200">
               <Settings className="w-5 h-5" />
             </div>
-            <Button className="h-12 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white" onClick={stop}>
-              녹음 종료
+
+            {/* 전송 중 버튼 비활성화 + 스피너 */}
+            <Button
+              className={`h-12 px-6 rounded-2xl text-white ${isSubmitting ? "bg-gray-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+              onClick={handleStopClick}
+              disabled={isSubmitting}
+              aria-busy={isSubmitting}
+            >
+              {isSubmitting ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  업로드 중
+                </span>
+              ) : (
+                "녹음 종료"
+              )}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* TTS 비활성화 예시
-      <QuestionTTS
-        autoplay
-        storageKey="lastQuestion"
-        lang="ko-KR"
-        style="friendly"
-        delayMs={3000}
-        nonce={nonce}
-        onStart={() => setIsAIspeaking(true)}
-        onQuestionEnd={() => { setIsAIspeaking(false); startAnswerPhase() }}
-      />
-      */}
+      {/* 전체 화면 로딩 오버레이 */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm grid place-items-center">
+          <div className="rounded-2xl bg-white shadow-2xl px-6 py-5 flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <div className="text-sm font-medium text-gray-900">응답 저장 중입니다… 잠시만 기다려주세요</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

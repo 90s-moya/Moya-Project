@@ -40,7 +40,9 @@ export default function AnswerRecorder({ keyInfo, ttsFinished, start, stop, isRe
     const play = async () => {
       try {
         await el.play();
-      } catch {}
+      } catch {
+        // 비디오 재생 실패는 무시 (자동 재생 정책 등)
+      }
     };
     if (el.readyState >= 2) play();
     else el.onloadedmetadata = play;
