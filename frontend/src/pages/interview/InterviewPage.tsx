@@ -68,7 +68,7 @@ export default function InterviewScreen() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         
         if (!audioContextRef.current) {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+          audioContextRef.current = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
         }
         
         const audioContext = audioContextRef.current
@@ -133,6 +133,22 @@ export default function InterviewScreen() {
     setIsAnswerPhase(true)
     setTimeout(() => { setIsRecording(true) }, 3000)
   }, [])
+
+  // ✅ 질문 표시 후 8초 대기하여 답변 시간으로 전환
+  useEffect(() => {
+    if (questionText) {
+      // 질문이 로드되면 AI 말하는 상태로 설정
+      setIsAIspeaking(true)
+      
+      // 8초 후 답변 시간으로 전환
+      const timer = setTimeout(() => {
+        setIsAIspeaking(false)
+        startAnswerPhase()
+      }, 8000) // 8초
+      
+      return () => clearTimeout(timer)
+    }
+  }, [questionText, startAnswerPhase])
 
   const stopRecording = () => {
     setIsRecording(false)
@@ -262,8 +278,8 @@ export default function InterviewScreen() {
         </div>
       </div>
 
-      {/* TTS (자동 재생 후 3초 뒤 답변 시작) */}
-      <QuestionTTS
+      {/* ✅ TTS 비활성화 - 8초 후 답변 시간으로 전환 */}
+      {/* <QuestionTTS
         autoplay
         storageKey="lastQuestion"
         lang="ko-KR"
@@ -272,7 +288,7 @@ export default function InterviewScreen() {
         nonce={nonce}
         onStart={() => setIsAIspeaking(true)}
         onQuestionEnd={() => { setIsAIspeaking(false); startAnswerPhase(); }}
-      />
+      /> */}
     </div>
   )
 }
