@@ -128,7 +128,7 @@ export default function VideoTile({
       )}
 
       {/* 오른쪽 하단 감정 피드백 (썸네일에서는 숨김) */}
-      {!hideOverlay && (
+      {!hideOverlay && !isLocal && (
         <div className="absolute bottom-2 right-2 flex gap-2">
           <button
             onClick={handleClickPositive}
@@ -156,7 +156,7 @@ export default function VideoTile({
       )}
 
       {/* 중앙 하단 피드백 팝업 (썸네일에서는 숨김) */}
-      {!hideOverlay && (
+      {!hideOverlay && !isLocal && (
         <FeedbackPopup
           show={showFeedbackPopup}
           feedbackType={feedbackType}
