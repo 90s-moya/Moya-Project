@@ -2,10 +2,12 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
-import { getDocsInRoom, uploadVideo } from "@/api/studyApi";
+import { getDocsInRoom, getRoomDetail, uploadVideo } from "@/api/studyApi";
 import { useMediaStore } from "@/store/useMediaStore";
 // 날짜 처리
 import dayjs from "dayjs";
+import type { StudyRoomDetail } from "@/types/study";
+import { AsteriskIcon } from "lucide-react";
 
 type Participant = {
   id: string;
@@ -31,7 +33,7 @@ export function useStudyRoom() {
   const navigate = useNavigate();
   const { roomId } = useParams();
 
-  // 미디어 스토어 사용 - micStream도 가져오기
+  // 미디어 스토어를 통해 카메라 및 마이크 스트림 가져오기
   const { cameraStream, micStream, stopAll } = useMediaStore();
 
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -39,6 +41,8 @@ export function useStudyRoom() {
   const [allDocs, setAllDocs] = useState<ParticipantsDocs[]>([]);
   const [focusedUserId, setFocusedUserId] = useState<string | null>(null);
   const [showCarousel, setShowCarousel] = useState(false);
+  // 방 정보 관련
+  const [roomInfo, setRoomInfo] = useState<StudyRoomDetail | null>(null);
 
   const myIdRef = useRef<string>("");
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
@@ -49,6 +53,22 @@ export function useStudyRoom() {
   const roomIdRef = useRef<string>("");
 
   const stopFixedRef = useRef<() => void>(() => {});
+
+  // 방 정보 가져오기
+  useEffect(() => {
+    const fetchRoomInfo = async () => {
+      if (!roomId) return;
+
+      try {
+        const data = await getRoomDetail(roomId);
+        setRoomInfo(data);
+      } catch (error) {
+        console.error("방 상세 조회 실패:", error);
+      }
+    };
+
+    fetchRoomInfo();
+  }, [roomId]);
 
   // roomId를 ref로 관리
   useEffect(() => {
@@ -220,45 +240,48 @@ export function useStudyRoom() {
   };
   // 캔버스로 그리기
   async function makeFixed30fpsStream(
-  src: MediaStream,
-  w = 960,
-  h = 540,
-  mirror = false
-): Promise<{ stream: MediaStream; stop: () => void }> {
-  const v = document.createElement("video");
-  v.srcObject = src;
-  v.muted = true;
-  v.playsInline = true;
-  await v.play().catch(() => {});
+    src: MediaStream,
+    w = 960,
+    h = 540,
+    mirror = false
+  ): Promise<{ stream: MediaStream; stop: () => void }> {
+    const v = document.createElement("video");
+    v.srcObject = src;
+    v.muted = true;
+    v.playsInline = true;
+    await v.play().catch(() => {});
 
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
 
-  const draw = () => {
-    ctx.save();
-    if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(v, 0, 0, w, h);
-    ctx.restore();
-  };
+    const draw = () => {
+      ctx.save();
+      if (mirror) {
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(v, 0, 0, w, h);
+      ctx.restore();
+    };
 
-  // rAF 말고 33ms 타이머로 30fps 고정
-  const timer = window.setInterval(draw, 1000 / 30);
+    // rAF 말고 33ms 타이머로 30fps 고정
+    const timer = window.setInterval(draw, 1000 / 30);
 
-  const fixed = canvas.captureStream(30);
-  const a = src.getAudioTracks()[0];
-  if (a) fixed.addTrack(a);
+    const fixed = canvas.captureStream(30);
+    const a = src.getAudioTracks()[0];
+    if (a) fixed.addTrack(a);
 
-  return {
-    stream: fixed,
-    stop: () => {
-      clearInterval(timer);
-      // 원본 트랙은 외부에서 정리
-      v.srcObject = null;
-    },
-  };
-}
+    return {
+      stream: fixed,
+      stop: () => {
+        clearInterval(timer);
+        // 원본 트랙은 외부에서 정리
+        v.srcObject = null;
+      },
+    };
+  }
 
   // 녹화 시작
   const startRecording = (stream: MediaStream) => {
@@ -303,12 +326,11 @@ export function useStudyRoom() {
     if (!rec || rec.state === "inactive") return;
 
     await new Promise<void>((resolve) => {
-      
       rec.onstop = async () => {
         const vTrack = localStream?.getVideoTracks?.()[0];
         if (vTrack) {
-        console.log("[송출 FPS(settings)]", vTrack.getSettings()?.frameRate);
-      }
+          console.log("[송출 FPS(settings)]", vTrack.getSettings()?.frameRate);
+        }
         try {
           if (recordedChunksRef.current.length) {
             const authStorage = localStorage.getItem("auth-storage") || "{}";
@@ -416,25 +438,25 @@ export function useStudyRoom() {
         console.log("받은 메세지", data);
 
         if (data.type === "join") {
+          console.log("새 참가자 join입니다.", data.senderId);
+
+          // 연결 생성과 participants 추가를 더 신중하게 처리리
           await peerManager.createConnectionWith(data.senderId);
 
-          if (localStream) {
-            peerManagerRef.current?.setLocalStream(localStream);
-          }
-
-          // 새 참가자를 participants 상태에 추가
+          // 참가자 추가 시 중복 체크 강화화
           setParticipants((prev) => {
-            const existingParticipant = prev.find(
-              (p) => p.id === data.senderId
-            );
-            if (!existingParticipant) {
-              console.log("새 참가자 추가:", data.senderId);
-              return [
-                ...prev,
-                { id: data.senderId, stream: null, isLocal: false },
-              ];
+            const exists = prev.some((p) => p.id === data.senderId);
+
+            if (exists) {
+              console.log("이미 존재하는 참가자입니다.", data.senderId);
+              return prev;
             }
-            return prev;
+
+            console.log("새 참가자 추가합니다.", data.senderId);
+            return [
+              ...prev,
+              { id: data.senderId, stream: null, isLocal: false },
+            ];
           });
 
           console.log("새 참여자 연결!");
@@ -462,11 +484,23 @@ export function useStudyRoom() {
     const peerManager = new PeerConnectionManager(myId, signaling);
     peerManagerRef.current = peerManager;
 
+    // 기존 onRemoteStream 콜백 개선
     peerManager.onRemoteStream = (peerId, stream) => {
-      setParticipants((prev) => [
-        ...prev.filter((p) => p.id !== peerId),
-        { id: peerId, stream },
-      ]);
+      console.log("원격 스트림 수신입니다.", peerId);
+
+      setParticipants((prev) => {
+        const existingIndex = prev.findIndex((p) => p.id === peerId);
+
+        if (existingIndex >= 0) {
+          // 기존 참가자의 스트림 업데이트
+          const updated = [...prev];
+          updated[existingIndex] = { ...updated[existingIndex], stream };
+          return updated;
+        } else {
+          // 새 참가자 추가 (join 이벤트를 놓친 경우)
+          return [...prev, { id: peerId, stream, isLocal: false }];
+        }
+      });
     };
 
     (async () => {
@@ -481,8 +515,8 @@ export function useStudyRoom() {
         // 스트림이 없으면 새로 생성
         local = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: {  ideal: 960, max: 960 },
-            height: {  ideal: 540, max: 540  },
+            width: { ideal: 960, max: 960 },
+            height: { ideal: 540, max: 540 },
             frameRate: { ideal: 30, max: 30 },
           },
           audio: true,
@@ -493,8 +527,13 @@ export function useStudyRoom() {
       // setLocalStream(local);
       // startRecording(local);
       // 30fps 변환
-      
-       const { stream: fixed30, stop: stopFixed } = await makeFixed30fpsStream(local, 960, 540, /*mirror=*/false);
+
+      const { stream: fixed30, stop: stopFixed } = await makeFixed30fpsStream(
+        local,
+        960,
+        540,
+        /*mirror=*/ false
+      );
       setLocalStream(fixed30);
       startRecording(fixed30);
       stopFixedRef.current = stopFixed;
@@ -506,6 +545,13 @@ export function useStudyRoom() {
       signaling.send({ type: "join", senderId: myId });
     })();
   }, []); // 의존성 배열을 비워서 한 번만 실행
+
+  useEffect(() => {
+    if (localStream && peerManagerRef.current) {
+      console.log("모든 연결에 로컬 스트림 설정");
+      peerManagerRef.current.setLocalStream(localStream);
+    }
+  }, [localStream]);
 
   return {
     participants,
@@ -521,5 +567,6 @@ export function useStudyRoom() {
     handleLeaveRoom,
     setFocusedUserId,
     setShowCarousel,
+    roomInfo,
   };
 }
