@@ -123,16 +123,71 @@ def list_calibrations() -> Dict[str, Any]:
 
 
 # === 시선 추적 관련 함수들 ===
-def load_calibration_for_tracking(calib_path: str) -> Dict[str, Any]:
+def load_calibration_from_localstorage() -> Dict[str, Any]:
+    """프론트엔드 로컬 스토리지에서 캘리브레이션 데이터 로드"""
+    try:
+        # 프론트엔드 디렉토리에서 gaze_calibration_data 파일 찾기
+        frontend_root = AI_SERVER_ROOT.parent / "frontend"
+        calib_file_patterns = [
+            "gaze_calibration_data.json",
+            "calibration_data_*.json"
+        ]
+        
+        calib_path = None
+        for pattern in calib_file_patterns:
+            files = list(frontend_root.glob(pattern))
+            if files:
+                # 가장 최신 파일 선택
+                calib_path = max(files, key=lambda f: f.stat().st_mtime)
+                break
+        
+        if not calib_path or not calib_path.exists():
+            # 현재 디렉토리에서도 찾아보기
+            for pattern in calib_file_patterns:
+                files = list(Path.cwd().glob(pattern))
+                if files:
+                    calib_path = max(files, key=lambda f: f.stat().st_mtime)
+                    break
+        
+        if not calib_path:
+            return {"status": "error", "message": "No calibration data found in local storage"}
+        
+        with open(calib_path, 'r', encoding='utf-8') as f:
+            calib_data = json.load(f)
+        
+        # 데이터 유효성 검사
+        required_fields = ['calibration_vectors', 'calibration_points', 'transform_method']
+        for field in required_fields:
+            if field not in calib_data:
+                return {"status": "error", "message": f"Missing required field: {field}"}
+        
+        return {
+            "status": "success", 
+            "message": "Calibration data loaded from local storage",
+            "data": calib_data,
+            "file_path": str(calib_path)
+        }
+        
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to load calibration from local storage: {str(e)}"}
+
+
+def load_calibration_for_tracking(calib_path: str = None, calib_data: dict = None) -> Dict[str, Any]:
     """시선 추적용 캘리브레이션 로드"""
     try:
         tracker = get_tracker()
-        with open(calib_path, 'r') as f:
-            calib_data = json.load(f)
+        
+        # 캘리브레이션 데이터가 직접 전달되지 않은 경우 파일에서 로드
+        if calib_data is None:
+            if calib_path is None:
+                return {"status": "error", "message": "No calibration data or path provided"}
+            
+            with open(calib_path, 'r') as f:
+                calib_data = json.load(f)
         
         # 캘리브레이션 데이터를 트래커에 로드
-        tracker.calib_vectors = calib_data.get('calib_vectors', [])
-        tracker.calib_points = calib_data.get('calib_points', [])
+        tracker.calib_vectors = calib_data.get('calibration_vectors', [])
+        tracker.calib_points = calib_data.get('calibration_points', [])
         tracker.transform_matrix = calib_data.get('transform_matrix')
         tracker.transform_method = calib_data.get('transform_method')
         
@@ -141,18 +196,38 @@ def load_calibration_for_tracking(calib_path: str) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-def infer_gaze(video_bytes: bytes, calib_path: Optional[str] = None) -> Dict[str, Any]:
+def infer_gaze(video_bytes: bytes, calib_path: Optional[str] = None, use_localstorage: bool = True) -> Dict[str, Any]:
     """
     업로드된 비디오 바이트에서 시선 추적 수행
     """
     try:
         tracker = get_tracker()
         
-        # 캘리브레이션 파일이 제공된 경우 로드
-        if calib_path:
+        # 캘리브레이션 데이터 로드 시도
+        calibration_loaded = False
+        
+        # 1. 로컬 스토리지에서 캘리브레이션 데이터 자동 로드 시도
+        if use_localstorage:
+            localstorage_result = load_calibration_from_localstorage()
+            if localstorage_result["status"] == "success":
+                load_result = load_calibration_for_tracking(calib_data=localstorage_result["data"])
+                if load_result["status"] == "success":
+                    calibration_loaded = True
+                    print(f"[INFO] Loaded calibration from local storage: {localstorage_result['file_path']}")
+        
+        # 2. 캘리브레이션 파일이 직접 제공된 경우 사용
+        if not calibration_loaded and calib_path:
             load_result = load_calibration_for_tracking(calib_path)
-            if load_result["status"] == "error":
+            if load_result["status"] == "success":
+                calibration_loaded = True
+                print(f"[INFO] Loaded calibration from provided path: {calib_path}")
+            else:
                 return load_result
+        
+        # 3. 캘리브레이션 데이터가 없는 경우 경고하지만 기본 시선 추적 계속 진행
+        if not calibration_loaded:
+            print("[WARNING] No calibration data found. Using default gaze-to-screen coordinate mapping.")
+            print("[WARNING] Results may be less accurate without calibration.")
         
         # 임시 mp4 파일 저장
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
@@ -162,7 +237,18 @@ def infer_gaze(video_bytes: bytes, calib_path: Optional[str] = None) -> Dict[str
         try:
             # 시선 추적 실행
             result = tracker.process_video_file(input_path)
-            return {"ok": True, "result": result}
+            return {
+                "ok": True, 
+                "result": result,
+                "calibration_status": {
+                    "loaded": calibration_loaded,
+                    "source": "local_storage" if (calibration_loaded and use_localstorage and localstorage_result["status"] == "success") 
+                             else "provided_path" if (calibration_loaded and calib_path) 
+                             else "none",
+                    "message": "Calibration applied successfully" if calibration_loaded 
+                              else "No calibration applied - using default mapping"
+                }
+            }
         finally:
             try:
                 os.remove(input_path)
