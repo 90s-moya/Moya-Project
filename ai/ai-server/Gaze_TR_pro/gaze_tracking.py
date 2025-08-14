@@ -119,6 +119,46 @@ class GazeTracker:
         self.gaze_heatmap_2d = np.zeros((self.HEATMAP_GRID_H, self.HEATMAP_GRID_W), dtype=np.int32)
         print(f"[INFO] Initialized gaze heatmap grid: {self.HEATMAP_GRID_W}x{self.HEATMAP_GRID_H}")
     
+    def load_calibration_from_localstorage(self):
+        """프론트엔드 로컬 스토리지에서 캘리브레이션 데이터 자동 로드"""
+        try:
+            # 프론트엔드 디렉토리에서 gaze_calibration_data 파일 찾기
+            current_dir = os.path.dirname(__file__)
+            project_root = os.path.abspath(os.path.join(current_dir, "../../"))
+            frontend_root = os.path.join(project_root, "frontend")
+            
+            calib_file_patterns = [
+                "gaze_calibration_data.json",
+                "calibration_data_*.json"
+            ]
+            
+            calib_path = None
+            for pattern in calib_file_patterns:
+                import glob
+                files = glob.glob(os.path.join(frontend_root, pattern))
+                if files:
+                    # 가장 최신 파일 선택
+                    calib_path = max(files, key=os.path.getmtime)
+                    break
+            
+            if not calib_path:
+                # 현재 디렉토리에서도 찾아보기
+                for pattern in calib_file_patterns:
+                    files = glob.glob(pattern)
+                    if files:
+                        calib_path = max(files, key=os.path.getmtime)
+                        break
+            
+            if not calib_path:
+                print("[WARNING] No calibration data found in local storage")
+                return False
+            
+            return self.load_calibration_data(calib_path)
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to load calibration from local storage: {e}")
+            return False
+
     def load_calibration_data(self, filename):
         """캘리브레이션 데이터 로드"""
         try:
@@ -257,11 +297,20 @@ class GazeTracker:
         }
         self.gaze_data.append(gaze_entry)
     
-    def process_video_file(self, video_path, output_prefix=None):
+    def process_video_file(self, video_path, output_prefix=None, auto_load_calibration=True):
         """동영상 파일에서 시선 추적"""
         if not os.path.exists(video_path):
             print(f"[ERROR] Video file not found: {video_path}")
             return False
+        
+        # 자동 캘리브레이션 로드 시도
+        if auto_load_calibration and not self.calib_vectors:
+            print("[INFO] Attempting to load calibration data from local storage...")
+            calibration_loaded = self.load_calibration_from_localstorage()
+            if calibration_loaded:
+                print("[INFO] Calibration data loaded successfully")
+            else:
+                print("[WARNING] No calibration data found. Using default gaze-to-screen mapping.")
         
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
