@@ -7,7 +7,7 @@ import traceback, re, ast
 from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
-
+from app.utils.urls import to_files_relative
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -463,6 +463,7 @@ async def analyze_complete(
         "order": qa.order,
         "sub_order": qa.sub_order,
         "video_url": qa.video_url,
+        "thumbnail_url": getattr(qa, "thumbnail_url", None),
         "posture_result": qa.posture_result,
         "face_result": qa.face_result,
         "gaze_result": qa.gaze_result,
@@ -481,6 +482,7 @@ async def analyze_complete_by_url(
     device: str = Form("cpu"),
     stride: int = Form(5),
     return_points: bool = Form(False),
+     thumbnail_url: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     # (1) QA 조회/생성
@@ -500,9 +502,11 @@ async def analyze_complete_by_url(
         out = analyze_all(data, device=device, stride=stride, return_points=return_points)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"URL 분석 실패: {e}")
+    rel_video = to_files_relative(video_url)
+    rel_thumb = to_files_relative(thumbnail_url)
 
-    # (4) 결과 + video_url 저장
-    qa = save_results_to_qa(db, qa, video_url=video_url, result=out)
+    qa = save_results_to_qa(db, qa, video_url=rel_video, thumbnail_url=rel_thumb, result=out)
+
 
     # (5) 응답
     return {
