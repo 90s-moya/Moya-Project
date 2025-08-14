@@ -41,8 +41,9 @@ def save_results_to_qa(
     # analyze_all 결과 -> DB 컬럼 매핑
     # posture_result ← result["posture"]
     # face_result    ← result["emotion"]  (감정/표정 결과)
-    if video_url and thumbnail_url:
+    if video_url:
         qa.video_url = video_url
+    if thumbnail_url:
         qa.thumbnail_url=thumbnail_url
     qa.posture_result = result.get("posture")
     qa.face_result    = result.get("emotion")

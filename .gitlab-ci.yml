@@ -100,18 +100,23 @@ deploy-fe:
   only:
     - fe-main
     - master
-# AI - 빌드
+
+
+variables:
+  DOCKER_BUILDKIT: 1
+  BUILDKIT_PROGRESS: plain
+
 build-ai:
   stage: build
   script:
-    - docker build -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai/ai-server
+    - docker pull gyujh630/moya-ai:cache || true
+    - docker build --cache-from=gyujh630/moya-ai:cache --build-arg BUILDKIT_INLINE_CACHE=1 -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai/ai-server
     - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
+    - docker push gyujh630/moya-ai:cache
   tags:
     - ec2
-  only:
-    - ai-dev
-    - ai-main
-    - master
+
 
 # AI - 개발 환경 배포 (8001 포트)
 deploy-ai-dev:
