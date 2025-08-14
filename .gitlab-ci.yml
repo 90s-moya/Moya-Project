@@ -116,6 +116,8 @@ build-ai:
     - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
     - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
     - docker push gyujh630/moya-ai:cache
+  tags:
+    - ec2
 
 
 # AI - 개발 환경 배포 (8001 포트)
