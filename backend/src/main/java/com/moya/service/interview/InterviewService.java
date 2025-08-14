@@ -82,10 +82,11 @@ public class InterviewService {
     public InterviewVideoCommand createInterviewVideo(UploadInterviewVideoRequest request, String folder) throws IOException {
         MultipartFile file = request.getFile();
         MultipartFile thumbnail = request.getThumbnail();
+        String sessionId = request.getInterviewSessionId().toString();
 
         // 1) 파일 저장 (보통 상대경로 반환: /files-dev/video/xxx.webm)
-        String videoPath = fileStorageService.saveOther(file, "video");
-        String thumbnailPath = (thumbnail != null) ? fileStorageService.saveOther(thumbnail, "thumbnail") : null;
+        String videoPath = fileStorageService.saveOther(file, "video/"+sessionId);
+        String thumbnailPath = (thumbnail != null) ? fileStorageService.saveOther(thumbnail, "thumbnail/"+sessionId) : null;
 
         // 2) 절대 URL로 보정
         String videoUrl = toAbsoluteUrl(videoPath);
