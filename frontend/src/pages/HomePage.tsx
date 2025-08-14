@@ -1,7 +1,8 @@
 import Header from "@/components/common/Header";
 import HomeInterviewSection from "@/components/home/HomeInterviewSection";
-import HomeTest from "@/components/home/HomeTest";
+import HomeIntroSection from "@/components/home/HomeIntroSection";
 import HomeStudySection from "@/components/home/HomeStudySection";
+import HomeTest from "@/components/home/HomeTest";
 
 export default function HomePage() {
   return (
@@ -15,6 +16,7 @@ export default function HomePage() {
       </div>
 
       <Header scrollBg />
+      {/* <HomeIntroSection></HomeIntroSection> */}
       <HomeTest></HomeTest>
       <HomeInterviewSection></HomeInterviewSection>
       <HomeStudySection></HomeStudySection>

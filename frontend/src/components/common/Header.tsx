@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
+import MoyaTextBlue from "@/assets/images/moya_text_blue.png";
 
 interface HeaderProps {
   scrollBg?: boolean;
@@ -27,11 +28,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
   const navLinkClass = (baseColor: string) =>
     `text-base md:text-lg font-medium transition-colors ${baseColor} hover:text-[#2b7fff]`;
 
-  const linkColor = scrollBg
-    ? scrolled
-      ? "text-gray-600"
-      : "text-white"
-    : "text-gray-600";
+  const linkColor = "text-gray-800";
 
   return (
     <header
@@ -45,8 +42,15 @@ export default function Header({ scrollBg = false }: HeaderProps) {
     >
       <div className="max-w-[1180px] mx-auto flex items-center justify-between h-20 px-4 md:px-8">
         {/* 로고 */}
-        <div className="text-[#2b7fff] text-2xl md:text-3xl font-bold select-none">
-          <Link to="/">MOYA</Link>
+        <div className="select-none">
+          <Link to="/">
+            <img 
+              src={MoyaTextBlue} 
+              alt="MOYA" 
+              className="md:w-28 w-20"
+              draggable={false}
+            />
+          </Link>
         </div>
 
         {/* 모바일 메뉴 버튼 */}
@@ -75,7 +79,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
           {isLogin ? (
             <button
               onClick={logout}
-              className="text-gray-600 hover:text-[#2b7fff] text-base font-medium"
+              className="text-gray-800 hover:text-[#2b7fff] text-base font-medium"
             >
               로그아웃
             </button>
@@ -83,7 +87,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
             <>
               <Link
                 to="/login"
-                className="text-gray-600 hover:text-[#2b7fff] text-base font-medium"
+                className="text-gray-800 hover:text-[#2b7fff] text-base font-medium"
               >
                 로그인
               </Link>
@@ -109,7 +113,12 @@ export default function Header({ scrollBg = false }: HeaderProps) {
             <div className="flex flex-col h-full">
               {/* 헤더 영역 */}
               <div className="flex items-center justify-between p-6">
-                <div className="text-[#2b7fff] text-2xl font-bold">MOYA</div>
+                <img 
+                  src={MoyaTextBlue} 
+                  alt="MOYA" 
+                  className="md:w-28 w-20"
+                  draggable={false}
+                />
                 <button
                   onClick={() => setMobileMenuOpen(false)}
                   className="text-gray-600 hover:text-gray-800"
@@ -154,7 +163,7 @@ export default function Header({ scrollBg = false }: HeaderProps) {
                         logout();
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full text-left text-xl font-medium text-gray-700 hover:text-[#2b7fff] transition-colors"
+                      className="w-full text-left text-xl font-medium text-gray-800 hover:text-[#2b7fff] transition-colors"
                     >
                       로그아웃
                     </button>
@@ -162,14 +171,14 @@ export default function Header({ scrollBg = false }: HeaderProps) {
                     <>
                       <Link 
                         to="/login" 
-                        className="block text-xl font-medium text-gray-700 hover:text-[#2b7fff] transition-colors"
+                        className="block text-xl font-medium text-gray-800 hover:text-[#2b7fff] transition-colors"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         로그인
                       </Link>
                       <Link 
                         to="/signup/detail" 
-                        className="block text-xl font-medium text-gray-700 hover:text-[#2b7fff] transition-colors"
+                        className="block text-xl font-medium text-gray-800 hover:text-[#2b7fff] transition-colors"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         회원가입
