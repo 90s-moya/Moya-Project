@@ -440,8 +440,13 @@ export function useStudyRoom() {
         if (data.type === "join") {
           console.log("새 참가자 join입니다.", data.senderId);
 
-          // 연결 생성과 participants 추가를 더 신중하게 처리리
+          // 연결 생성과 participants 추가를 더 신중하게 처리
           await peerManager.createConnectionWith(data.senderId);
+
+          // 현재 localStream이 있으면 즉시 설정
+          if (localStream) {
+            peerManagerRef.current?.setLocalStream(localStream);
+          }
 
           // 참가자 추가 시 중복 체크 강화화
           setParticipants((prev) => {
@@ -524,8 +529,6 @@ export function useStudyRoom() {
         console.log("새로운 스트림 생성");
       }
 
-      // setLocalStream(local);
-      // startRecording(local);
       // 30fps 변환
 
       const { stream: fixed30, stop: stopFixed } = await makeFixed30fpsStream(
@@ -539,19 +542,12 @@ export function useStudyRoom() {
       stopFixedRef.current = stopFixed;
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== myId),
-        { id: myId, stream: fixed30, isLocal: true },
+        { id: myId, stream: fixed30, isLocal: true }, // 내 모습
       ]);
-      peerManager.setLocalStream(fixed30);
+      peerManager.setLocalStream(fixed30); // 다른 참가자들에게
       signaling.send({ type: "join", senderId: myId });
     })();
   }, []); // 의존성 배열을 비워서 한 번만 실행
-
-  useEffect(() => {
-    if (localStream && peerManagerRef.current) {
-      console.log("모든 연결에 로컬 스트림 설정");
-      peerManagerRef.current.setLocalStream(localStream);
-    }
-  }, [localStream]);
 
   return {
     participants,
