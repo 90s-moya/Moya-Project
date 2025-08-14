@@ -242,7 +242,7 @@ export function useStudyRoom() {
       const d = new Date();
       const ms = d.getTime() - d.getTimezoneOffset() * 60_000; // 로컬 오프셋 보정
       const localDateTime = new Date(ms).toISOString().slice(0, 19);
-      videoStartRef.current = localDateTime;
+      if(!videoStartRef.current == null) videoStartRef.current = localDateTime;
       console.log(localDateTime);
                 
           
