@@ -110,6 +110,8 @@ export const POSTURE_STATUS_MAP = {
   'Good Posture': '바른 자세',
   'Shoulders Uneven': '자세 틀어짐',
   'Hands Above Shoulders': '불필요한 손동작',
+  'Head Down': '고개 숙임',
+  'Head Off-Center': '중앙 이탈',
 } as const;
 
 
@@ -122,7 +124,9 @@ export const getPostureStatusText = (status: PostureStatusType): string => {
 export const POSTURE_COLOR_MAP = {
   'Good Posture': '#86EFAC',
   'Shoulders Uneven': '#FCD34D',
-  'Hands Above Shoulders': '#FCA5A5',
+  'Hands Above Shoulders': '#FBBF24',
+  'Head Down': '#F59E0B',
+  'Head Off-Center': '#D97706',
 } as const;
 
 export const getPostureColor = (status: string): string => {

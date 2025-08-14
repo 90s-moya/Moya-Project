@@ -38,7 +38,7 @@ const ResultCard: React.FC<ReportCardProps> = ({
       <div className="aspect-video bg-gray-200 relative flex items-center justify-center">
         {showImage ? (
           <img
-            src={result.thumbnail_url}
+            src={`${import.meta.env.VITE_FILE_URL}${result.thumbnail_url}`}
             alt="면접 썸네일"
             className="w-full h-full object-cover"
             onError={() => setImgError(true)}
