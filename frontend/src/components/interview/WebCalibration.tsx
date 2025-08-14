@@ -72,9 +72,14 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
   // 키보드 이벤트 처리
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.code === 'Space' && !isRecording && currentPointIndex < points.length) {
+      if (event.code === 'Space') {
         event.preventDefault();
-        collectSample();
+        
+        if (!isRecording && currentPointIndex < points.length) {
+          collectSample();
+        } else if (currentPointIndex >= points.length) {
+          console.log('[CALIB] All calibration points completed. Please wait for automatic completion.');
+        }
       } else if (event.code === 'Escape') {
         onCancel();
       }
@@ -122,6 +127,12 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
 
   const collectSample = async () => {
     if (!webcamRef.current) return;
+    
+    // 9개 점 모두 완료된 경우 추가 입력 방지
+    if (currentPointIndex >= points.length) {
+      console.log('[CALIB] All calibration points completed. Ignoring additional input.');
+      return;
+    }
 
     setIsRecording(true);
     
@@ -269,11 +280,13 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
         <div
           key={point.id}
           className={`absolute w-4 h-4 rounded-full transition-all duration-300 ${
-            index === currentPointIndex 
-              ? 'bg-red-500 animate-pulse scale-150' 
-              : point.completed 
-                ? 'bg-green-500 scale-75' 
-                : 'bg-gray-400 scale-50'
+            currentPointIndex >= points.length
+              ? 'bg-green-500 scale-75'  // 모든 캘리브레이션 완료 시 모든 점을 초록색으로
+              : index === currentPointIndex 
+                ? 'bg-red-500 animate-pulse scale-150' 
+                : point.completed 
+                  ? 'bg-green-500 scale-75' 
+                  : 'bg-gray-400 scale-50'
           }`}
           style={{
             left: `${point.x}%`,
@@ -283,8 +296,8 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
         />
       ))}
 
-      {/* 현재 활성 포인트 강조 */}
-      {currentPointIndex < points.length && (
+      {/* 현재 활성 포인트 강조 - 캘리브레이션 진행 중일 때만 */}
+      {currentPointIndex < points.length && !isRecording && (
         <div
           className="absolute w-16 h-16 border-4 border-red-500 rounded-full animate-ping"
           style={{
