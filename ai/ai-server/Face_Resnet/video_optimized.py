@@ -148,6 +148,58 @@ def happy_guard(face_bgr, face_mesh, smile_thr=0.02, ear_thr=0.18):
     ear_like = eye_gap / mouth_width
     return (smile_score > smile_thr) and (ear_like < ear_thr)
 
+def analyze_video_bytes(
+    video_bytes,
+    model_name="Celal11/resnet-50-finetuned-FER2013-0.001",
+    output_path=None,
+    show_video=False,
+    face_min_conf=0.5,
+    face_model_selection=1,
+    face_margin=0.2,
+    min_face_px=80,
+    blur_thr=60.0,
+    use_clahe=True,
+    ema_alpha=0.8,
+    enter_thr=0.55,
+    exit_thr=0.45,
+    margin_thr=0.15,
+    min_stable=5,
+    logit_bias_str="",
+    use_happy_guard=False
+):
+    import tempfile
+    import os
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+    temp_file.write(video_bytes)
+    temp_file.flush()
+    temp_file.close()
+    video_path = temp_file.name
+    
+    try:
+        result = analyze_video(
+            video_path=video_path,
+            model_name=model_name,
+            output_path=output_path,
+            show_video=show_video,
+            face_min_conf=face_min_conf,
+            face_model_selection=face_model_selection,
+            face_margin=face_margin,
+            min_face_px=min_face_px,
+            blur_thr=blur_thr,
+            use_clahe=use_clahe,
+            ema_alpha=ema_alpha,
+            enter_thr=enter_thr,
+            exit_thr=exit_thr,
+            margin_thr=margin_thr,
+            min_stable=min_stable,
+            logit_bias_str=logit_bias_str,
+            use_happy_guard=use_happy_guard
+        )
+        return result
+    finally:
+        if os.path.exists(video_path):
+            os.unlink(video_path)
+
 def analyze_video(
     video_path,
     model_name="Celal11/resnet-50-finetuned-FER2013-0.001",
@@ -392,8 +444,10 @@ def analyze_video(
         print(f"감정 변화 리포트: {report_filename}")
         if output_path:
             print(f"분석된 동영상 저장: {output_path}")
+        return report
     else:
         print("감지된 프레임이 없어 리포트를 생성하지 않습니다.")
+        return None
 
 def main():
     p = argparse.ArgumentParser(description='동영상 파일 표정 분석 (얼굴 크롭 + EMA + 히스테리시스 + 바이어스 + 해피-가드)')
