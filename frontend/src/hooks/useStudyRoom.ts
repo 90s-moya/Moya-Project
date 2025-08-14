@@ -432,9 +432,9 @@ export function useStudyRoom() {
         // 스트림이 없으면 새로 생성
         local = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 960, max: 960 },
-            height: { ideal: 540, max: 540 },
-            frameRate: { ideal: 30, max: 30 },
+            width: { exact: 960 },
+            height: { exact: 540 },
+            frameRate: { exact: 30 },
           },
           audio: true,
         });
