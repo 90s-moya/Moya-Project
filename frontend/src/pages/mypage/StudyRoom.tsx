@@ -30,21 +30,26 @@ const StudyRoom: React.FC = () => {
 
   // 정렬된 방 목록
   const sortedRooms = useMemo(() => {
-    const sorted = [...registeredRooms];
+    const now = new Date().getTime();
+
+    // 시작 일시가 현재 시간보다 미래인 방들만 필터링
+    const futureRooms = registeredRooms.filter((room) => {
+      const openAtTime = new Date(room.openAt).getTime();
+      return openAtTime > now;
+    });
 
     // 마감순 (openAt 기준으로 현재 시간에 가장 가까운 순서)
-    return sorted.sort((a, b) => {
-      const now = new Date().getTime();
+    return futureRooms.sort((a, b) => {
       const aTimeDiff = Math.abs(new Date(a.openAt).getTime() - now);
       const bTimeDiff = Math.abs(new Date(b.openAt).getTime() - now);
       return aTimeDiff - bTimeDiff;
     });
   }, [registeredRooms]);
 
-  // 룸 상세 페이지로 이동 핸들러
-  // const handleRoomClick = (roomId: string) => {
-  //   navigate(`/study/detail/${roomId}`);
-  // };
+  // 카드 클릭 핸들러
+  const handleRoomClick = (roomId: string) => {
+    navigate(`/study/setup/${roomId}`);
+  };
 
   // 참여하기 버튼 클릭 핸들러 (이벤트 전파 방지)
   const handleJoinRoom = (e: React.MouseEvent, roomId: string) => {
@@ -58,11 +63,11 @@ const StudyRoom: React.FC = () => {
   };
 
   return (
-    <MypageLayout activeMenu="studyroom">
+    <MypageLayout activeMenu="studyRoom">
       {/* 페이지 제목 */}
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-2xl font-semibold text-[#2B7FFF] leading-[1.4]">
-          등록한 스터디 목록
+          면접 스터디 등록 목록
         </h3>
       </div>
 
@@ -108,43 +113,94 @@ const StudyRoom: React.FC = () => {
           {sortedRooms.map((room) => (
             <div
               key={room.id}
-              // onClick={() => handleRoomClick(room.id)}
-              className="relative bg-[#fafafc] border border-[#dedee4] rounded-lg p-6 h-full flex flex-col justify-between min-h-[120px] text-[18px] transition-all hover:shadow-lg hover:-translate-y-1 w-full cursor-pointer"
+              onClick={() => handleRoomClick(room.id)}
+              className="relative bg-[#fafafc] border border-[#dedee4] rounded-lg p-6 transition-all hover:shadow-lg hover:-translate-y-1 w-full cursor-pointer"
             >
-              <div>
-                <div className="mb-2">
-                  <h3 className="font-semibold text-2xl leading-snug text-[#1b1c1f] group-hover:text-[#2b7fff] transition-colors duration-200">
-                    {room.title}
-                  </h3>
+              {/* 데스크톱 버전 (lg 이상) - 기존 스타일 */}
+              <div className="hidden lg:block">
+                <div className="h-full flex flex-col justify-between min-h-[120px] text-[18px]">
+                  <div>
+                    <div className="mb-2">
+                      <h3 className="font-semibold text-xl leading-snug text-[#1b1c1f] group-hover:text-[#2b7fff] transition-colors duration-200">
+                        {room.title}
+                      </h3>
+                    </div>
+                    <p className="text-[#6F727C] text-base leading-[1.5] mb-4">
+                      {room.body}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    {/* 카테고리 태그 (왼쪽) */}
+                    <span className="text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
+                      {room.categoryName}
+                    </span>
+                    <span className="text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
+                      {room.joinUser}/{room.maxUser}명
+                    </span>
+                    <span className="text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
+                      {formatDateTime(room.openAt)}
+                    </span>
+                    <span className="text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
+                      {formatDateTime(room.expiredAt)}
+                    </span>
+
+                    <div className="flex items-center gap-4">
+                      {/* 참여하기 버튼 */}
+                      <button
+                        onClick={(e) => handleJoinRoom(e, room.id)}
+                        className="bg-[#2B7FFF] hover:bg-[#1E6FE8] text-white px-4 py-2 rounded-[10px] text-sm font-semibold leading-[1.714] transition-colors h-10"
+                      >
+                        참여하기
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-[#6F727C] text-lg leading-[1.5] mb-4">
-                  {room.body}
-                </p>
               </div>
 
-              <div className="flex items-center justify-between">
-                {/* 카테고리 태그 (왼쪽) */}
-                <span className="text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
-                  {room.categoryName}
-                </span>
-                <span className="text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
-                  {room.joinUser}/{room.maxUser}명
-                </span>
-                <span className="text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
-                  {formatDateTime(room.openAt)}
-                </span>
-                <span className="text-base px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium">
-                  {formatDateTime(room.expiredAt)}
-                </span>
+              {/* 모바일/태블릿 버전 (lg 미만) - 반응형 스타일 */}
+              <div className="lg:hidden">
+                {/* 제목과 설명 영역 */}
+                <div className="mb-4">
+                  <h3 className="font-semibold text-xl leading-snug text-[#1b1c1f] group-hover:text-[#2b7fff] transition-colors duration-200 mb-2">
+                    {room.title}
+                  </h3>
+                  <p className="text-[#6F727C] text-base leading-[1.5]">
+                    {room.body}
+                  </p>
+                </div>
 
-                <div className="flex items-center gap-4">
-                  {/* 참여하기 버튼 */}
-                  <button
-                    onClick={(e) => handleJoinRoom(e, room.id)}
-                    className="bg-[#2B7FFF] hover:bg-[#1E6FE8] text-white px-4 py-2 rounded-[10px] text-lg font-semibold leading-[1.714] transition-colors h-11"
-                  >
-                    참여하기
-                  </button>
+                {/* 정보 태그들 - 반응형 레이아웃 */}
+                <div className="flex flex-col gap-3">
+                  {/* 첫 번째 줄: 카테고리와 인원수 */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium whitespace-nowrap">
+                      {room.categoryName}
+                    </span>
+                    <span className="text-sm px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium whitespace-nowrap">
+                      {room.joinUser}/{room.maxUser}명
+                    </span>
+                  </div>
+
+                  {/* 두 번째 줄: 시작일시와 종료일시 */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium whitespace-nowrap">
+                      시작: {formatDateTime(room.openAt)}
+                    </span>
+                    <span className="text-sm px-3 py-1 bg-[#e3f0ff] text-[#2B7FFF] rounded-xl font-medium whitespace-nowrap">
+                      종료: {formatDateTime(room.expiredAt)}
+                    </span>
+                  </div>
+
+                  {/* 세 번째 줄: 참여하기 버튼 */}
+                  <div className="flex justify-end pt-2">
+                    <button
+                      onClick={(e) => handleJoinRoom(e, room.id)}
+                      className="bg-[#2B7FFF] hover:bg-[#1E6FE8] text-white px-4 py-2 rounded-[10px] text-sm font-semibold leading-[1.714] transition-colors h-10"
+                    >
+                      참여하기
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
