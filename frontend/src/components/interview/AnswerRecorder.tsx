@@ -77,6 +77,7 @@ export default function AnswerRecorder({ keyInfo, ttsFinished }: Props) {
           autoPlay
           muted
           playsInline
+          style={{ transform: "scaleX(-1)" }}
         />
       )}
 

@@ -33,7 +33,9 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
   const videoRecorderRef = useRef<MediaRecorder | null>(null);
   const videoChunksRef = useRef<Blob[]>([]);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
-
+  // 캔버스 보내기
+  const processedStreamRef = useRef<MediaStream | null>(null);    // 캔버스 30fps 스트림
+  const drawTimerRef = useRef<number | null>(null);
   // 썸네일 추가
   const thumbBlobRef = useRef<Blob | null>(null);
 
@@ -117,7 +119,7 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
         await vtrack.applyConstraints({
           width: { exact: 960 },
           height: { exact: 540 },
-          frameRate: { ideal: 30, max: 30 },
+          frameRate: { exact: 30 },
         });
       } catch { /* 미지원이면 협상된 값 사용 */ }
 
@@ -131,6 +133,27 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
     } catch {
       thumbBlobRef.current = null;
     }
+
+    
+    // 캔버스 그리기 30fps
+    const w = 960, h = 540;
+    const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    const vid = document.createElement('video'); vid.srcObject = stream; vid.muted = true; await vid.play();
+
+    const draw = () => {
+      ctx.save();
+      ctx.translate(w, 0); ctx.scale(-1, 1); // ← 미러 필요시 활성화
+      ctx.drawImage(vid, 0, 0, w, h);
+      ctx.restore();
+    };
+    drawTimerRef.current = window.setInterval(draw, 1000/30); // **30fps 고정**
+    const processed = canvas.captureStream(30);                // **30fps 스트림**
+    const aTrack = stream.getAudioTracks()[0];
+    if (aTrack) processed.addTrack(aTrack);
+    processedStreamRef.current = processed;
+
+    // 캔버스 끝
 
     // 오디오 전용
     const audioOnly = new MediaStream(stream.getAudioTracks());
@@ -236,31 +259,46 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
     }
 
       // 비디오 저장
-      let videoMR = new MediaRecorder(stream);
+      // let videoMR = new MediaRecorder(stream);
+    let webmOptions: MediaRecorderOptions | undefined;
+    const tryMime = (mt: string) => (window as any).MediaRecorder?.isTypeSupported?.(mt);
+    if (tryMime?.('video/webm;codecs=vp9,opus')) webmOptions = { mimeType: 'video/webm;codecs=vp9,opus', videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
+    else if (tryMime?.('video/webm;codecs=vp8,opus')) webmOptions = { mimeType: 'video/webm;codecs=vp8,opus', videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
+    else webmOptions = { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
+
+      let videoMR = new MediaRecorder(processed, webmOptions);
 
       videoRecorderRef.current = videoMR;
       videoChunksRef.current = [];
       videoMR.ondataavailable = (e) => { if (e.data.size) videoChunksRef.current.push(e.data); };
 
       videoMR.onstop = async () => {
-          // 자동 저장(다운로드)만 수행
-          const vmime = videoMR.mimeType || 'video/webm';
-          const vblob = new Blob(videoChunksRef.current, { type: vmime });
+          // 현재 video track fps 확인
+      const vTrack = processedStreamRef.current?.getVideoTracks()[0];
+      if (vTrack) {
+        const settings = vTrack.getSettings();
+        console.log("[녹화 FPS]", settings.frameRate ?? "알 수 없음");
+      }
+        const usedMime = videoMR.mimeType || 'video/webm';
+          const vblob = new Blob(videoChunksRef.current, { type: usedMime});
           if(vblob.size===0){
             console.warn('녹화 비디오 없음')
             return;
           }
-          
+        
           const file = new File([vblob],
             `${key.order}_${key.subOrder}.webm`,
-            {type:vmime}
+            { type: usedMime }
           )
-
+          const calibData = localStorage.getItem("calibData");
           const formData = new FormData();
           formData.append("file", file);
           formData.append("interviewSessionId", localStorage.getItem("interviewSessionId") ?? "");
           formData.append("order", String(key.order));
           formData.append("subOrder", String(key.subOrder));
+          formData.append("calibDataJson", JSON.stringify(calibData));
+
+
           const thumb = thumbBlobRef.current;
           if (thumb) {
             const thumbFile = new File(
@@ -281,12 +319,14 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
           setVideoStream(null)
 
           videoRecorderRef.current = null;
+          if (drawTimerRef.current) { clearInterval(drawTimerRef.current); drawTimerRef.current = null; }
+          processedStreamRef.current = null;
 
         };
     
     mr.start(100);
     //비디오
-    videoMR.start(250);
+    videoMR.start();
     mediaRecorderRef.current = mr;
     setIsRecording(true);
     setSeconds(0);
@@ -294,12 +334,14 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
     timerRef.current = window.setInterval(() => {
       setSeconds((s) => { const n = s + 1; if (n >= maxDurationSec) stop(); return n; });
     }, 1000);
-  }, [key, maxDurationSec, setLocalPending, markSynced, markFailed, seconds, stop, seconds]);
+  }, [key, maxDurationSec, setLocalPending, markSynced, markFailed, seconds, stop]);
 
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (abortRef.current) abortRef.current.abort();
     if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
+    if (videoRecorderRef.current?.state === 'recording') videoRecorderRef.current.stop();
+    if (drawTimerRef.current) { clearInterval(drawTimerRef.current); drawTimerRef.current = null; }
   }, []);
 
   return { start, stop, isRecording, seconds, error, videoStream };
