@@ -2,7 +2,7 @@
 import axios from "axios"
 import type { CalibrationRequest, CalibrationResponse, TrackingInitRequest, GazeAnalysisResult } from '@/types/gaze'
 
-const GAZE_SERVER_URL = "http://localhost:5000"
+const GAZE_SERVER_URL = ""
 
 // 캘리브레이션 시작
 export const startCalibration = async (data: CalibrationRequest): Promise<CalibrationResponse> => {
@@ -30,9 +30,14 @@ export const initTracking = async (data: TrackingInitRequest) => {
 }
 
 // 동영상 시선추적 분석
-export const analyzeVideo = async (videoFile: File): Promise<any> => {
+export const analyzeVideo = async (videoFile: File, calibData?: any): Promise<any> => {
   const formData = new FormData()
   formData.append('video', videoFile)
+  
+  // 캘리브레이션 데이터가 있으면 추가
+  if (calibData) {
+    formData.append('calib_data', JSON.stringify(calibData))
+  }
   
   const response = await axios.post(`${GAZE_SERVER_URL}/api/tracking/video`, formData, {
     headers: {

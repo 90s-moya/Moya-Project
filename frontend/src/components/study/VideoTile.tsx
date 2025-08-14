@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import positiveImg from "@/assets/images/positive.png";
 import negativeImg from "@/assets/images/negative.png";
 import FeedbackPopup from "./FeedbackPopup";
+import { User } from "lucide-react";
 
 interface VideoTileProps {
   stream: MediaStream | null;
@@ -10,9 +11,9 @@ interface VideoTileProps {
   userId: string;
   roomId: string;
   userDocs?: {
-    docsId: string; // docs_id → docsId로 변경
-    userId: string; // user_id → userId로 변경
-    fileUrl: string; // file_url → fileUrl로 변경
+    docsId: string;
+    userId: string;
+    fileUrl: string;
     docsStatus: string;
   }[];
   onDocsClick?: (userId: string) => void; // 서류 클릭 시 부모 컴포넌트에 알림
@@ -36,6 +37,8 @@ export default function VideoTile({
   >(null);
   const [isSending, setIsSending] = useState(false);
 
+  // 카메라 상태 감지 로직 제거 - 단순하게 스트림만 체크
+
   // 비디오 스트림 연결 최적화
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -50,9 +53,9 @@ export default function VideoTile({
 
   // 서류 아이콘 클릭 시 실행되는 함수 (디바운싱 추가)
   const handleClickDocs = () => {
-    console.log("서류 아이콘 클릭 됨.");
-    console.log("사용자 ID:", userId);
-    console.log("사용자 서류:", userDocs);
+    // console.log("서류 아이콘 클릭 됨.");
+    // console.log("사용자 ID:", userId);
+    // console.log("사용자 서류:", userDocs);
 
     // 부모 컴포넌트에 서류 클릭 이벤트 전달
     if (onDocsClick) {
@@ -104,7 +107,7 @@ export default function VideoTile({
 
   return (
     <div className="relative rounded-lg w-full h-full bg-gray-400 overflow-hidden">
-      {/* 비디오 스트림 */}
+      {/* 비디오 스트림 - 카메라 상태 체크 없이 항상 표시 */}
       <video
         ref={videoRef}
         autoPlay
@@ -114,6 +117,16 @@ export default function VideoTile({
         // 비디오 로딩 최적화
         preload="metadata"
       />
+
+      {/* 스트림이 없을 때만 표시 */}
+      {!stream && (
+        <div className="absolute inset-0 bg-gray-600 flex flex-col items-center justify-center">
+          <div className="text-center">
+            <User className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-300 text-sm">연결 중...</p>
+          </div>
+        </div>
+      )}
 
       {/* 오른쪽 상단 서류 아이콘 (썸네일에서는 숨김) */}
       {!hideOverlay && (
@@ -127,8 +140,8 @@ export default function VideoTile({
         </div>
       )}
 
-      {/* 오른쪽 하단 감정 피드백 (썸네일에서는 숨김) */}
-      {!hideOverlay && (
+      {/* 오른쪽 하단 감정 피드백 (썸네일에서는 숨김, 본인 화면에서는 숨김) */}
+      {!hideOverlay && !isLocal && (
         <div className="absolute bottom-2 right-2 flex gap-2">
           <button
             onClick={handleClickPositive}
@@ -155,8 +168,8 @@ export default function VideoTile({
         </div>
       )}
 
-      {/* 중앙 하단 피드백 팝업 (썸네일에서는 숨김) */}
-      {!hideOverlay && (
+      {/* 중앙 하단 피드백 팝업 (썸네일에서는 숨김, 본인 화면에서는 숨김) */}
+      {!hideOverlay && !isLocal && (
         <FeedbackPopup
           show={showFeedbackPopup}
           feedbackType={feedbackType}

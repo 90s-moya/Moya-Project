@@ -37,9 +37,11 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
 
     // 자세 상태별 y축 값 매핑
     const postureYValues = {
-      'Good Posture': 3,
-      'Shoulders Uneven': 2,
-      'Hands Above Shoulders': 1
+      'Good Posture': 5,
+      'Shoulders Uneven': 4,
+      'Hands Above Shoulders': 3,
+      'Head Down': 2,
+      'Head Off-Center': 1
     };
 
     const data: { frame: number; posture: number }[] = [];
@@ -116,18 +118,20 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
                     interval={2}
                   />
                   <YAxis
-                    domain={[0.5, 3.5]}
-                    ticks={[1, 2, 3]}
+                    domain={[0.5, 5.5]}
+                    ticks={[1, 2, 3, 4, 5]}
                     tickFormatter={(value) => {
                       switch (value) {
-                        case 1: return getPostureStatusText('Hands Above Shoulders');
-                        case 2: return getPostureStatusText('Shoulders Uneven');
-                        case 3: return getPostureStatusText('Good Posture');
+                        case 1: return getPostureStatusText('Head Off-Center');
+                        case 2: return getPostureStatusText('Head Down');
+                        case 3: return getPostureStatusText('Hands Above Shoulders');
+                        case 4: return getPostureStatusText('Shoulders Uneven');
+                        case 5: return getPostureStatusText('Good Posture');
                         default: return '';
                       }
                     }}
-                    fontSize={12}
-                    width={80}
+                    fontSize={10}
+                    width={100}
                     tickLine={false}
                     tickMargin={8}
                   />
@@ -135,9 +139,11 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
                     labelFormatter={frameToTime}
                     formatter={(value) => {
                       switch (value) {
-                        case 1: return [getPostureStatusText('Hands Above Shoulders')];
-                        case 2: return [getPostureStatusText('Shoulders Uneven')];
-                        case 3: return [getPostureStatusText('Good Posture')];
+                        case 1: return [getPostureStatusText('Head Off-Center')];
+                        case 2: return [getPostureStatusText('Head Down')];
+                        case 3: return [getPostureStatusText('Hands Above Shoulders')];
+                        case 4: return [getPostureStatusText('Shoulders Uneven')];
+                        case 5: return [getPostureStatusText('Good Posture')];
                         default: return ['Unknown'];
                       }
                     }}
@@ -232,7 +238,8 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
                   <p className="text-sm font-medium text-red-700 mb-2">자세 개선이 필요해요</p>
                   <p className="text-xs text-gray-600">• 어깨를 균등하게 유지하고 한쪽으로 기울이지 않도록 주의하세요.</p>
                   <p className="text-xs text-gray-600">• 답변을 할 때 나도 모르게 손을 올려 제스처를 하지 않는지 되짚어보세요.</p>
-                  <p className="text-xs text-gray-600">• 등을 곧게 펴고 시선은 정면을 향하도록 유지하세요.</p>
+                  <p className="text-xs text-gray-600">• 고개를 숙이지 말고 정면을 향하도록 유지하세요.</p>
+                  <p className="text-xs text-gray-600">• 화면 중앙에 위치하여 시선을 집중할 수 있도록 하세요.</p>
                 </div>
               );
             }

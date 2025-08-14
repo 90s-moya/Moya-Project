@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import Header from "@/components/common/Header";
 import CloudFriends from "@/assets/images/cloud-friends.png";
 import { Mouse } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const { 
     showMiddleTyping, 
     middleTypingComplete, 
@@ -17,10 +18,11 @@ export default function HomePage() {
   } = useTypingAnimation();
 
   const fullpageOptions = {
+    licenseKey: 'gplv3-license',
     navigation: true,
     navigationPosition: 'right' as const,
     showActiveTooltip: true,
-    anchors: ['home', 'feature1', 'feature2', 'feature3'],
+    anchors: ['home', 'ai-interview', 'report', 'study-matching', 'online-study', 'feedback', 'trial'],
     css3: true,
     autoScrolling: true,
     fitToSection: true,
@@ -49,7 +51,7 @@ export default function HomePage() {
       
       <ReactFullpage
         {...fullpageOptions}
-        render={({ state, fullpageApi }: { state: any; fullpageApi: any }) => {
+        render={({ state, fullpageApi }: { state: unknown; fullpageApi: unknown }) => {
           return (
             <ReactFullpage.Wrapper>
               {/* 첫 번째 섹션: 타이핑 애니메이션 */}
@@ -134,7 +136,10 @@ export default function HomePage() {
 
                         {/* CTA 버튼 */}
                         <div className="space-y-4">
-                          <button className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105">
+                          <button 
+                            onClick={() => navigate('/interview/start')}
+                            className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
+                          >
                             지금 시작하기
                           </button>
                         </div>
@@ -144,56 +149,142 @@ export default function HomePage() {
 
                                      {/* 스크롤 다운 인디케이터 */}
                    <div 
-                     className={`absolute bottom-8 left-1/2 transform -translate-x-1/2 ${
+                     className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 ${
                        animationComplete ? 'block' : 'hidden'
                      }`}
                    >
-                    <div className="flex flex-col items-center space-y-3 text-gray-400 hover:text-[#2b7fff] transition-colors cursor-pointer">
+                    <div className="flex flex-col items-center space-y-3 text-gray-400">
                       <span className="text-sm font-medium">아래로 스크롤하세요</span>
                       <Mouse className="w-6 h-6 animate-bounce" />
                     </div>
                   </div>
                 </section>
               </div>
-              
-                             {/* 두 번째 섹션: 실시간 AI 분석 */}
-               <div className="section relative z-10">
-                 <div className="max-w-7xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
-                   <div className="flex justify-center lg:justify-start w-full lg:w-1/2">
-                     <img src="https://via.placeholder.com/500x400/2b7fff/ffffff?text=AI+Analysis+GIF" alt="AI 분석" className="w-full max-w-md rounded-xl shadow-2xl" />
-                   </div>
-                   <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
-                      <h2 className="text-3xl font-bold text-gray-800">실시간 AI 분석</h2>
-                      <p className="text-lg text-gray-600">표정, 목소리, 자세를 실시간으로 분석하여 면접 성과를 즉시 피드백받으세요.</p>
+              {/* 두 번째 섹션: AI 면접을 시작해보세요 */}
+              <div className="section relative z-10">
+                <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
+                  <div className="flex justify-center w-full lg:w-1/2">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#2b7fff] to-[#1e5bcc] flex items-center justify-center aspect-[5/4]">
+                      <div className="text-white text-center p-8">
+                        <div className="text-4xl mb-4">🎯</div>
+                        <h3 className="text-xl font-bold mb-2">AI 면접</h3>
+                        <p className="text-sm opacity-90">맞춤형 질문 생성</p>
+                      </div>
                     </div>
-                 </div>
-               </div>
+                  </div>
+                  <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
+                    <h2 className="text-3xl font-bold text-gray-800">AI 면접을 시작해보세요</h2>
+                    <p className="text-lg text-gray-600">업로드한 서류를 바탕으로 맞춤형 질문이 주어지고,<br/>답변에 따라 꼬리질문을 유연하게 생성해요.</p>
+                  </div>
+                </div>
+              </div>
 
-               {/* 세 번째 섹션: 맞춤형 질문 */}
-               <div className="section relative z-10">
-                 <div className="max-w-7xl mx-auto w-full px-6 flex flex-col lg:flex-row-reverse gap-12 items-center h-full">
-                   <div className="flex justify-center lg:justify-end w-full lg:w-1/2">
-                     <img src="https://via.placeholder.com/500x400/ff6b6b/ffffff?text=Custom+Questions+GIF" alt="맞춤형 질문" className="w-full max-w-md rounded-xl shadow-2xl" />
-                   </div>
-                   <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
-                      <h2 className="text-3xl font-bold text-gray-800">맞춤형 질문</h2>
-                      <p className="text-lg text-gray-600">지원 직무와 경력에 맞는 개인화된 면접 질문으로 실전에 준비하세요.</p>
+              {/* 세 번째 섹션: 면접 결과 리포트 */}
+              <div className="section relative z-10">
+                <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row-reverse gap-12 items-center h-full">
+                  <div className="flex justify-center w-full lg:w-1/2">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#ff6b6b] to-[#ee5a52] flex items-center justify-center aspect-[5/4]">
+                      <div className="text-white text-center p-8">
+                        <div className="text-4xl mb-4">📊</div>
+                        <h3 className="text-xl font-bold mb-2">결과 리포트</h3>
+                        <p className="text-sm opacity-90">상세한 분석 제공</p>
+                      </div>
                     </div>
-                 </div>
-               </div>
+                  </div>
+                  <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
+                    <h2 className="text-3xl font-bold text-gray-800">AI가 분석한 면접 리포트를 확인하세요</h2>
+                    <p className="text-lg text-gray-600">나도 모르는 내 말투, 행동, 표정, 시선 습관까지 한눈에!<br/>AI 코치의 총평도 놓치지 마세요.</p>
+                  </div>
+                </div>
+              </div>
 
-               {/* 네 번째 섹션: 스터디 그룹 */}
-               <div className="section relative z-10">
-                 <div className="max-w-7xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
-                   <div className="flex justify-center lg:justify-start w-full lg:w-1/2">
-                     <img src="https://via.placeholder.com/500x400/4ecdc4/ffffff?text=Study+Group+GIF" alt="스터디 그룹" className="w-full max-w-md rounded-xl shadow-2xl" />
-                   </div>
-                   <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
-                      <h2 className="text-3xl font-bold text-gray-800">스터디 그룹</h2>
-                      <p className="text-lg text-gray-600">다른 지원자들과 함께 면접 스터디를 진행하며 서로의 실력을 향상시키세요.</p>
+              {/* 네 번째 섹션: 스터디원을 구해보세요 */}
+              <div className="section relative z-10">
+                <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
+                  <div className="flex justify-center w-full lg:w-1/2">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#4ecdc4] to-[#44a08d] flex items-center justify-center aspect-[5/4]">
+                      <div className="text-white text-center p-8">
+                        <div className="text-4xl mb-4">👥</div>
+                        <h3 className="text-xl font-bold mb-2">스터디 매칭</h3>
+                        <p className="text-sm opacity-90">원하는 조건으로 매칭</p>
+                      </div>
                     </div>
-                 </div>
-               </div>
+                  </div>
+                  <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
+                    <h2 className="text-3xl font-bold text-gray-800">스터디원을 구해보세요</h2>
+                    <p className="text-lg text-gray-600">내가 원하는 직무, 원하는 시간대를 쉽게 찾고, <br/>모의면접을 함께할 수 있어요.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 다섯 번째 섹션: 더 편리한 온라인 모의면접 스터디 */}
+              <div className="section relative z-10">
+                <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row-reverse gap-12 items-center h-full">
+                  <div className="flex justify-center w-full lg:w-1/2">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#9b59b6] to-[#8e44ad] flex items-center justify-center aspect-[5/4]">
+                      <div className="text-white text-center p-8">
+                        <div className="text-4xl mb-4">💻</div>
+                        <h3 className="text-xl font-bold mb-2">온라인 스터디</h3>
+                        <p className="text-sm opacity-90">편리한 피드백 시스템</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
+                    <h2 className="text-3xl font-bold text-gray-800">더 편리한 온라인 모의면접 스터디</h2>
+                    <p className="text-lg text-gray-600">긍정 / 부정 피드백 누르고 전달하면 끝!<br />참고 자료도 간편하게 볼 수 있어요.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 여섯 번째 섹션: 면접스터디 피드백 */}
+              <div className="section relative z-10">
+                <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
+                  <div className="flex justify-center w-full lg:w-1/2">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#f39c12] to-[#e67e22] flex items-center justify-center aspect-[5/4]">
+                      <div className="text-white text-center p-8">
+                        <div className="text-4xl mb-4">💬</div>
+                        <h3 className="text-xl font-bold mb-2">피드백 관리</h3>
+                        <p className="text-sm opacity-90">체계적인 피드백 확인</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
+                    <h2 className="text-3xl font-bold text-gray-800">면접스터디 피드백</h2>
+                    <p className="text-lg text-gray-600">언제 어떤 피드백을 받았는지 쉽게 확인할 수 있어요.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 일곱 번째 섹션: 무료로 체험하기 */}
+              <div className="section relative z-10">
+                <div className="max-w-5xl mx-auto w-full px-6 flex flex-col items-center justify-center h-full text-center space-y-8">
+                  <div className="space-y-6">
+                    <h2 className="text-4xl lg:text-5xl font-bold text-gray-800">Try for free</h2>
+                    <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+                      모야에서 지금 바로 시작해보세요!<br />
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row gap-6 pt-8">
+                    <button 
+                      onClick={() => navigate('/interview/start')}
+                      className="bg-[#2b7fff] hover:bg-blue-600 text-white px-10 py-4 rounded-xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 min-w-[200px]"
+                    >
+                      AI 면접 시작하기
+                    </button>
+                    <button 
+                      onClick={() => navigate('/study')}
+                      className="border-2 border-[#2b7fff] text-[#2b7fff] hover:bg-[#2b7fff] hover:text-white px-10 py-4 rounded-xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 min-w-[200px]"
+                    >
+                      면접 스터디 참여하기
+                    </button>
+                  </div>
+                  
+                  <div className="pt-16 pb-8">
+                    <p className="text-gray-400 text-sm">© 2024 Moya. All rights reserved.</p>
+                  </div>
+                </div>
+              </div>
             </ReactFullpage.Wrapper>
           );
         }}
