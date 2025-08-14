@@ -1,0 +1,167 @@
+[
+  {
+    "timestamp": 0.06666666666666667,
+    "raw_point": [
+      475,
+      355
+    ],
+    "calibrated_point": [
+      475,
+      355
+    ]
+  },
+  {
+    "timestamp": 0.1,
+    "raw_point": [
+      500,
+      479
+    ],
+    "calibrated_point": [
+      500,
+      479
+    ]
+  },
+  {
+    "timestamp": 0.13333333333333333,
+    "raw_point": [
+      112,
+      199
+    ],
+    "calibrated_point": [
+      112,
+      199
+    ]
+  },
+  {
+    "timestamp": 0.16666666666666666,
+    "raw_point": [
+      606,
+      367
+    ],
+    "calibrated_point": [
+      606,
+      367
+    ]
+  },
+  {
+    "timestamp": 0.2,
+    "raw_point": [
+      353,
+      266
+    ],
+    "calibrated_point": [
+      353,
+      266
+    ]
+  },
+  {
+    "timestamp": 0.23333333333333334,
+    "raw_point": [
+      132,
+      407
+    ],
+    "calibrated_point": [
+      132,
+      407
+    ]
+  },
+  {
+    "timestamp": 0.26666666666666666,
+    "raw_point": [
+      861,
+      445
+    ],
+    "calibrated_point": [
+      861,
+      445
+    ]
+  },
+  {
+    "timestamp": 0.3,
+    "raw_point": [
+      387,
+      215
+    ],
+    "calibrated_point": [
+      387,
+      215
+    ]
+  },
+  {
+    "timestamp": 0.3333333333333333,
+    "raw_point": [
+      247,
+      326
+    ],
+    "calibrated_point": [
+      247,
+      326
+    ]
+  },
+  {
+    "timestamp": 0.36666666666666664,
+    "raw_point": [
+      267,
+      281
+    ],
+    "calibrated_point": [
+      267,
+      281
+    ]
+  },
+  {
+    "timestamp": 0.4,
+    "raw_point": [
+      441,
+      278
+    ],
+    "calibrated_point": [
+      441,
+      278
+    ]
+  },
+  {
+    "timestamp": 0.43333333333333335,
+    "raw_point": [
+      98,
+      345
+    ],
+    "calibrated_point": [
+      98,
+      345
+    ]
+  },
+  {
+    "timestamp": 0.4666666666666667,
+    "raw_point": [
+      394,
+      460
+    ],
+    "calibrated_point": [
+      394,
+      460
+    ]
+  },
+  {
+    "timestamp": 0.5,
+    "raw_point": [
+      420,
+      378
+    ],
+    "calibrated_point": [
+      420,
+      378
+    ]
+  },
+  {
+    "timestamp": 0.5333333333333333,
+    "raw_point": [
+      416,
+      345
+    ],
+    "calibrated_point": [
+      416,
+      345
+    ]
+  }
+]
