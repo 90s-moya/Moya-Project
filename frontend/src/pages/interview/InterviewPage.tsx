@@ -230,17 +230,7 @@ export default function InterviewScreen() {
           </div>
 
           <div className="flex items-center gap-4">
-            <div
-              className={`w-12 h-12 rounded-full grid place-items-center shadow ring-1 ${isMicOn ? "bg-blue-500 text-white ring-blue-500/50" : "bg-gray-200 text-gray-600 ring-gray-300"}`}
-              onClick={!isSubmitting ? toggleMic : undefined}
-              role="button"
-              aria-disabled={isSubmitting}
-            >
-              {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-            </div>
-            <div className="w-12 h-12 rounded-full grid place-items-center shadow bg-gray-100 text-gray-700 ring-1 ring-gray-200">
-              <Settings className="w-5 h-5" />
-            </div>
+            
 
             {/* 전송 중 버튼 비활성화 + 스피너 */}
             <Button
