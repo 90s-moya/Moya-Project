@@ -90,7 +90,7 @@ public class SecurityConfig {
                     "/v1/user/check-email",
                     "/v1/user/random",
                     "/v1/user/check-nickname",
-                    "/v1/room/*",
+                    "v1/room",
                         "/v1/room-member/*",
                         "/v1/interview-video",
                         "/ws",
