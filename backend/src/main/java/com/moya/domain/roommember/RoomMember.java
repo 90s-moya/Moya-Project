@@ -32,4 +32,6 @@ public class RoomMember extends BaseEntity {
     private String video_url;
     // 화면 녹화 시작 시 시간
     private LocalDateTime video_start;
+    // 비디오 fps
+    private int video_fps;
 }

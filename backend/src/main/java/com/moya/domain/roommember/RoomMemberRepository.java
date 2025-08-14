@@ -26,6 +26,6 @@ public interface RoomMemberRepository extends JpaRepository<RoomMember, UUID> {
     RoomMember findByRoomIdAndUserId(UUID room_id, UUID user_id);
 
     @Modifying
-    @Query("UPDATE RoomMember rm set rm.video_url = :video_url, rm.video_start = :video_start where rm.room_id.id = :room_id and rm.user_id.id = :user_id")
-    void saveVideo(UUID user_id, UUID room_id, String video_url, LocalDateTime video_start);
+    @Query("UPDATE RoomMember rm set rm.video_url = :video_url, rm.video_start = :video_start, rm.video_fps=:video_fps where rm.room_id.id = :room_id and rm.user_id.id = :user_id")
+    void saveVideo(UUID user_id, UUID room_id, String video_url, LocalDateTime video_start, int video_fps);
 }
