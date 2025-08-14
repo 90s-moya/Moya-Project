@@ -12,6 +12,12 @@ public class UploadInterviewVideoRequest {
     private MultipartFile file;
     private MultipartFile thumbnail;
     private UUID interviewSessionId;
-    private String order;
-    private String subOrder;
+    private Integer order;
+    private Integer subOrder;
+
+    // 옵션 (기본값)
+    private String device = "cpu";
+    private Integer stride = 5;
+    private Boolean returnPoints = false;
+
 }

@@ -4,25 +4,29 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
-@Getter @Setter
-@NoArgsConstructor @AllArgsConstructor @Builder
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @Entity
 @Table(name = "question_answer_pair")
 public class QuestionAnswerPair {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id") // INT AUTO_INCREMENT
-    private Long id;
+    @Column(name = "id", length = 36, nullable = false)
+    private String id; // UUID 문자열
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "session_id", referencedColumnName = "id", nullable = false)
     private EvaluationSession session;
 
-    @Column(name = "`order`", nullable = false) // order는 예약어 가능성 → 백틱으로 회피
+    @Column(name = "`order`", nullable = false)
     private Integer order;
 
     @Column(name = "sub_order", nullable = false)
@@ -31,6 +35,20 @@ public class QuestionAnswerPair {
     @Lob
     @Column(name = "question", nullable = false)
     private String question;
+
+    @Lob
+    @Column(name = "video_url")
+    private String videoUrl;
+
+    // MySQL JSON 컬럼 → String으로 매핑
+    @Column(name = "gaze_result", columnDefinition = "json")
+    private String gazeResult;
+
+    @Column(name = "posture_result", columnDefinition = "json")
+    private String postureResult;
+
+    @Column(name = "face_result", columnDefinition = "json")
+    private String faceResult;
 
     @Lob
     @Column(name = "answer")
@@ -61,12 +79,29 @@ public class QuestionAnswerPair {
     @Lob
     @Column(name = "end_type")
     private String endType;
+    @Lob
+    @Column(name = "thumbnail_url")
+    private String thumbnailUrl;
+    @Lob
+    @Column(name = "speech_label")
+    private String speechLabel;
+
+    @Lob
+    @Column(name = "syll_art")
+    private String syllArt;
 
     @CreationTimestamp
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(name = "updated_at")
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.id == null) {
+            this.id = UUID.randomUUID().toString();
+        }
+    }
 }

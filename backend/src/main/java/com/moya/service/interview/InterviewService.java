@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -16,14 +17,14 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
-
 @Service
 @RequiredArgsConstructor
 public class InterviewService {
 
     @Value("${PYTHON_PATH}")
     private String pythonPath;
-
+    @Value("${FILE_PATH}")
+    private String video_path;
     private final RestTemplate restTemplate;
     private final FileStorageService fileStorageService;
 
@@ -74,12 +75,83 @@ public class InterviewService {
         MultipartFile thumbnail = request.getThumbnail();
         String videoUrl = fileStorageService.saveOther(file, "video");
         System.out.println(videoUrl);
-        // 썸네일
         String thumbnailUrl = fileStorageService.saveOther(thumbnail, "thumbnail");
+
+        if (request.getInterviewSessionId() != null) {
+            Integer stride = request.getStride() != null ? request.getStride() : 5;
+            String device = request.getDevice() != null ? request.getDevice() : "cpu";
+            boolean returnPoints = Boolean.TRUE.equals(request.getReturnPoints());
+
+            Integer order = toIntOrNull(String.valueOf(request.getOrder()));
+            Integer subOrder = toIntOrNull(String.valueOf(request.getSubOrder()));
+
+            if (order != null && subOrder != null) {
+                sendAnalyzeByUrlAsync(
+                        request.getInterviewSessionId(),
+                        order,
+                        subOrder,
+                        videoUrl,
+                        device,
+                        stride,
+                        returnPoints
+                );
+            } else {
+                System.err.println("[analyze] skip: order/subOrder parse 실패 (order="
+                        + request.getOrder() + ", subOrder=" + request.getSubOrder() + ")");
+            }
+        }
 
         return InterviewVideoCommand.builder()
                 .ThumbnailUrl(thumbnailUrl)
                 .videoUrl(videoUrl)
                 .build();
     }
+
+    private Integer toIntOrNull(String s) {
+        try {
+            return (s == null || s.isBlank()) ? null : Integer.parseInt(s.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** FastAPI /v1/analyze/complete-by-url 호출 (응답 무시, FastAPI가 DB 저장) */
+    @Async
+    public void sendAnalyzeByUrlAsync(
+            UUID sessionId,
+            int order,
+            int subOrder,
+            String videoUrl,
+            String device,
+            int stride,
+            boolean returnPoints
+    ) {
+        try {
+            HttpHeaders text = new HttpHeaders();
+            text.setContentType(MediaType.TEXT_PLAIN);
+            String fullVideoUrl = videoUrl + "/" + video_path;
+            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+            body.add("video_url", new HttpEntity<>(fullVideoUrl, text));
+            body.add("session_id", new HttpEntity<>(sessionId.toString(), text));
+            body.add("order", new HttpEntity<>(String.valueOf(order), text));
+            body.add("sub_order", new HttpEntity<>(String.valueOf(subOrder), text));
+            body.add("device", new HttpEntity<>(device, text));
+            body.add("stride", new HttpEntity<>(String.valueOf(stride), text));
+            body.add("return_points", new HttpEntity<>(String.valueOf(returnPoints), text));
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+
+            restTemplate.exchange(
+                    pythonPath + "/v1/analyze/complete-by-url",
+                    HttpMethod.POST,
+                    new HttpEntity<>(body, headers),
+                    String.class // 응답 바디는 사용하지 않음
+            );
+        } catch (Exception e) {
+            System.err.println("[analyze async] " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+    }
 }
+
