@@ -20,6 +20,7 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
   const [currentPointIndex, setCurrentPointIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [samplesCollected, setSamplesCollected] = useState(0);
+  const [showInstructions, setShowInstructions] = useState(true);
   const [calibrationData, setCalibrationData] = useState<{
     points: Array<[number, number]>,
     gazeVectors: Array<[number, number]>
@@ -51,12 +52,20 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
       setCurrentPointIndex(0);
       setIsRecording(false);
       setSamplesCollected(0);
+      setShowInstructions(true);
       setCalibrationData({
         points: [],
         gazeVectors: []
       });
       setPoints(calibrationPoints.map(p => ({ ...p, completed: false })));
       console.log('[CALIBRATION] State reset complete - starting from point 1');
+      
+      // 3초 후 안내창 숨기기
+      const instructionTimer = setTimeout(() => {
+        setShowInstructions(false);
+      }, 3000);
+      
+      return () => clearTimeout(instructionTimer);
     }
   }, [isOpen]);
 
@@ -286,33 +295,40 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
         />
       )}
 
-      {/* 상단 지시사항 */}
-      <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-white bg-opacity-90 rounded-lg px-6 py-4 text-center">
-        <div className="text-lg font-semibold text-gray-800 mb-2">
-          시선 캘리브레이션
+      {/* 상단 지시사항 - 3초 후 자동으로 사라짐 */}
+      {showInstructions && (
+        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-white bg-opacity-90 rounded-lg px-6 py-4 text-center transition-opacity duration-500">
+          <div className="text-lg font-semibold text-gray-800 mb-2">
+            시선 캘리브레이션
+          </div>
+          <div className="text-sm text-gray-600 mb-2">
+            빨간 점을 응시한 후 SPACE키를 눌러 캘리브레이션을 진행하세요
+          </div>
+          <div className="text-xs text-gray-500 mb-2">
+            ESC를 누르면 취소됩니다
+          </div>
+          <div className="text-xs text-blue-600">
+            3초 후 이 안내창이 자동으로 사라집니다
+          </div>
         </div>
-        <div className="text-sm text-gray-600 mb-2">
-          {getInstructions()}
-        </div>
-        <div className="text-xs text-gray-500">
-          ESC를 누르면 취소됩니다
-        </div>
-      </div>
+      )}
 
-      {/* 하단 진행 상황 */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white bg-opacity-90 rounded-lg px-6 py-3">
-        <div className="flex items-center space-x-4">
-          <div className="text-sm text-gray-600">
-            수집된 샘플: {samplesCollected}/{points.length}
-          </div>
-          <div className="w-32 bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(samplesCollected / points.length) * 100}%` }}
-            />
+      {/* 하단 진행 상황 - 안내창이 사라진 후에만 표시 */}
+      {!showInstructions && (
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-white bg-opacity-90 rounded-lg px-6 py-3 transition-opacity duration-500">
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-gray-600">
+              {getInstructions()}
+            </div>
+            <div className="w-32 bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(samplesCollected / points.length) * 100}%` }}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 녹화 중 표시 */}
       {isRecording && (
