@@ -105,7 +105,7 @@ public class InterviewService {
 
             Integer order = toIntOrNull(String.valueOf(request.getOrder()));
             Integer subOrder = toIntOrNull(String.valueOf(request.getSubOrder()));
-
+            String calibDataJson = request.getCalibDataJson();
             if (order != null && subOrder != null) {
                 sendAnalyzeByUrlAsync(
                         request.getInterviewSessionId(),
@@ -114,7 +114,8 @@ public class InterviewService {
                         videoUrl,
                         device,
                         stride,
-                        returnPoints
+                        returnPoints,
+                        calibDataJson
                 );
             } else {
                 System.err.println("[analyze] skip: order/subOrder parse 실패 (order="
@@ -137,7 +138,8 @@ public class InterviewService {
             String videoUrl,
             String device,
             int stride,
-            boolean returnPoints
+            boolean returnPoints,
+            String calibDataJson
     ) {
         try {
             String resolved = toAbsoluteUrl(videoUrl); // 안전차원으로 한 번 더 보정
@@ -154,6 +156,9 @@ public class InterviewService {
             body.add("device",        new HttpEntity<>(device, text));
             body.add("stride",        new HttpEntity<>(String.valueOf(stride), text));
             body.add("return_points", new HttpEntity<>(String.valueOf(returnPoints), text));
+            if (calibDataJson != null && !calibDataJson.isBlank()) {
+                body.add("calib_data", new HttpEntity<>(calibDataJson, text));
+            }
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
