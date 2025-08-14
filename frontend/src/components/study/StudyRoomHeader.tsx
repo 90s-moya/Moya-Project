@@ -33,7 +33,7 @@ export default function StudyRoomHeader({
   if (!focusedUserId) return null;
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 mt-2 mb-4 justify-center">
+    <div className="flex gap-2 overflow-x-auto pb-1 mt-1 mb-2 justify-center">
       {participants
         .filter((p) => p.id !== focusedUserId)
         .sort((a, b) => {

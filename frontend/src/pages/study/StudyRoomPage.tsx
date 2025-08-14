@@ -27,7 +27,7 @@ export default function StudyRoomPage() {
   return (
     <div className="min-h-screen bg-white text-[#1b1c1f] flex flex-col">
       {/* 메인 콘텐츠 영역 */}
-      <main className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden relative">
         {/* 헤더 (포커스 모드일 때만 표시) */}
         <StudyRoomHeader
           participants={participants}
