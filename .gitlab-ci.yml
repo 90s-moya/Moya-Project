@@ -39,7 +39,7 @@ deploy-be-dev:
       -e MAIL_USERNAME="$MAIL_USERNAME"
       -e MAIL_PASSWORD="$MAIL_PASSWORD"
       -e PYTHON_PATH="$PYTHON_PATH"
-      -e VIDEO_PATH="$VIDEO_PATH_DEV"
+      -e VIDEO_PATH="$VITE_FILE_URL"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
@@ -64,7 +64,7 @@ deploy-be-prod:
       -e MAIL_USERNAME="$MAIL_USERNAME"
       -e MAIL_PASSWORD="$MAIL_PASSWORD"
       -e PYTHON_PATH="$PYTHON_PATH"
-      -e VIDEO_PATH="$VIDEO_PATH_PROD"
+      -e VIDEO_PATH="$VITE_FILE_URL"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
   tags:
     - ec2
