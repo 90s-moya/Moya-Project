@@ -148,53 +148,66 @@ const FeedbackDetail: React.FC = () => {
               <div
                 className="h-full max-h-[calc(100vh-300px)] overflow-y-auto flex flex-col gap-4 pr-4"
               >
-                {[...feedbackData.feedbackList].map((fd, index) => {
-                  // 시간 계산: (createdAt - videoStart - 10초)
-                  const open = dayjs(videoStart);
-                  const created = dayjs(fd.createdAt);
-                  let timeInSeconds = created.diff(open, 'second') - 10;
-                  if (timeInSeconds < 0) timeInSeconds = 0;
-                  
-                  // MM:SS 형식으로 변환
-                  const minutes = Math.floor(timeInSeconds / 60);
-                  const seconds = timeInSeconds % 60;
-                  const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                  
-                  return (
-                    <div
-                      key={fd.fdId}
-                      className="flex items-start gap-4 relative z-10"
-                    >
-                      {/* 타임라인 점과 시간 (좌측) */}
-                      <div className="flex flex-col items-center w-16 flex-shrink-0">
-                        <div className="w-2 h-2 mb-0.5 bg-[#2B7FFF] rounded-full mt-5">
-                        </div>
-                        <div className="text-sm text-[#2B7FFF] font-medium text-center bg-white">
-                          {timeString}
-                        </div>
+                {feedbackData.feedbackList.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-[#1b1c1f] mb-2">
+                        받은 피드백이 없어요!
                       </div>
-                      
-                      {/* 피드백 박스 (우측) */}
-                      <div 
-                        className="flex-1 flex items-start gap-3 bg-[#fafafc] border border-[#dedee4] rounded-lg p-4 cursor-pointer hover:bg-gray-300/30 transition-colors pr-6 py-5"
-                        onClick={() => handleFeedbackClick(fd.createdAt)}
-                      >
-                        {/* 아이콘 */}
-                        <div className="flex items-center mr-2">
-                          {fd.feedbackType === 'POSITIVE' ? (
-                            <img src={positiveIcon} alt="긍정 피드백" width="28" height="28" />
-                          ) : (
-                            <img src={negativeIcon} alt="부정 피드백" width="28" height="28" />
-                          )}
-                        </div>
-                        {/* 메시지 */}
-                        <div className="flex-1">
-                          <div className="text-sm md:text-base text-[#1b1c1f] mb-1 leading-relaxed">{fd.message}</div>
-                        </div>
+                      <div className="text-sm text-gray-500">
+                        영상을 다시 보면서 연습해보세요
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ) : (
+                  [...feedbackData.feedbackList].map((fd, index) => {
+                    // 시간 계산: (createdAt - videoStart - 10초)
+                    const open = dayjs(videoStart);
+                    const created = dayjs(fd.createdAt);
+                    let timeInSeconds = created.diff(open, 'second') - 10;
+                    if (timeInSeconds < 0) timeInSeconds = 0;
+                    
+                    // MM:SS 형식으로 변환
+                    const minutes = Math.floor(timeInSeconds / 60);
+                    const seconds = timeInSeconds % 60;
+                    const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    return (
+                      <div
+                        key={fd.fdId}
+                        className="flex items-start gap-4 relative z-10"
+                      >
+                        {/* 타임라인 점과 시간 (좌측) */}
+                        <div className="flex flex-col items-center w-16 flex-shrink-0">
+                          <div className="w-2 h-2 mb-0.5 bg-[#2B7FFF] rounded-full mt-5">
+                          </div>
+                          <div className="text-sm text-[#2B7FFF] font-medium text-center bg-white">
+                            {timeString}
+                          </div>
+                        </div>
+                        
+                        {/* 피드백 박스 (우측) */}
+                        <div 
+                          className="flex-1 flex items-start gap-3 bg-[#fafafc] border border-[#dedee4] rounded-lg p-4 cursor-pointer hover:bg-gray-300/30 transition-colors pr-6 py-5"
+                          onClick={() => handleFeedbackClick(fd.createdAt)}
+                        >
+                          {/* 아이콘 */}
+                          <div className="flex items-center mr-2">
+                            {fd.feedbackType === 'POSITIVE' ? (
+                              <img src={positiveIcon} alt="긍정 피드백" width="28" height="28" />
+                            ) : (
+                              <img src={negativeIcon} alt="부정 피드백" width="28" height="28" />
+                            )}
+                          </div>
+                          {/* 메시지 */}
+                          <div className="flex-1">
+                            <div className="text-sm md:text-base text-[#1b1c1f] mb-1 leading-relaxed">{fd.message}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
