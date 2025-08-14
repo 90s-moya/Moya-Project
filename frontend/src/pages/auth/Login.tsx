@@ -24,7 +24,11 @@ const Login: React.FC = () => {
 
   const { login } = useAuthStore();
   const navigate = useNavigate();
-
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleLogin();
+    }
+  };
   const handleLogin = async () => {
     if (!email || !password) {
       setErrorMsg("이메일과 비밀번호를 입력해주세요.");
@@ -124,6 +128,7 @@ const Login: React.FC = () => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   placeholder="비밀번호를 입력하세요"
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors"
                 />
