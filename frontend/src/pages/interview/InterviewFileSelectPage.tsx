@@ -9,7 +9,7 @@ import Header from "@/components/common/Header";
 type DocItem = {
   docsId: string;
   userId: string;
-  fileUrl: string; // 백엔드가 내려주는 '원본(api-dev)' URL
+  fileUrl: string;
   docsStatus: "PORTFOLIO" | "RESUME" | "COVERLETTER";
 };
 
@@ -31,9 +31,7 @@ function toFileUrl(originalUrl: string) {
   const apiBase = import.meta.env.VITE_API_URL || "";
   const fileBase = import.meta.env.VITE_FILE_URL || "";
   if (!originalUrl) return originalUrl;
-  return originalUrl.startsWith(apiBase)
-    ? originalUrl.replace(apiBase, fileBase)
-    : originalUrl;
+  return originalUrl.startsWith(apiBase) ? originalUrl.replace(apiBase, fileBase) : originalUrl;
 }
 
 const safe = (s?: string) => (s ?? "").trim();
@@ -59,18 +57,31 @@ function getNameFromUrl(u?: string): string {
   }
 }
 
+function prettyFileName(full: string): string {
+  const base = getNameFromUrl(full);
+  return (
+    base
+      .replace(/^[0-9a-f-]{12,}/i, "")
+      .replace(/\[[^\]]*]/g, "")
+      .replace(/_{2,}/g, "_")
+      .replace(/^-+/, "")
+      .trim() || base
+  );
+}
+
 export default function InterviewFileSelectPage() {
   const navigate = useNavigate();
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [selected, setSelected] = useState<DocUrls>({});
   const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<DocType>("RESUME"); // 표 형태 탭 상태
 
   useEffect(() => {
     (async () => {
       const res = await DocsApi.getMyDocs();
       const data: DocItem[] = (res as any)?.data ?? res;
       setDocs(data);
-      setSelected(toInitialSelected(data)); // 원본으로 초기화
+      setSelected(toInitialSelected(data));
     })();
   }, []);
 
@@ -91,48 +102,16 @@ export default function InterviewFileSelectPage() {
     );
   };
 
-  // 다음 단계 전송
   const handleNext = async () => {
-    //const resumUrl = toFileUrl(selected.resumeUrl)
     const payload = {
       resumeUrl: selected.resumeUrl?.trim() ?? "",
       portfolioUrl: selected.portfolioUrl?.trim() ?? "",
       coverletterUrl: selected.coverletterUrl?.trim() ?? "",
     };
-    
-    //console.log("==================dkjfdkfj",payload);
-
     try {
       setLoading(true);
-
-      // 토큰 만료 로그(옵션)
-      // try {
-      //   const auth = localStorage.getItem("auth-storage");
-      //   const token = auth ? JSON.parse(auth).state.token : "";
-      //   const expired = (() => {
-      //     try {
-      //       const [, p] = token.split(".");
-      //       const { exp } = JSON.parse(atob(p));
-      //       return Date.now() >= exp * 1000;
-      //     } catch {
-      //       return true;
-      //     }
-      //   })();
-      //   console.log("[/v1/pdf] token expired?", expired);
-      // } catch (e) {
-      //   console.log("[/v1/pdf] token parse error", e);
-      // }
-
       const extracted = await extractTextFromPdf(payload);
-      console.log("extracted result:", extracted);
-
-      //if(extracted) localStorage.setItem("interviewSessionId", extracted.data.id);
-    
-      navigate("/interview/modelist", {
-        state: {
-          ...extracted,  // resumeText / portfolioText / coverletterText
-        },
-      });
+      navigate("/interview/modelist", { state: { ...extracted } });
     } catch (err: any) {
       const status = err?.response?.status;
       console.error("[/v1/pdf] failed:", status, err?.response?.data || err);
@@ -140,100 +119,211 @@ export default function InterviewFileSelectPage() {
     } finally {
       setLoading(false);
     }
-  }; // ← 반드시 닫기!
+  };
 
   const isNextDisabled =
     !selected.resumeUrl && !selected.portfolioUrl && !selected.coverletterUrl;
 
-  const displayName = (raw?: string) => getNameFromUrl(toFileUrl(safe(raw || "")));
+  const summary =
+    [
+      selected.resumeUrl ? "이력서 선택됨" : "",
+      selected.portfolioUrl ? "포트폴리오 선택됨" : "",
+      selected.coverletterUrl ? "자기소개서 선택됨" : "",
+    ]
+      .filter(Boolean)
+      .join(" / ") || "선택된 서류 없음";
+
+  // 현재 탭에서 선택된 파일명
+  const currentPickedName = (() => {
+    const raw =
+      tab === "RESUME" ? selected.resumeUrl :
+      tab === "PORTFOLIO" ? selected.portfolioUrl :
+      selected.coverletterUrl;
+    return raw ? prettyFileName(toFileUrl(raw)) : "-";
+  })();
 
   return (
     <>
       <Header scrollBg={false} />
 
-      <div className="mx-auto max-w-3xl px-6 py-8 mt-16">
-        <header className="mb-6">
-          <h1 className="text-2xl font-semibold">서류 선택</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            유형별로 사용할 서류를 선택하세요. 선택된 서류는 상태에 따라
-            resumeUrl, portfolioUrl, coverletterUrl로 전송됩니다.
-          </p>
+      {/* 상단 여백 고정 */}
+      <div className="pt-20 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/60">
+        <div className="mx-auto max-w-5xl px-6 pb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+                STEP 1/3
+              </span>
+              <h1 className="mt-3 text-2xl font-semibold text-slate-900">서류 선택</h1>
+              <p className="mt-2 text-sm text-slate-600">
+                탭에서 유형을 선택해 1개 이상 고르세요. 다음 단계에서 AI가 분석해 인터뷰를 준비합니다
+              </p>
+            </div>
+
+            <div className="hidden md:block max-w-sm text-right">
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                {summary}
+              </div>
+            </div>
+          </div>
+
+          {/* 가이드 카드 */}
+          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
+            <ul className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                카드 클릭으로 선택, 우측 링크로 미리보기
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                파일명은 두 줄까지만 표시되고 전체 이름은 툴팁으로 확인
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                선택 후 하단의 다음 버튼으로 진행
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* 표 형태 탭 바 */}
+      <div className="mx-auto max-w-5xl px-6">
+        <div
+          role="tablist"
+          aria-label="문서 유형"
+          className="grid grid-cols-3 rounded-xl border border-slate-200 bg-white text-sm shadow-sm"
+        >
+          {(["RESUME", "PORTFOLIO", "COVERLETTER"] as DocType[]).map((t, i) => {
+            const active = tab === t;
+            return (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t)}
+                className={[
+                  "h-11 w-full px-4 font-medium transition",
+                  "border-slate-200",
+                  i !== 2 ? "border-r" : "",
+                  active
+                    ? "bg-blue-50 text-blue-700"
+                    : "bg-white text-slate-700 hover:bg-slate-50"
+                ].join(" ")}
+              >
+                {STATUS_LABEL[t]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 현재 탭 콘텐츠: 카드 그리드 */}
+      <main className="mx-auto max-w-5xl px-6 py-8">
+        <header className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-blue-500" aria-hidden />
+            <h2 className="text-base md:text-lg font-semibold text-slate-900">
+              {STATUS_LABEL[tab]}
+            </h2>
+          </div>
+          <span className="text-xs text-slate-500">현재 선택: {currentPickedName}</span>
         </header>
 
-        <section className="space-y-8">
-          {(["RESUME", "PORTFOLIO", "COVERLETTER"] as DocType[]).map((type) => (
-            <div key={type} className="border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-medium">{STATUS_LABEL[type]}</h2>
-                <span className="text-xs text-gray-500">
-                  현재 선택:{" "}
-                  {type === "RESUME" && (displayName(selected.resumeUrl) || "-")}
-                  {type === "PORTFOLIO" && (displayName(selected.portfolioUrl) || "-")}
-                  {type === "COVERLETTER" && (displayName(selected.coverletterUrl) || "-")}
-                </span>
-              </div>
+        {grouped[tab].length === 0 ? (
+          <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+            등록된 {STATUS_LABEL[tab]}가 없습니다
+          </div>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {grouped[tab].map((d) => {
+              const raw = safe(d.fileUrl);
+              const display = toFileUrl(raw);
+              const checked =
+                (tab === "RESUME" && selected.resumeUrl === raw) ||
+                (tab === "PORTFOLIO" && selected.portfolioUrl === raw) ||
+                (tab === "COVERLETTER" && selected.coverletterUrl === raw);
 
-              {grouped[type].length === 0 ? (
-                <div className="text-sm text-gray-500">등록된 {STATUS_LABEL[type]}가 없습니다</div>
-              ) : (
-                <ul className="space-y-2">
-                  {grouped[type].map((d) => {
-                    const raw = safe(d.fileUrl);        // 원본
-                    const display = toFileUrl(raw);     // 화면용
-                    const checked =
-                      (type === "RESUME" && selected.resumeUrl === raw) ||
-                      (type === "PORTFOLIO" && selected.portfolioUrl === raw) ||
-                      (type === "COVERLETTER" && selected.coverletterUrl === raw);
-                    return (
-                      <li key={d.docsId} className="flex items-center justify-between rounded-lg border px-3 py-2">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="radio"
-                            name={`pick-${type}`}
-                            checked={checked}
-                            onChange={() => onPick(type, raw)}
-                          />
-                          <span className="text-sm">
-                            {getNameFromUrl(display)}
-                            <span className="ml-2 text-xs text-gray-400">
-                              ({STATUS_LABEL[d.docsStatus as DocType]})
-                            </span>
-                          </span>
-                        </label>
+              return (
+                <li key={d.docsId}>
+                  <label
+                    className={[
+                      "group relative block h-full cursor-pointer rounded-xl border p-4 transition",
+                      checked ? "border-blue-300 bg-blue-50/50" : "border-slate-200 bg-white hover:bg-slate-50",
+                    ].join(" ")}
+                    title={getNameFromUrl(display)}
+                  >
+                    <input
+                      type="radio"
+                      name={`pick-${tab}`}
+                      checked={checked}
+                      onChange={() => onPick(tab, raw)}
+                      className="sr-only"
+                      aria-label={`${STATUS_LABEL[tab]} 선택`}
+                    />
 
-                        <a
-                          className="text-xs underline text-blue-600"
-                          href={display}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          열기
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          ))}
-        </section>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center">
+                          <span className="text-[10px] font-semibold text-slate-600">PDF</span>
+                        </div>
+                        <span className="text-xs text-slate-500">{STATUS_LABEL[d.docsStatus as DocType]}</span>
+                      </div>
+                      <div
+                        className={[
+                          "h-4 w-4 rounded-full border",
+                          checked ? "border-blue-600 bg-blue-600" : "border-slate-300 bg-white",
+                        ].join(" ")}
+                        aria-hidden
+                      />
+                    </div>
 
-        <footer className="mt-8 flex justify-end">
-          {Button ? (
-            <Button disabled={loading || isNextDisabled} onClick={handleNext}>
-              다음
-            </Button>
-          ) : (
-            <button
-              className="rounded-md bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
+                    <div className="mt-3 text-sm font-medium text-slate-900 line-clamp-2">
+                      {prettyFileName(display)}
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between">
+                      <a
+                        className="text-xs underline text-blue-600 hover:text-blue-700"
+                        href={display}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        열기
+                      </a>
+                      <span className="text-[11px] text-slate-500">클릭해서 선택</span>
+                    </div>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </main>
+
+      {/* 하단 고정 진행 바 */}
+      <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs text-slate-500">선택 요약</p>
+            <p className="truncate text-sm text-slate-700">{summary}</p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {loading && (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-transparent" aria-label="처리 중" />
+            )}
+            <Button
               disabled={loading || isNextDisabled}
               onClick={handleNext}
+              className="rounded-full px-6"
             >
               다음
-            </button>
-          )}
-        </footer>
+            </Button>
+          </div>
+        </div>
       </div>
     </>
   );
