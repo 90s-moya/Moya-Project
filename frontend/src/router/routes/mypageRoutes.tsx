@@ -12,14 +12,14 @@ import CoverLetter from "@/pages/mypage/CoverLetter";
 import StudyRoom from "@/pages/mypage/StudyRoom";
 
 const mypageRoutes: RouteObject[] = [
-    {path: "/mypage/userinfo", element: <UserInfo />},
-    {path: "/mypage/resume", element: <Resume />},
-    {path: "/mypage/portfolio", element: <Portfolio />},
-    {path: "/mypage/result", element: <ReportList />},
-    {path: "/mypage/result/:reportId/:resultId", element: <ResultDetail />},
-    {path: "/mypage/feedback", element: <Feedback />},
-    {path: "/mypage/feedback/:id", element: <FeedbackDetail />},
-    { path: "/mypage/coverletter", element: <CoverLetter /> },
-    { path: "/mypage/room", element: <StudyRoom /> },
-]
+  { path: "/mypage/userinfo", element: <UserInfo /> },
+  { path: "/mypage/resume", element: <Resume /> },
+  { path: "/mypage/portfolio", element: <Portfolio /> },
+  { path: "/mypage/result", element: <ReportList /> },
+  { path: "/mypage/result/:reportId/:resultId", element: <ResultDetail /> },
+  { path: "/mypage/feedback", element: <Feedback /> },
+  { path: "/mypage/feedback/:id", element: <FeedbackDetail /> },
+  { path: "/mypage/coverletter", element: <CoverLetter /> },
+  { path: "/mypage/studyRoom", element: <StudyRoom /> },
+];
 export default mypageRoutes;
