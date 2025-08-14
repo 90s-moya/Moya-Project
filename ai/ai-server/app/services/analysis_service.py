@@ -13,50 +13,80 @@ from app.services.face_service import infer_face_video
 
 def preprocess_video(video_bytes: bytes, target_fps: int = 30, max_frames: int = 1800, resize_to=(960, 540)) -> bytes:
     """영상 FPS 제한, 해상도 축소, 최대 프레임 제한"""
-    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
-        tmp.write(video_bytes)
-        tmp_path = tmp.name
+    import os
+    
+    tmp_path = None
+    out_path = None
+    
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+            tmp.write(video_bytes)
+            tmp_path = tmp.name
 
-    cap = cv2.VideoCapture(tmp_path)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30
-    frame_interval = max(1, int(fps / target_fps))
+        cap = cv2.VideoCapture(tmp_path)
+        if not cap.isOpened():
+            raise HTTPException(status_code=400, detail="비디오 파일을 읽을 수 없습니다")
+            
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30
+        frame_interval = max(1, int(fps / target_fps))
 
-    out_path = tmp_path + "_processed.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out_writer = None
+        out_path = tmp_path + "_processed.mp4"
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        out_writer = None
 
-    frame_count = 0
-    processed_frames = 0
+        frame_count = 0
+        processed_frames = 0
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        if frame_count % frame_interval == 0:
-            if resize_to:
-                frame = cv2.resize(frame, resize_to)
-
-            if out_writer is None:
-                h, w = frame.shape[:2]
-                out_writer = cv2.VideoWriter(out_path, fourcc, target_fps, (w, h))
-
-            out_writer.write(frame)
-            processed_frames += 1
-
-            if processed_frames >= max_frames:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
                 break
 
-        frame_count += 1
+            if frame_count % frame_interval == 0:
+                if resize_to:
+                    frame = cv2.resize(frame, resize_to)
 
-    cap.release()
-    if out_writer:
-        out_writer.release()
+                if out_writer is None:
+                    h, w = frame.shape[:2]
+                    out_writer = cv2.VideoWriter(out_path, fourcc, target_fps, (w, h))
 
-    with open(out_path, "rb") as f:
-        processed_bytes = f.read()
+                out_writer.write(frame)
+                processed_frames += 1
 
-    return processed_bytes
+                if processed_frames >= max_frames:
+                    break
+
+            frame_count += 1
+
+        cap.release()
+        if out_writer:
+            out_writer.release()
+
+        # 처리된 파일이 존재하는지 확인
+        if not os.path.exists(out_path):
+            raise HTTPException(status_code=500, detail="비디오 처리 중 오류가 발생했습니다")
+
+        with open(out_path, "rb") as f:
+            processed_bytes = f.read()
+
+        return processed_bytes
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"비디오 처리 실패: {str(e)}")
+    finally:
+        # 임시 파일들 정리
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except:
+                pass
+        if out_path and os.path.exists(out_path):
+            try:
+                os.unlink(out_path)
+            except:
+                pass
 
 
 # ======================
