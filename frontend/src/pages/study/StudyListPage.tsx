@@ -46,23 +46,57 @@ export default function StudyListPage() {
   // 현재 날짜
   const now = new Date();
 
-  // 시작일시가 현재 시간보다 미래인 스터디만 필터링
+  // 종료일시가 지나지 않은 스터디만 필터링
   const activeRooms = rooms.filter((room) => {
-    // 시작일시가 현재 시간보다 지난 경우 제외
-    if (new Date(room.openAt) <= now) {
+    // 종료일시가 지난 경우 제외
+    if (room.expiredAt && new Date(room.expiredAt) <= now) {
       return false;
     }
 
     return true;
   });
 
+  // 스터디 상태를 판단하는 함수
+  const getRoomStatus = (room: StudyRoom) => {
+    const now = new Date();
+    const openAt = new Date(room.openAt);
+    const isStarted = openAt <= now;
+    const isFull = room.joinUser >= room.maxUser;
+
+    if (isFull) return "full";
+    if (isStarted) return "started";
+    return "upcoming";
+  };
+
   // 최신순으로 정렬된 rooms (생성 시간 기준)
-  const recentSortedRooms = [...activeRooms].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const recentSortedRooms = [...activeRooms].sort((a, b) => {
+    const aStatus = getRoomStatus(a);
+    const bStatus = getRoomStatus(b);
+
+    // 상태별 우선순위: upcoming > started > full
+    const statusPriority = { upcoming: 0, started: 1, full: 2 };
+
+    if (statusPriority[aStatus] !== statusPriority[bStatus]) {
+      return statusPriority[aStatus] - statusPriority[bStatus];
+    }
+
+    // 같은 상태 내에서는 생성 시간 기준 정렬
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   // 마감순으로 정렬된 rooms (시작일시가 현재 시간에 가장 가까운 순서)
   const deadlineSortedRooms = [...activeRooms].sort((a, b) => {
+    const aStatus = getRoomStatus(a);
+    const bStatus = getRoomStatus(b);
+
+    // 상태별 우선순위: upcoming > started > full
+    const statusPriority = { upcoming: 0, started: 1, full: 2 };
+
+    if (statusPriority[aStatus] !== statusPriority[bStatus]) {
+      return statusPriority[aStatus] - statusPriority[bStatus];
+    }
+
+    // 같은 상태 내에서는 시작일시 기준 정렬
     const now = new Date().getTime();
     const aTimeDiff = Math.abs(new Date(a.openAt).getTime() - now);
     const bTimeDiff = Math.abs(new Date(b.openAt).getTime() - now);
@@ -114,11 +148,11 @@ export default function StudyListPage() {
     <div className="min-h-screen bg-white">
       <Header scrollBg={false} />
 
-      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-[17px] leading-relaxed">
+      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-base leading-relaxed">
         {/* Title Section */}
         <div className="mb-10 flex justify-between items-center">
           <div>
-            <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">
+            <h1 className="text-3xl font-semibold text-[#2B7FFF] mb-2">
               면접 스터디 모집
             </h1>
             <p className="text-[#4b4e57] text-lg">
@@ -128,7 +162,7 @@ export default function StudyListPage() {
 
           <Button
             onClick={() => navigate("/study/create")}
-            className="bg-[#2b7fff] hover:bg-blue-600 text-white font-semibold text-lg rounded-lg px-6 py-6 flex items-center gap-2"
+            className="bg-[#2b7fff] hover:bg-blue-600 text-white font-semibold text-base rounded-lg px-6 py-3 flex items-center gap-2 h-12"
           >
             <Plus className="w-5 h-5" />
             스터디 생성하기
@@ -139,7 +173,7 @@ export default function StudyListPage() {
         {urgentRooms.length > 0 && (
           <Card className="p-8 mb-12">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-[#1b1c1f] mb-2 flex items-center gap-2">
+              <h2 className="text-2xl font-semibold text-[#1b1c1f] mb-2 flex items-center gap-2">
                 <AlertTriangle className="w-6 h-6 text-[#2b7fff]" />
                 모집 인원이 얼마 안 남았어요!
               </h2>
@@ -180,7 +214,7 @@ export default function StudyListPage() {
         {/* All Study Rooms Section */}
         <Card className="p-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-[#1b1c1f] mb-2 flex items-center gap-2">
+            <h2 className="text-2xl font-semibold text-[#1b1c1f] mb-2 flex items-center gap-2">
               <Users className="w-6 h-6 text-[#2b7fff]" />
               면접 스터디 목록
             </h2>
@@ -196,13 +230,13 @@ export default function StudyListPage() {
                 setActiveTab("recent");
                 setVisibleCount(6);
               }}
-              className={`flex items-center gap-2 text-xl font-semibold pb-3 border-b-2 transition-colors ${
+              className={`flex items-center gap-2 text-lg font-semibold pb-3 border-b-2 transition-colors ${
                 activeTab === "recent"
                   ? "text-[#2b7fff] border-[#2b7fff]"
                   : "text-[#6f727c] border-transparent hover:text-[#2b7fff] hover:border-[#2b7fff]"
               }`}
             >
-              <Calendar className="w-5 h-5" />
+              <Calendar className="w-4 h-4" />
               최근 생성순
             </button>
             <button
@@ -210,19 +244,19 @@ export default function StudyListPage() {
                 setActiveTab("deadline");
                 setVisibleCount(6);
               }}
-              className={`flex items-center gap-2 text-xl font-semibold pb-3 border-b-2 transition-colors ${
+              className={`flex items-center gap-2 text-lg font-semibold pb-3 border-b-2 transition-colors ${
                 activeTab === "deadline"
                   ? "text-[#2b7fff] border-[#2b7fff]"
                   : "text-[#6f727c] border-transparent hover:text-[#2b7fff] hover:border-[#2b7fff]"
               }`}
             >
-              <Clock className="w-5 h-5" />
+              <Clock className="w-4 h-4" />
               마감순
             </button>
           </div>
 
           {/* Study Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-[16px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-base">
             {visibleRooms.length === 0 ? (
               <div className="col-span-full text-center py-12">
                 <div className="flex flex-col items-center gap-4">
@@ -247,7 +281,7 @@ export default function StudyListPage() {
             <div className="mt-10 flex justify-center">
               <Button
                 onClick={() => setVisibleCount((prev) => prev + 6)}
-                className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold flex items-center gap-2"
+                className="bg-[#2b7fff] hover:bg-blue-600 text-white px-6 py-3 rounded-lg text-base font-semibold flex items-center gap-2 h-12"
               >
                 <TrendingUp className="w-5 h-5" />
                 더보기

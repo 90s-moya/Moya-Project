@@ -8,7 +8,7 @@ export default function StudyBackToList() {
     <div className="mb-6 flex justify-start -ml-4">
       <Button
         variant="ghost"
-        className="text-[#2b7fff] hover:text-blue-600 font-semibold text-lg flex items-center gap-2 transition-colors"
+        className="text-[#1b1c1f] hover:text-blue-600 font-semibold text-lg flex items-center gap-2 transition-colors"
         onClick={() => navigate("/study")}
       >
         <svg
