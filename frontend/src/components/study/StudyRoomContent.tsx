@@ -44,20 +44,18 @@ export default function StudyRoomContent({
   getGridColumns,
   roomId,
 }: StudyRoomContentProps) {
+  // 참가자 수에 따른 그리드 행 개수 계산
+  const getGridRows = (count: number) => {
+    const cols = getGridColumns(count);
+    return Math.ceil(count / cols);
+  };
+
   // VideoTile 렌더링 함수
   const renderVideoTile = (participant: Participant) => {
     const userDocs = getParticipantDocs(participant.id);
-    const isFocused = focusedUserId === participant.id;
 
     return (
-      <div
-        key={participant.id}
-        className={`w-full aspect-video ${
-          isFocused
-            ? "col-span-2 row-span-2 transition-[grid-column,grid-row] duration-200"
-            : "transition-[grid-column,grid-row] duration-200"
-        }`}
-      >
+      <div key={participant.id} className="w-full h-full">
         <VideoTile
           stream={participant.stream}
           isLocal={participant.isLocal}
@@ -71,12 +69,20 @@ export default function StudyRoomContent({
   };
 
   return (
-    <div className="h-full pt-[50px] px-4">
+    <div
+      className="px-4"
+      style={{
+        height: focusedUserId
+          ? "calc(100vh - 210px)" // 포커스 모드: header(~140px) + footer(~60px) + 여유(~10px) 제외
+          : "calc(100vh - 60px)", // 일반 모드: footer(~60px)만 제외
+        paddingBottom: focusedUserId ? "4px" : "4px",
+      }}
+    >
       {/* 포커스 모드일 때: 왼쪽 포커스된 비디오 + 오른쪽 서류 */}
       {focusedUserId ? (
-        <div className="flex gap-4 h-full animate-in fade-in duration-200">
+        <div className="flex gap-3 h-full animate-in fade-in duration-200">
           {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
-          <div className="w-1/2 h-[68vh]">
+          <div className="w-1/2 h-full">
             {participants
               .filter((p) => p.id === focusedUserId)
               .map((participant) => (
@@ -94,7 +100,7 @@ export default function StudyRoomContent({
           </div>
 
           {/* 오른쪽: 서류 캐러셀 (화면의 절반) */}
-          <div className="w-1/2 h-[68vh] bg-gray-50 rounded-lg overflow-hidden">
+          <div className="w-1/2 h-full bg-gray-50 rounded-md overflow-hidden">
             <Carousel
               items={getCarouselItems()}
               onClose={handleCloseCarousel}
@@ -104,11 +110,20 @@ export default function StudyRoomContent({
       ) : (
         /* 일반 모드: 그리드 레이아웃 (참가자 수 기반 반응형) */
         <div
-          className="grid gap-4 h-full animate-in fade-in duration-200"
+          className="grid h-full animate-in fade-in duration-200"
           style={{
             gridTemplateColumns: `repeat(${getGridColumns(
               participants.length
             )}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${getGridRows(
+              participants.length
+            )}, minmax(0, 1fr))`,
+            gap:
+              participants.length <= 4
+                ? "8px"
+                : participants.length <= 6
+                ? "6px"
+                : "4px", // 참가자 수에 따라 갭 조정
           }}
         >
           {participants.map(renderVideoTile)}

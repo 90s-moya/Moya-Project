@@ -15,6 +15,7 @@ import { registerDocs, getMyDocsForEnterRoom } from "@/api/studyApi";
 import type { MyDoc } from "@/types/study";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { useMediaStore } from "@/store/useMediaStore"; // 추가
 
 // 파일명만 추출하는 유틸리티 함수
 const getFileName = (fileUrl: string): string => {
@@ -49,10 +50,11 @@ export default function StudySetupPage() {
   const [isMicOn, setIsMicOn] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-
   const navigate = useNavigate();
-
   const { id } = useParams();
+
+  // 미디어 스토어 사용
+  const { setCameraStream, setMicStream } = useMediaStore();
 
   // API를 통해 불러온 내 서류 정보를 저장하는 docList
   const [docList, setDocList] = useState<MyDoc[]>([]);
@@ -89,27 +91,31 @@ export default function StudySetupPage() {
   const startStream = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: {
+          width: { ideal: 960, max: 960 },
+          height: { ideal: 540, max: 540 },
+          frameRate: { ideal: 30, max: 30 },
+        },
         audio: true,
       });
+
+      // 스트림을 전역 스토어에 저장
+      setCameraStream(stream);
+      setMicStream(stream);
 
       // 마이크 연결 체크
       const audioTracks = stream.getAudioTracks();
       if (stream && audioTracks.length > 0) {
-        console.log("마이크 연결됨");
         setIsMicOn(true);
       } else {
-        console.log("마이크 연결 오류");
         alert("마이크 연결 오류");
       }
 
       // 카메라 연결 체크
       const cameraTracks = stream.getVideoTracks();
       if (stream && cameraTracks.length > 0) {
-        console.log("카메라 연결됨");
         setIsCameraOn(true);
       } else {
-        console.log("카메라 연결 오류");
         alert("카메라 연결 오류");
       }
 
