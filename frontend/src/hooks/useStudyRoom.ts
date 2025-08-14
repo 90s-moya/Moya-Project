@@ -196,10 +196,11 @@ export function useStudyRoom() {
   // 참가자 수에 따라 동적으로 그리드 열 개수 결정
   const getGridColumns = (count: number) => {
     if (count <= 2) return 2;
-    if (count === 3) return 3;
+    if (count === 3) return 2; // 3명일 때도 2열로 변경 (화면 크기 최적화)
     if (count === 4) return 2;
-    if (count === 5) return 3;
-    return 3;
+    if (count <= 6) return 3;
+    if (count <= 8) return 4; // 7-8명일 때는 4열
+    return 4; // 9명 이상도 4열 유지
   };
 
   // 서류 타입별 제목 반환
