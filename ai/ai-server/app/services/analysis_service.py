@@ -14,15 +14,16 @@ def analyze_all(
     return_points: bool = False,
     calib_data: dict = None,
 ):
-    """하나의 업로드 영상으로 Posture + Emotion + Gaze 동시 실행"""
-    with ThreadPoolExecutor(max_workers=3) as ex:
-        f_posture = ex.submit(analyze_video_bytes, video_bytes)
-        f_face    = ex.submit(infer_face_video, video_bytes, device, stride, None, return_points)
-        f_gaze    = ex.submit(infer_gaze, video_bytes, calib_data=calib_data)
 
-        posture = f_posture.result()
-        face    = f_face.result()
-        gaze    = f_gaze.result()
+
+    # 1) Posture 분석
+    posture = analyze_video_bytes(video_bytes)
+
+    # 2) Emotion 분석
+    face = infer_face_video(video_bytes, device, stride, None, return_points)
+
+    # 3) Gaze 분석
+    gaze = infer_gaze(video_bytes)
 
     print(f"[DEBUG] analyze_all results:")
     print(f"[DEBUG] posture type: {type(posture)}")

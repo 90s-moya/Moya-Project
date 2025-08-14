@@ -513,7 +513,7 @@ async def analyze_complete_by_url(
     비디오 URL을 직접 받아서 다운로드 → 분석 → 결과 DB 저장
     """
     # (1) QA 조회/생성
-    qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order)
+    qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order,calib_data=parsed_calib_data)
 
     # (2) URL에서 비디오 다운로드
     try:

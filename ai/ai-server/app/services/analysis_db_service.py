@@ -10,6 +10,7 @@ def get_or_create_qa_pair(
     session_id: str,
     order: int,
     sub_order: int,
+    **kwargs
 ) -> QuestionAnswerPair:
     qa = (
         db.query(QuestionAnswerPair)
