@@ -19,13 +19,44 @@ def preprocess_video(video_bytes: bytes, target_fps: int = 30, max_frames: int =
     out_path = None
     
     try:
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        # 파일 확장자를 원본과 동일하게 설정
+        if filename.lower().endswith('.webm'):
+            suffix = ".webm"
+        elif filename.lower().endswith('.mp4'):
+            suffix = ".mp4"
+        else:
+            suffix = ".mp4"  # 기본값
+            
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(video_bytes)
             tmp_path = tmp.name
 
-        cap = cv2.VideoCapture(tmp_path)
-        if not cap.isOpened():
-            raise HTTPException(status_code=400, detail="비디오 파일을 읽을 수 없습니다")
+        # OpenCV로 비디오 읽기 시도 - 다양한 백엔드 시도
+        cap = None
+        backends_to_try = [cv2.CAP_FFMPEG, cv2.CAP_ANY]
+        
+        for backend in backends_to_try:
+            try:
+                cap = cv2.VideoCapture(tmp_path, backend)
+                if cap.isOpened():
+                    # 실제로 프레임을 읽을 수 있는지 테스트
+                    ret, test_frame = cap.read()
+                    if ret and test_frame is not None:
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # 처음으로 되돌리기
+                        break
+                    else:
+                        cap.release()
+                        cap = None
+                else:
+                    cap.release()
+                    cap = None
+            except:
+                if cap:
+                    cap.release()
+                cap = None
+                
+        if cap is None:
+            raise HTTPException(status_code=400, detail=f"비디오 파일을 읽을 수 없습니다 (파일: {filename})")
             
         fps = cap.get(cv2.CAP_PROP_FPS) or 30
         frame_interval = max(1, int(fps / target_fps))
