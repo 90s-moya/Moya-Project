@@ -290,12 +290,15 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
             `${key.order}_${key.subOrder}.webm`,
             { type: usedMime }
           )
-        
+          const calibData = localStorage.getItem("calibData");
           const formData = new FormData();
           formData.append("file", file);
           formData.append("interviewSessionId", localStorage.getItem("interviewSessionId") ?? "");
           formData.append("order", String(key.order));
           formData.append("subOrder", String(key.subOrder));
+          formData.append("calibDataJson", JSON.stringify(calibData));
+
+
           const thumb = thumbBlobRef.current;
           if (thumb) {
             const thumbFile = new File(
