@@ -490,8 +490,10 @@ async def analyze_complete_by_url(
 
     # (2) URL에서 비디오 다운로드
     try:
+        # URL에서 개행문자 및 공백 제거
+        clean_url = video_url.strip().replace('\n', '').replace('\r', '')
         async with httpx.AsyncClient(timeout=60) as client:
-            r = await client.get(video_url)
+            r = await client.get(clean_url)
             r.raise_for_status()
             data = r.content
     except Exception as e:
