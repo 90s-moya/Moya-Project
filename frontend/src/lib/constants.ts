@@ -211,3 +211,108 @@ export const generateGazePieChartData = (centerGazePercentage: number, periphera
   ];
 };
 
+// 더미 이미지 데이터
+export const DUMMY_IMAGES = [
+  {
+    id: 1,
+    src: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop",
+    alt: "면접 준비 1",
+    title: "AI 면접 연습",
+    description: "실전 같은 면접 경험"
+  },
+  {
+    id: 2,
+    src: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=300&fit=crop",
+    alt: "면접 준비 2",
+    title: "피드백 분석",
+    description: "개인 맞춤형 피드백"
+  },
+  {
+    id: 3,
+    src: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&h=300&fit=crop",
+    alt: "면접 준비 3",
+    title: "스터디 그룹",
+    description: "함께 성장하는 공간"
+  },
+  {
+    id: 4,
+    src: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=400&h=300&fit=crop",
+    alt: "면접 준비 4",
+    title: "실시간 분석",
+    description: "즉시 확인하는 결과"
+  },
+  {
+    id: 5,
+    src: "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=400&h=300&fit=crop",
+    alt: "면접 준비 5",
+    title: "다양한 질문",
+    description: "실제 면접 질문 유형"
+  },
+  {
+    id: 6,
+    src: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=300&fit=crop",
+    alt: "면접 준비 6",
+    title: "전문가 조언",
+    description: "업계 전문가의 팁"
+  },
+  {
+    id: 7,
+    src: "https://images.unsplash.com/photo-1551434678-e076c223a692?w=400&h=300&fit=crop",
+    alt: "면접 준비 7",
+    title: "팀워크 연습",
+    description: "그룹 면접 대비"
+  },
+  {
+    id: 8,
+    src: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop",
+    alt: "면접 준비 8",
+    title: "자기소개 연습",
+    description: "완벽한 자기소개"
+  }
+];
+
+export const STUDY_IMAGES = [
+  {
+    id: 1,
+    src: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=400&h=300&fit=crop",
+    alt: "스터디 1",
+    title: "실시간 스터디",
+    description: "온라인으로 함께하는 면접 연습"
+  },
+  {
+    id: 2,
+    src: "https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=400&h=300&fit=crop",
+    alt: "스터디 2",
+    title: "피드백 공유",
+    description: "서로의 답변에 대한 피드백"
+  },
+  {
+    id: 3,
+    src: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&h=300&fit=crop",
+    alt: "스터디 3",
+    title: "다양한 관점",
+    description: "다양한 배경의 참가자들"
+  },
+  {
+    id: 4,
+    src: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&h=300&fit=crop",
+    alt: "스터디 4",
+    title: "체계적 학습",
+    description: "단계별 면접 준비 과정"
+  },
+  {
+    id: 5,
+    src: "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?w=400&h=300&fit=crop",
+    alt: "스터디 5",
+    title: "실전 모의고사",
+    description: "실제 면접과 동일한 환경"
+  },
+  {
+    id: 6,
+    src: "https://images.unsplash.com/photo-1559136555-9303baea8ebd?w=400&h=300&fit=crop",
+    alt: "스터디 6",
+    title: "개인별 맞춤",
+    description: "개인별 약점 보완"
+  }
+];
+

@@ -122,26 +122,161 @@
   }
 }
 
-/* Prevent layout shift when vertical scrollbar appears */
-@layer base {
-  @supports (scrollbar-gutter: stable) {
-    html { scrollbar-gutter: stable; }
+/* FullPage.js 스타일 커스터마이징 */
+#fp-nav ul li a span {
+  background: #2b7fff !important;
+  transition: all 0.3s ease !important;
+}
+
+#fp-nav ul li a.active span {
+  background: #2b7fff !important;
+  transform: scale(1.2) !important;
+}
+
+#fp-nav ul li a:hover span {
+  background: #1e5bb8 !important;
+  transform: scale(1.1) !important;
+}
+
+.fp-tooltip {
+  color: #2b7fff !important;
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
+  transition: opacity 0.3s ease !important;
+}
+
+/* 섹션 높이 설정 */
+.section {
+  height: 100vh !important;
+}
+
+/* 네비게이션 도트 애니메이션 */
+#fp-nav ul li {
+  transition: all 0.3s ease !important;
+}
+
+#fp-nav ul li:hover {
+  transform: translateX(-3px) !important;
+}
+
+/* FullPage.js 워터마크 숨기기 */
+#fp-nav .fp-tooltip.fp-right::after {
+  display: none !important;
+}
+
+.fp-watermark {
+  display: none !important;
+}
+
+/* 워터마크 관련 모든 요소 숨기기 */
+[data-fp-watermark] {
+  display: none !important;
+}
+
+/* 홈페이지 애니메이션 */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
   }
-  @supports not (scrollbar-gutter: stable) {
-    /* Fallback for older browsers */
-    html { overflow-y: scroll; }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
-/* globals.css 또는 app/globals.css */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
-.scrollbar-hide {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;     /* Firefox */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-slideInFromLeft {
+  animation: slideInFromLeft 1s ease-out forwards;
+  animation-delay: 0.2s;
+}
+
+.animate-slideInFromRight {
+  animation: slideInFromRight 1s ease-out forwards;
+  animation-delay: 0.4s;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* 커스텀 섹션 전환 애니메이션 */
+.section-enter {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.section-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 600ms ease-out, transform 600ms ease-out;
+}
+
+.section-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.section-exit-active {
+  opacity: 0;
+  transform: translateY(-30px);
+  transition: opacity 600ms ease-out, transform 600ms ease-out;
+}
+
+
+
+
 
 button {
   cursor: pointer;
