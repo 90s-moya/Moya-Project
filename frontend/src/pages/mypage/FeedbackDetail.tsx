@@ -50,7 +50,7 @@ const FeedbackDetail: React.FC = () => {
   const handleFeedbackClick = (createdAt: string) => {
     const open = dayjs(videoStart);
     console.log(videoStart, dayjs(createdAt));
-    const created = dayjs(createdAt);
+    const created = dayjs(createdAt).add(9, 'hour'); // UTC to KST
     let seek = created.diff(open, 'second') - 10;
     console.log(seek);
     if (seek < 0) seek = 0;
@@ -163,7 +163,7 @@ const FeedbackDetail: React.FC = () => {
                   [...feedbackData.feedbackList].map((fd, index) => {
                     // 시간 계산: (createdAt - videoStart - 10초)
                     const open = dayjs(videoStart);
-                    const created = dayjs(fd.createdAt);
+                    const created = dayjs(fd.createdAt).add(9, 'hour'); // UTC to KST
                     let timeInSeconds = created.diff(open, 'second') - 10;
                     if (timeInSeconds < 0) timeInSeconds = 0;
                     
