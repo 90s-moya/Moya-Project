@@ -506,14 +506,6 @@ class GazeTracker:
         if self.gaze_heatmap_2d is not None and np.sum(self.gaze_heatmap_2d) > 0:
             center_ratio = self.calculate_center_gaze_ratio()
             
-            # 캘리브레이션 정보 추가
-            calibration_info = {
-                "transform_method": self.transform_method or "none",
-                "total_calibration_points": len(self.calib_points),
-                "calibration_points": self.calib_points,
-                "calibration_vectors": self.calib_vectors
-            }
-            
             heatmap_data = {
                 "metadata": {
                     "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -530,7 +522,6 @@ class GazeTracker:
                     "max_gaze_count": int(np.max(self.gaze_heatmap_2d)),
                     "center_gaze_ratio": round(center_ratio, 2)
                 },
-                "calibration": calibration_info,
                 "heatmap_data": self.gaze_heatmap_2d.tolist(),
                 "analysis": {
                     "center_gaze_percentage": round(center_ratio, 2),
@@ -541,21 +532,22 @@ class GazeTracker:
             
             heatmap_filename = f"results/{prefix}_heatmap_{timestamp}.json"
             with open(heatmap_filename, 'w', encoding='utf-8') as f:
-                # heatmap_data만 한 줄로 저장하기 위한 커스텀 저장
-                import re
+                # heatmap_data만 따로 처리
+                heatmap_array = heatmap_data.pop('heatmap_data')
                 
-                # heatmap_data를 제외한 다른 필드들을 먼저 저장
-                temp_data = heatmap_data.copy()
-                heatmap_array = temp_data.pop("heatmap_data")
+                # 메타데이터와 분석 정보를 먼저 저장
+                json_str = json.dumps(heatmap_data, indent=2, ensure_ascii=False)
                 
-                # 다른 필드들을 예쁘게 포맷팅
-                output = json.dumps(temp_data, indent=2, ensure_ascii=False)
+                # heatmap_data를 각 행별로 한 줄씩 처리
+                heatmap_lines = []
+                for row in heatmap_array:
+                    heatmap_lines.append('    ' + json.dumps(row, separators=(',', ':')))
+                heatmap_str = '[\n' + ',\n'.join(heatmap_lines) + '\n  ]'
                 
-                # 마지막 } 제거하고 heatmap_data 추가
-                output = output.rstrip('\n}')
-                output += ',\n  "heatmap_data":' + json.dumps(heatmap_array, separators=(',', ':')) + '\n}'
+                # 마지막 }를 제거하고 heatmap_data 추가
+                json_str = json_str.rstrip('\n}') + ',\n  "heatmap_data": ' + heatmap_str + '\n}'
                 
-                f.write(output)
+                f.write(json_str)
             
             print(f"[INFO] Heatmap saved: {heatmap_filename}")
         
@@ -563,7 +555,7 @@ class GazeTracker:
         if self.gaze_data:
             detailed_filename = f"results/{prefix}_detailed_{timestamp}.json"
             with open(detailed_filename, 'w', encoding='utf-8') as f:
-                json.dump(self.gaze_data, f, indent=2, ensure_ascii=False, separators=(',', ':'))
+                json.dump(self.gaze_data, f, indent=2, ensure_ascii=False)
             
             print(f"[INFO] Detailed gaze data saved: {detailed_filename}")
         
