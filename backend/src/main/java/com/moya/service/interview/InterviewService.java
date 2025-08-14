@@ -157,8 +157,13 @@ public class InterviewService {
             body.add("stride",        new HttpEntity<>(String.valueOf(stride), text));
             body.add("return_points", new HttpEntity<>(String.valueOf(returnPoints), text));
             if (calibDataJson != null && !calibDataJson.isBlank()) {
-                body.add("calib_data", new HttpEntity<>(calibDataJson, text));
+                HttpHeaders jsonHeaders = new HttpHeaders();
+                jsonHeaders.setContentType(MediaType.APPLICATION_JSON);
+                // 로그는 길이만 출력
+                System.out.println("[calib_data] length=" + calibDataJson.length());
+                body.add("calib_data", new HttpEntity<>(calibDataJson, jsonHeaders));
             }
+
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
