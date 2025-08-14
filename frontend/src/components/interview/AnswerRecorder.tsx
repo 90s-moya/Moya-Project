@@ -80,6 +80,7 @@ export default function AnswerRecorder({ keyInfo, ttsFinished, start, stop, isRe
           autoPlay
           muted
           playsInline
+          style={{ transform: "scaleX(-1)" }}
         />
       )}
 

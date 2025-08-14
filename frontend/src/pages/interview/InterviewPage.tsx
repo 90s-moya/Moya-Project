@@ -7,7 +7,7 @@ import aiCharacter from "@/assets/images/ai-character.png"
 import { useAnswerRecorder } from "@/lib/recording/useAnswerRecorder"
 import AnswerRecorder from "@/components/interview/AnswerRecorder"
 import { type QuestionKey } from "@/types/interview"
-// import QuestionTTS from "@/components/interview/QuestionTTS"
+
 
 export default function InterviewScreen() {
   const [isMicOn, setIsMicOn] = useState(true)

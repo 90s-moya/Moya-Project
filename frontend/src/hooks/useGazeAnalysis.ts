@@ -64,8 +64,8 @@ export const useGazeAnalysis = (): UseGazeAnalysisReturn => {
 
       setAnalysisProgress('시선추적 분석 중... (시간이 걸릴 수 있습니다)');
 
-      // 4. 동영상 시선추적 분석
-      const analysisResult = await analyzeVideo(videoFile);
+      // 4. 동영상 시선추적 분석 (캘리브레이션 데이터와 함께)
+      const analysisResult = await analyzeVideo(videoFile, calibrationData);
       
       if (analysisResult.status !== 'success') {
         throw new Error(analysisResult.message || '분석에 실패했습니다.');
