@@ -48,6 +48,8 @@ export function useStudyRoom() {
   const videoStartRef = useRef<string | null>(null);
   const roomIdRef = useRef<string>("");
 
+  const stopFixedRef = useRef<() => void>(() => {});
+
   // roomId를 ref로 관리
   useEffect(() => {
     if (roomId) {
@@ -216,6 +218,47 @@ export function useStudyRoom() {
         return "서류";
     }
   };
+  // 캔버스로 그리기
+  async function makeFixed30fpsStream(
+  src: MediaStream,
+  w = 960,
+  h = 540,
+  mirror = false
+): Promise<{ stream: MediaStream; stop: () => void }> {
+  const v = document.createElement("video");
+  v.srcObject = src;
+  v.muted = true;
+  v.playsInline = true;
+  await v.play().catch(() => {});
+
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+
+  const draw = () => {
+    ctx.save();
+    if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(v, 0, 0, w, h);
+    ctx.restore();
+  };
+
+  // rAF 말고 33ms 타이머로 30fps 고정
+  const timer = window.setInterval(draw, 1000 / 30);
+
+  const fixed = canvas.captureStream(30);
+  const a = src.getAudioTracks()[0];
+  if (a) fixed.addTrack(a);
+
+  return {
+    stream: fixed,
+    stop: () => {
+      clearInterval(timer);
+      // 원본 트랙은 외부에서 정리
+      v.srcObject = null;
+    },
+  };
+}
 
   // 녹화 시작
   const startRecording = (stream: MediaStream) => {
@@ -245,7 +288,7 @@ export function useStudyRoom() {
       const d = new Date();
       const ms = d.getTime() - d.getTimezoneOffset() * 60_000; // 로컬 오프셋 보정
       const localDateTime = new Date(ms).toISOString().slice(0, 19);
-      if (!videoStartRef.current == null) videoStartRef.current = localDateTime;
+      if (videoStartRef.current == null) videoStartRef.current = localDateTime;
       console.log(localDateTime);
 
       console.log("녹화 시작");
@@ -260,7 +303,12 @@ export function useStudyRoom() {
     if (!rec || rec.state === "inactive") return;
 
     await new Promise<void>((resolve) => {
+      
       rec.onstop = async () => {
+        const vTrack = localStream?.getVideoTracks?.()[0];
+        if (vTrack) {
+        console.log("[송출 FPS(settings)]", vTrack.getSettings()?.frameRate);
+      }
         try {
           if (recordedChunksRef.current.length) {
             const authStorage = localStorage.getItem("auth-storage") || "{}";
@@ -318,6 +366,7 @@ export function useStudyRoom() {
     }
 
     await stopRecordingAndUpload();
+    stopFixedRef.current?.();
     cleanUpMediaAndConnections();
 
     // 전역 스토어의 스트림도 정리
@@ -432,8 +481,8 @@ export function useStudyRoom() {
         // 스트림이 없으면 새로 생성
         local = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 960, max: 960 },
-            height: { ideal: 540, max: 540 },
+            width: {  ideal: 960, max: 960 },
+            height: {  ideal: 540, max: 540  },
             frameRate: { ideal: 30, max: 30 },
           },
           audio: true,
@@ -441,14 +490,19 @@ export function useStudyRoom() {
         console.log("새로운 스트림 생성");
       }
 
-      setLocalStream(local);
-      startRecording(local);
-
+      // setLocalStream(local);
+      // startRecording(local);
+      // 30fps 변환
+      
+       const { stream: fixed30, stop: stopFixed } = await makeFixed30fpsStream(local, 960, 540, /*mirror=*/false);
+      setLocalStream(fixed30);
+      startRecording(fixed30);
+      stopFixedRef.current = stopFixed;
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== myId),
-        { id: myId, stream: local, isLocal: true },
+        { id: myId, stream: fixed30, isLocal: true },
       ]);
-      peerManager.setLocalStream(local);
+      peerManager.setLocalStream(fixed30);
       signaling.send({ type: "join", senderId: myId });
     })();
   }, []); // 의존성 배열을 비워서 한 번만 실행

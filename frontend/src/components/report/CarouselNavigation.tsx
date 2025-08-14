@@ -22,11 +22,9 @@ const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
       const gap = 24; // gap-6 = 24px
       const buttonSpace = 80; // 버튼 공간을 더 줄임
       
-      console.log('컨테이너 너비:', containerWidth); // 디버그용
       
       // 사용 가능한 너비 계산
       const availableWidth = containerWidth - buttonSpace;
-      console.log('사용 가능한 너비:', availableWidth); // 디버그용
       
       // 각 카드 개수별 필요한 최소 너비 계산
       const widthFor1Card = cardWidth; // 240px
@@ -50,7 +48,6 @@ const CarouselNavigation: React.FC<CarouselNavigationProps> = ({
       // 결과 개수보다 많이 표시할 수 없음
       newItemsPerView = Math.min(newItemsPerView, results.length);
       
-      console.log('결정된 카드 개수:', newItemsPerView); // 디버그용
       
       setItemsPerView(newItemsPerView);
       
