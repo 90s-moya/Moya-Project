@@ -245,7 +245,7 @@ export function useStudyRoom() {
       const d = new Date();
       const ms = d.getTime() - d.getTimezoneOffset() * 60_000; // 로컬 오프셋 보정
       const localDateTime = new Date(ms).toISOString().slice(0, 19);
-      if(!videoStartRef.current == null) videoStartRef.current = localDateTime;
+      if (!videoStartRef.current == null) videoStartRef.current = localDateTime;
       console.log(localDateTime);
 
       console.log("녹화 시작");
@@ -372,6 +372,21 @@ export function useStudyRoom() {
           if (localStream) {
             peerManagerRef.current?.setLocalStream(localStream);
           }
+
+          // 새 참가자를 participants 상태에 추가
+          setParticipants((prev) => {
+            const existingParticipant = prev.find(
+              (p) => p.id === data.senderId
+            );
+            if (!existingParticipant) {
+              console.log("새 참가자 추가:", data.senderId);
+              return [
+                ...prev,
+                { id: data.senderId, stream: null, isLocal: false },
+              ];
+            }
+            return prev;
+          });
 
           console.log("새 참여자 연결!");
           return;
