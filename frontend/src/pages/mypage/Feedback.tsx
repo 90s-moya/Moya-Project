@@ -33,6 +33,7 @@ const Feedback: React.FC = () => {
   // 참여한 시간 포맷: YYYY/MM/DD HH:mm
   const formatCardDate = (dateString: string) => {
     const parsed = dayjs(dateString);
+    console.log(parsed);
     if (!parsed.isValid()) {
       return '';
     }
@@ -119,7 +120,7 @@ const Feedback: React.FC = () => {
                  {study.categoryName}
                </span>
                {/* 참여한 시간 (오른쪽 하단) */}
-               <span className="absolute bottom-4 right-6 text-sm text-gray-500">{formatCardDate(study.openAt)}</span>
+               <span className="absolute bottom-4 right-6 text-sm text-gray-500">{formatCardDate(study.createdAt)}</span>
              </div>
           ))}
         </div>
