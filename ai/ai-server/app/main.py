@@ -1,5 +1,9 @@
 
 # app/main.py
+import os
+# PyTorch 호환성을 위한 환경변수 설정 (PTGaze 라이브러리 호환)
+os.environ['TORCH_WEIGHTS_ONLY'] = 'FALSE'
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import json
@@ -8,6 +12,19 @@ import sys
 from pathlib import Path
 from app.api import report_router   # 경로 맞는지 확인!
 from fastapi.middleware.cors import CORSMiddleware
+
+# PyTorch torch.load 기본값 수정
+try:
+    import torch
+    # torch.load의 기본 weights_only를 False로 설정하는 monkey patch
+    original_load = torch.load
+    def patched_load(*args, **kwargs):
+        if 'weights_only' not in kwargs:
+            kwargs['weights_only'] = False
+        return original_load(*args, **kwargs)
+    torch.load = patched_load
+except ImportError:
+    pass
 # from app.api.demo_router import router as demo_router
 app = FastAPI()
 # 전체 Origin 허용
