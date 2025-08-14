@@ -306,6 +306,7 @@ export function useStudyRoom() {
       
       rec.onstop = async () => {
         const vTrack = localStream?.getVideoTracks?.()[0];
+        const fps = vTrack?.getSettings()?.frameRate; 
         if (vTrack) {
         console.log("[송출 FPS(settings)]", vTrack.getSettings()?.frameRate);
       }
@@ -326,6 +327,7 @@ export function useStudyRoom() {
             if (!roomId) return;
             formData.append("roomId", roomId);
             formData.append("videoStart", videoStartRef.current ?? "");
+            formData.append("videoFps", String(fps ?? ""));
             console.log("ghkrdls=========", formData);
 
             await uploadVideo(formData);
