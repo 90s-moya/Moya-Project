@@ -263,14 +263,30 @@ def analyze_video(
 
     out = None
     if output_path:
-        # 다양한 출력 포맷 지원
-        if output_path.endswith('.webm'):
-            fourcc = cv2.VideoWriter_fourcc(*'VP80')  # VP8 코덱
-        elif output_path.endswith('.avi'):
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        else:
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        # 더 안정적인 코덱 선택
+        codecs_to_try = ['H264', 'XVID', 'MJPG', 'mp4v']
+        out = None
+        
+        for codec in codecs_to_try:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*codec)
+                out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+                if out.isOpened():
+                    print(f"[Face VideoWriter] {codec} 코덱으로 성공적으로 초기화")
+                    break
+                else:
+                    out.release()
+                    out = None
+            except Exception as e:
+                print(f"[Face VideoWriter] {codec} 코덱 실패: {e}")
+                if out:
+                    out.release()
+                    out = None
+                continue
+        
+        if out is None:
+            print("[Face VideoWriter] 모든 코덱 실패, 출력 비디오 저장 없이 진행")
+            output_path = None
 
     detector = init_face_detector(min_conf=face_min_conf, model_selection=face_model_selection)
 

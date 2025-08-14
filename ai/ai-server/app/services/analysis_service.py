@@ -31,8 +31,20 @@ def preprocess_video(video_bytes: bytes, target_fps: int = 30, max_frames: int =
         frame_interval = max(1, int(fps / target_fps))
 
         out_path = tmp_path + "_processed.mp4"
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        # 더 안정적인 코덱들을 순서대로 시도
+        codecs_to_try = ['H264', 'XVID', 'MJPG', 'mp4v']
+        fourcc = None
         out_writer = None
+        
+        for codec in codecs_to_try:
+            try:
+                fourcc = cv2.VideoWriter_fourcc(*codec)
+                break
+            except:
+                continue
+        
+        if fourcc is None:
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # fallback
 
         frame_count = 0
         processed_frames = 0
@@ -48,7 +60,27 @@ def preprocess_video(video_bytes: bytes, target_fps: int = 30, max_frames: int =
 
                 if out_writer is None:
                     h, w = frame.shape[:2]
-                    out_writer = cv2.VideoWriter(out_path, fourcc, target_fps, (w, h))
+                    # VideoWriter 생성을 여러 코덱으로 시도
+                    for codec in codecs_to_try:
+                        try:
+                            test_fourcc = cv2.VideoWriter_fourcc(*codec)
+                            out_writer = cv2.VideoWriter(out_path, test_fourcc, target_fps, (w, h))
+                            if out_writer.isOpened():
+                                print(f"[VideoWriter] {codec} 코덱으로 성공적으로 초기화")
+                                break
+                            else:
+                                out_writer.release()
+                                out_writer = None
+                        except Exception as e:
+                            print(f"[VideoWriter] {codec} 코덱 실패: {e}")
+                            if out_writer:
+                                out_writer.release()
+                                out_writer = None
+                            continue
+                    
+                    # 모든 코덱이 실패한 경우
+                    if out_writer is None or not out_writer.isOpened():
+                        raise HTTPException(status_code=500, detail="비디오 인코더 초기화 실패")
 
                 out_writer.write(frame)
                 processed_frames += 1
