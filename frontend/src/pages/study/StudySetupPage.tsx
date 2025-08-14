@@ -161,13 +161,13 @@ export default function StudySetupPage() {
     <div className="min-h-screen bg-white">
       <Header scrollBg={false} />
 
-      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-[17px] leading-relaxed">
+      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-base leading-relaxed">
         {/* Title Section */}
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">
+        <div className="mb-8">
+          <h1 className="text-2xl font-semibold text-[#2B7FFF] mb-2 leading-[1.4]">
             면접스터디 환경 설정
           </h1>
-          <p className="text-[#4b4e57] text-lg">
+          <p className="text-[#4b4e57] text-base">
             카메라, 마이크, 그리고 필요한 서류를 준비해주세요!
           </p>
         </div>
@@ -181,7 +181,7 @@ export default function StudySetupPage() {
               <div className="space-y-6">
                 <div className="flex items-center gap-3 mb-6">
                   <Video className="w-6 h-6 text-[#2b7fff]" />
-                  <Label className="text-xl font-bold text-[#1b1c1f]">
+                  <Label className="text-xl font-semibold text-[#1b1c1f]">
                     카메라 및 마이크 설정
                   </Label>
                 </div>
@@ -204,7 +204,7 @@ export default function StudySetupPage() {
                     <div className="w-full h-full flex items-center justify-center">
                       <div className="text-center">
                         <Video className="w-12 h-12 text-[#6f727c] mx-auto mb-3" />
-                        <div className="text-lg text-[#6f727c] font-medium">
+                        <div className="text-base text-[#6f727c] font-semibold">
                           카메라를 활성화해주세요
                         </div>
                         <div className="text-sm text-[#6f727c] mt-1">
@@ -225,7 +225,7 @@ export default function StudySetupPage() {
                           isCameraOn ? "text-green-500" : "text-[#6f727c]"
                         }`}
                       />
-                      <span className="text-base font-medium text-[#1b1c1f]">
+                      <span className="text-base font-semibold text-[#1b1c1f]">
                         카메라
                       </span>
                     </div>
@@ -253,7 +253,7 @@ export default function StudySetupPage() {
                           isMicOn ? "text-green-500" : "text-[#6f727c]"
                         }`}
                       />
-                      <span className="text-base font-medium text-[#1b1c1f]">
+                      <span className="text-base font-semibold text-[#1b1c1f]">
                         마이크
                       </span>
                     </div>
@@ -281,7 +281,7 @@ export default function StudySetupPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* 서류 선택 카드 */}
             <Card className="p-6 w-full">
-              <h3 className="text-xl font-bold text-[#1b1c1f] mb-4 flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-[#1b1c1f] mb-4 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-[#2b7fff]" />
                 서류 선택
               </h3>
@@ -290,7 +290,7 @@ export default function StudySetupPage() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="resumeId"
-                    className="text-sm font-semibold text-[#1b1c1f]"
+                    className="text-base font-semibold text-[#1b1c1f]"
                   >
                     이력서
                   </Label>
@@ -315,7 +315,7 @@ export default function StudySetupPage() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="coverletterId"
-                    className="text-sm font-semibold text-[#1b1c1f]"
+                    className="text-base font-semibold text-[#1b1c1f]"
                   >
                     자기소개서
                   </Label>
@@ -340,7 +340,7 @@ export default function StudySetupPage() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="portfolioId"
-                    className="text-sm font-semibold text-[#1b1c1f]"
+                    className="text-base font-semibold text-[#1b1c1f]"
                   >
                     포트폴리오
                   </Label>
@@ -368,7 +368,7 @@ export default function StudySetupPage() {
               <div className="space-y-4">
                 <Button
                   onClick={startStream}
-                  className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white px-6 py-4 rounded-lg text-lg font-semibold flex items-center justify-center gap-2"
+                  className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white px-6 py-4 rounded-lg text-base font-semibold flex items-center justify-center gap-2"
                 >
                   <Settings className="w-5 h-5" />
                   카메라 및 마이크 시작
@@ -376,7 +376,7 @@ export default function StudySetupPage() {
                 <Button
                   onClick={handleEnterRoom}
                   disabled={!isCameraOn || !isMicOn}
-                  className={`w-full px-6 py-4 rounded-lg text-lg font-semibold flex items-center justify-center gap-2 ${
+                  className={`w-full px-6 py-4 rounded-lg text-base font-semibold flex items-center justify-center gap-2 ${
                     isCameraOn && isMicOn
                       ? "bg-green-600 hover:bg-green-700 text-white"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
