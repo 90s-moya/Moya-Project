@@ -21,7 +21,7 @@ def analyze_all(
 
         posture = f_posture.result()
         face    = f_face.result()
-        # gaze    = f_gaze.result()
+        gaze    = f_gaze.result()
 
     return {
         "timestamp": datetime.utcnow().isoformat() + "Z",
