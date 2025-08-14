@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useNavigate } from "react-router-dom"
 import Header from "@/components/common/Header"
 import ReadyModal from "@/components/interview/ReadyModal"
-import WebCalibration from "@/components/interview/WebCalibration"
+import { WebCalibration } from "@/components/interview/WebCalibration"
 
 
 enum TestStatus {
@@ -244,16 +244,17 @@ export default function InterviewSetupPage() {
               </div>
 
               <div className={`rounded-xl p-4 border ${eyeTrackingReady ? "border-emerald-500 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                              <div className="text-gray-800 font-semibold flex items-center gap-2"> 시선 추적
-                              {eyeTrackingReady && (
-                  <button 
-                    onClick={resetEyeTracking}
-                    className="text-xs bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-yellow-700"
-                    title="재캘리브레이션"
-                  >
-                    재설정
-                  </button>
-                )}
+                <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  시선 추적
+                  {eyeTrackingReady && (
+                    <button 
+                      onClick={resetEyeTracking}
+                      className="text-xs bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-yellow-700"
+                      title="재캘리브레이션"
+                    >
+                      재설정
+                    </button>
+                  )}
                 </div>
                 <div className="mt-1 text-xs text-slate-600">
                   {eyeTrackingReady ? "캘리브레이션 완료! 시선 추적이 준비되었습니다." : "시선 추적 캘리브레이션이 필요합니다."}

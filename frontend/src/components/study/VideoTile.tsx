@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import positiveImg from "@/assets/images/positive.png";
 import negativeImg from "@/assets/images/negative.png";
 import FeedbackPopup from "./FeedbackPopup";
+import { VideoOff, User } from "lucide-react";
 
 interface VideoTileProps {
   stream: MediaStream | null;
@@ -10,9 +11,9 @@ interface VideoTileProps {
   userId: string;
   roomId: string;
   userDocs?: {
-    docsId: string; // docs_id → docsId로 변경
-    userId: string; // user_id → userId로 변경
-    fileUrl: string; // file_url → fileUrl로 변경
+    docsId: string;
+    userId: string;
+    fileUrl: string;
     docsStatus: string;
   }[];
   onDocsClick?: (userId: string) => void; // 서류 클릭 시 부모 컴포넌트에 알림
@@ -35,6 +36,46 @@ export default function VideoTile({
     "POSITIVE" | "NEGATIVE" | null
   >(null);
   const [isSending, setIsSending] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(true);
+
+  // 카메라 상태 감지
+  useEffect(() => {
+    if (!stream) {
+      setIsCameraOn(false);
+      return;
+    }
+
+    const videoTracks = stream.getVideoTracks();
+
+    if (videoTracks.length === 0) {
+      setIsCameraOn(false);
+      return;
+    }
+
+    const videoTrack = videoTracks[0];
+    setIsCameraOn(videoTrack.enabled);
+
+    // 트랙 상태 변경 감지
+    const handleTrackEnded = () => setIsCameraOn(false);
+    const handleTrackMute = () => setIsCameraOn(false);
+    const handleTrackUnmute = () => setIsCameraOn(videoTrack.enabled);
+
+    videoTrack.addEventListener("ended", handleTrackEnded);
+    videoTrack.addEventListener("mute", handleTrackMute);
+    videoTrack.addEventListener("unmute", handleTrackUnmute);
+
+    // 주기적으로 트랙 상태 확인 (일부 브라우저에서 이벤트가 발생하지 않을 수 있음)
+    const checkInterval = setInterval(() => {
+      setIsCameraOn(videoTrack.enabled && videoTrack.readyState === "live");
+    }, 1000);
+
+    return () => {
+      videoTrack.removeEventListener("ended", handleTrackEnded);
+      videoTrack.removeEventListener("mute", handleTrackMute);
+      videoTrack.removeEventListener("unmute", handleTrackUnmute);
+      clearInterval(checkInterval);
+    };
+  }, [stream]);
 
   // 비디오 스트림 연결 최적화
   useEffect(() => {
@@ -50,9 +91,9 @@ export default function VideoTile({
 
   // 서류 아이콘 클릭 시 실행되는 함수 (디바운싱 추가)
   const handleClickDocs = () => {
-    console.log("서류 아이콘 클릭 됨.");
-    console.log("사용자 ID:", userId);
-    console.log("사용자 서류:", userDocs);
+    // console.log("서류 아이콘 클릭 됨.");
+    // console.log("사용자 ID:", userId);
+    // console.log("사용자 서류:", userDocs);
 
     // 부모 컴포넌트에 서류 클릭 이벤트 전달
     if (onDocsClick) {
@@ -110,10 +151,21 @@ export default function VideoTile({
         autoPlay
         playsInline
         muted={isLocal}
-        className="w-full h-full object-cover transform scale-x-[-1]"
+        className={`w-full h-full object-cover transform scale-x-[-1] ${
+          !isCameraOn ? "opacity-0" : "opacity-100"
+        }`}
         // 비디오 로딩 최적화
         preload="metadata"
       />
+
+      {/* 카메라 꺼짐 상태 표시 */}
+      {!isCameraOn && (
+        <div className="absolute inset-0 bg-gray-700 flex flex-col items-center justify-center">
+          <div className="text-center">
+            <VideoOff className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          </div>
+        </div>
+      )}
 
       {/* 오른쪽 상단 서류 아이콘 (썸네일에서는 숨김) */}
       {!hideOverlay && (
@@ -127,8 +179,8 @@ export default function VideoTile({
         </div>
       )}
 
-      {/* 오른쪽 하단 감정 피드백 (썸네일에서는 숨김) */}
-      {!hideOverlay && (
+      {/* 오른쪽 하단 감정 피드백 (썸네일에서는 숨김, 본인 화면에서는 숨김) */}
+      {!hideOverlay && !isLocal && (
         <div className="absolute bottom-2 right-2 flex gap-2">
           <button
             onClick={handleClickPositive}
@@ -155,8 +207,8 @@ export default function VideoTile({
         </div>
       )}
 
-      {/* 중앙 하단 피드백 팝업 (썸네일에서는 숨김) */}
-      {!hideOverlay && (
+      {/* 중앙 하단 피드백 팝업 (썸네일에서는 숨김, 본인 화면에서는 숨김) */}
+      {!hideOverlay && !isLocal && (
         <FeedbackPopup
           show={showFeedbackPopup}
           feedbackType={feedbackType}
