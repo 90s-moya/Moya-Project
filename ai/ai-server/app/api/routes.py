@@ -7,19 +7,30 @@ import traceback, re, ast
 from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
-
+from app.utils.urls import to_files_relative
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from typing import List, Tuple
 from sqlalchemy import String
 from sqlalchemy.orm import Session
-
+import httpx
 from app.database import get_db, SessionLocal
 from app.models import EvaluationSession, QuestionAnswerPair
 from app.schemas import EvaluationSessionRead
 from app.services.analysis_service import analyze_all
+from app.services.analysis_db_service import get_or_create_qa_pair, save_results_to_qa
+
 from app.services.face_service import infer_face
-from app.services.gaze_service import infer_gaze
+from app.services.gaze_service import (
+    infer_gaze, 
+    start_calibration, 
+    add_calibration_point, 
+    run_calibration, 
+    save_calibration, 
+    list_calibrations,
+    load_calibration_for_tracking
+)
 from app.utils.gpt import (
     ask_gpt_if_ends_async,
     generate_followup_question,
@@ -30,7 +41,7 @@ from app.utils.gpt import (
 from app.utils.stt import (
     transcribe_audio_async,             # (레거시) 필요 시 유지
     transcribe_audio_bytes,             # 빠른 경로: 최소 STT
-    analyze_audio_bytes,                # 백그라운드: 상세 분석
+    transcribe_and_analyze,                # 백그라운드: 상세 분석
 )
 from app.utils.posture import analyze_video_bytes
 
@@ -430,19 +441,115 @@ async def followup_question(
 @router.post("/v1/analyze/complete")
 async def analyze_complete(
     file: UploadFile = File(...),
-    device: str = "cpu",
-    stride: int = 5,
-    return_points: bool = False,
+    session_id: str = Form(...),
+    order: int = Form(...),
+    sub_order: int = Form(...),
+    device: str = Form("cpu"),
+    stride: int = Form(5),
+    return_points: bool = Form(False),
+    calib_data: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
 ):
     data = await file.read()
     if not data:
-        raise HTTPException(400, "빈 파일")
-    try:
-        out = analyze_all(data, device=device, stride=stride, return_points=return_points)
-        return out
-    except Exception as e:
-        raise HTTPException(500, f"complete analysis 실패: {e}")
+        raise HTTPException(status_code=400, detail="빈 파일")
+    parsed_calib_data = None
+    if calib_data:
+        try:
+            parsed_calib_data = json.loads(calib_data)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid calib_data JSON: {e}")
 
+    # (1) QA 조회/생성
+    qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order)
+
+    # (2) 분석 실행
+    try:
+        out = analyze_all(data, device=device, stride=stride, return_points=return_points, calib_data=parsed_calib_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"complete analysis 실패: {e}")
+
+    # (3) 결과 저장 (파일 업로드 자체는 외부에서 하고 URL만 따로 넣을 수 있음)
+    qa = save_results_to_qa(db, qa, video_url=qa.video_url, result=out)
+
+    # (4) 응답
+    return {
+        "result_id": qa.id,
+        "report_id": qa.session_id,
+        "order": qa.order,
+        "sub_order": qa.sub_order,
+        "video_url": qa.video_url,
+        "thumbnail_url": getattr(qa, "thumbnail_url", None),
+        "posture_result": qa.posture_result,
+        "face_result": qa.face_result,
+        "gaze_result": qa.gaze_result,
+        "created_at": qa.created_at.isoformat() + "Z" if qa.created_at else None,
+    }
+
+# --------------------------
+# (신규) 분석: URL 입력 + 세부키
+# --------------------------
+@router.post("/v1/analyze/complete-by-url")
+async def analyze_complete_by_url(
+    video_url: str = Form(...),
+    session_id: str = Form(...),
+    order: int = Form(...),
+    sub_order: int = Form(...),
+    device: str = Form("cpu"),
+    stride: int = Form(5),
+    return_points: bool = Form(False),
+    thumbnail_url: Optional[str] = None,
+    calib_data: Optional[str] = Form(None),
+
+    db: Session = Depends(get_db),
+):
+    parsed_calib_data = None
+    if calib_data:
+        try:
+            parsed_calib_data = json.loads(calib_data)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid calib_data JSON: {e}")
+    """
+    비디오 URL을 직접 받아서 다운로드 → 분석 → 결과 DB 저장
+    """
+    # (1) QA 조회/생성
+    qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order,calib_data=parsed_calib_data)
+
+    # (2) URL에서 비디오 다운로드
+    try:
+        # URL에서 개행문자 및 공백 제거
+        clean_url = video_url.strip().replace('\n', '').replace('\r', '')
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.get(clean_url)
+            r.raise_for_status()
+            data = r.content
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"URL 다운로드 실패: {e}")
+
+    # (3) 분석 실행
+    try:
+        out = analyze_all(data, device=device, stride=stride, return_points=return_points, calib_data=parsed_calib_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"URL 분석 실패: {e}")
+    rel_video = to_files_relative(video_url)
+    rel_thumb = to_files_relative(thumbnail_url)
+
+    qa = save_results_to_qa(db, qa, video_url=rel_video, thumbnail_url=rel_thumb, result=out)
+
+
+    # (5) 응답
+    return {
+        "result_id": qa.id,
+        "report_id": qa.session_id,
+        "order": qa.order,
+        "sub_order": qa.sub_order,
+        "video_url": qa.video_url,
+        "thumbnail_url": getattr(qa, "thumbnail_url", None),
+        "posture_result": qa.posture_result,
+        "face_result": qa.face_result,
+        "gaze_result": qa.gaze_result,
+        "created_at": qa.created_at.isoformat() + "Z" if qa.created_at else None,
+    }
 
 @router.post("/v1/face/predict")
 async def face_predict(file: UploadFile = File(...), device: str = "cpu"):
@@ -462,8 +569,36 @@ async def gaze_predict(file: UploadFile = File(...)):
     if not data:
         raise HTTPException(400, "빈 파일")
     try:
+        import json
+        from fastapi import Response
+        
         out = infer_gaze(data)
-        return {"ok": True, "result": out}
+        
+        # heatmap_data를 직접 압축 처리
+        def compress_heatmap_data(data):
+            if isinstance(data, dict):
+                result = {}
+                for key, value in data.items():
+                    if key == "heatmap_data" and isinstance(value, list):
+                        # heatmap_data는 이미 압축된 상태로 처리
+                        result[key] = value
+                    elif isinstance(value, dict):
+                        result[key] = compress_heatmap_data(value)
+                    elif isinstance(value, list):
+                        result[key] = [compress_heatmap_data(item) if isinstance(item, dict) else item for item in value]
+                    else:
+                        result[key] = value
+                return result
+            return data
+        
+        # 결과 압축 처리
+        compressed_out = compress_heatmap_data(out)
+        result = {"ok": True, "result": compressed_out}
+        
+        # 전체를 압축된 JSON으로 변환
+        json_str = json.dumps(result, separators=(',', ':'), ensure_ascii=False)
+        
+        return Response(content=json_str, media_type="application/json")
     except Exception as e:
         raise HTTPException(500, f"gaze inference 실패: {e}")
 
@@ -481,6 +616,77 @@ async def posture_report(file: UploadFile = File(...)):
     return JSONResponse(content=report)
 
 
+# === 캘리브레이션 관련 엔드포인트들 ===
+class CalibrationStartRequest(BaseModel):
+    screen_width: int = 1920
+    screen_height: int = 1080
+    window_width: int = 1344
+    window_height: int = 756
+
+class CalibrationPointRequest(BaseModel):
+    gaze_vector: List[float]
+    target_point: Tuple[float, float]
+
+@router.post("/v1/calibration/start")
+async def calibration_start(request: CalibrationStartRequest):
+    """캘리브레이션 시작"""
+    try:
+        result = start_calibration(
+            request.screen_width, 
+            request.screen_height, 
+            request.window_width, 
+            request.window_height
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"캘리브레이션 시작 실패: {e}")
+
+@router.post("/v1/calibration/add-point")
+async def calibration_add_point(request: CalibrationPointRequest):
+    """캘리브레이션 포인트 추가"""
+    try:
+        result = add_calibration_point(request.gaze_vector, request.target_point)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"캘리브레이션 포인트 추가 실패: {e}")
+
+@router.post("/v1/calibration/run")
+async def calibration_run(mode: str = Form("quick")):
+    """캘리브레이션 실행"""
+    try:
+        result = run_calibration(mode)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"캘리브레이션 실행 실패: {e}")
+
+@router.post("/v1/calibration/save")
+async def calibration_save(filename: str = Form(None)):
+    """캘리브레이션 저장"""
+    try:
+        result = save_calibration(filename)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"캘리브레이션 저장 실패: {e}")
+
+@router.get("/v1/calibration/list")
+async def calibration_list():
+    """저장된 캘리브레이션 목록"""
+    try:
+        result = list_calibrations()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"캘리브레이션 목록 조회 실패: {e}")
+
+@router.post("/v1/tracking/load-calibration")
+async def tracking_load_calibration(calib_path: str = Form(...)):
+    """시선 추적용 캘리브레이션 로드"""
+    try:
+        result = load_calibration_for_tracking(calib_path)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"캘리브레이션 로드 실패: {e}")
+
+
 # --------------------------
 # 백그라운드 작업: 음성 상세 분석 저장
 # --------------------------
@@ -492,13 +698,19 @@ async def _bg_analyze_and_persist(qa_id: int, audio_bytes: bytes):
     """
     db = SessionLocal()
     try:
-        analysis = await analyze_audio_bytes(audio_bytes)
+        analysis = await transcribe_and_analyze(audio_bytes)
         qa = db.query(QuestionAnswerPair).get(qa_id)
         if qa:
             try:
-                # JSON 칼럼이 있는 경우
-                if hasattr(qa, "speech_analysis"):
-                    qa.speech_analysis = analysis
+                # 1) 개별 컬럼이 있는 경우 우선 저장
+                if hasattr(qa, "speech_label") and hasattr(qa, "syll_art"):
+                    qa.speech_label = analysis.get("label")
+                    qa.syll_art = analysis.get("reason")
+
+                # 2) JSON 컬럼이 있는 경우(겸용 또는 대안)
+                elif hasattr(qa, "speech_analysis"):
+                    qa.speech_analysis = analysis  # dict 그대로 (JSON 타입이어야 함)
+
                 else:
                     # 하위호환: 문자열 필드에 JSON을 덧붙여 저장
                     payload = "\n[SPEECH_ANALYSIS]\n" + json.dumps(analysis, ensure_ascii=False)

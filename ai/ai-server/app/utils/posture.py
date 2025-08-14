@@ -35,7 +35,7 @@ def _extract_feedbacks(landmarks, mp_pose):
     head_down_ratio = abs(nose[1] - eye_center[1])
     off_center_ratio = abs(nose[0] - shoulder_center[0])
 
-    if shoulder_diff_y > 0.02:
+    if shoulder_diff_y > 0.03:
         feedbacks.append("Shoulders Uneven")
     if head_down_ratio > 0.07:
         feedbacks.append("Head Down")
@@ -63,11 +63,11 @@ def _extract_feedbacks(landmarks, mp_pose):
 
 # 프레임별 대표 라벨 우선순위 (원하면 자유롭게 조정)
 _LABEL_PRIORITY = [
-    "Shoulders Uneven",
-    "Head Down",
-    "Head Off-Center",
-    "Hands Above Shoulders",
     "Good Posture",
+    "Head Off-Center",
+    "Head Down",
+    "Shoulders Uneven",
+    "Hands Above Shoulders",
 ]
 
 def _choose_label(feedbacks):
@@ -103,42 +103,37 @@ def _compress_runs(sampled_frames, labels, step):
             prev_frame = f
             continue
         # 구간 종료 후 저장
-        segments.append({"label": cur_label, "start_frame": seg_start, "end_frame": prev_frame})
+        segments.append({
+            "label": cur_label,
+            "start_frame": int(seg_start),
+            "end_frame": int(prev_frame),
+        })
         # 새 구간 시작
         cur_label = lb
         seg_start = f
         prev_frame = f
 
     # 마지막 구간 저장
-    segments.append({"label": cur_label, "start_frame": seg_start, "end_frame": prev_frame})
+    segments.append({
+        "label": cur_label,
+        "start_frame": int(seg_start),
+        "end_frame": int(prev_frame),
+    })
     return segments
 
 def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every: int = 1):
     """
     업로드된 동영상 바이트 -> 샘플링/분석 -> JSON 리포트 반환
 
-    Parameters
-    ----------
-    mode : "segments" | "samples"
-        - "segments": 동일 라벨의 연속 구간을 압축하여 {"label","start_frame","end_frame"} 형태로 반환
-        - "samples" : 샘플 프레임별 {"frame","label"} 형태로 반환
-    sample_every : int
-        N프레임마다 1회 처리. 예) 30이면 30fps 영상을 1fps처럼 분석
-
-    Returns
-    -------
-    dict
-        {
-          "timestamp": ISO8601,
-          "total_frames_read": int,   # 원본에서 읽은 총 프레임 수(스킵 포함)
-          "total_samples": int,       # 실제 분석한 샘플 수
-          "source_fps": float|0.0,    # 원본 FPS(못 읽으면 0.0)
-          "frame_step": int,          # sample_every
-          "effective_fps": float|None,# source_fps / sample_every
-          "summary": {...},           # 라벨별 비율
-          "detailed_logs": [...],     # segments 또는 samples
-          "mode": "segments"|"samples"
-        }
+    반환 포맷
+    {
+      "timestamp": ISO8601,
+      "total_frames": int,                # 원본에서 읽은 총 프레임 수(스킵 포함)
+      "frame_distribution": {label:int},  # 라벨별 카운트
+      "detailed_logs": [                  # 연속 구간
+        {"label": str, "start_frame": int, "end_frame": int}, ...
+      ]
+    }
     """
     assert mode in ("segments", "samples"), "mode must be 'segments' or 'samples'"
     assert sample_every >= 1
@@ -154,7 +149,6 @@ def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every:
     cap = cv2.VideoCapture(tmp_path)
 
     try:
-        source_fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
         total_frames_read = 0
         sampled_frames = []
         per_frame_labels = []
@@ -193,32 +187,24 @@ def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every:
         except OSError:
             pass
 
-    # 요약(라벨 비율)
-    total_samples = len(per_frame_labels)
-    if total_samples > 0:
+    # 라벨 카운트만 남김
+    if per_frame_labels:
         counts = Counter(per_frame_labels)
-        summary = {
-            k: {"frames": v, "ratio": round((v / total_samples) * 100, 1)}
-            for k, v in counts.items()
-        }
+        frame_distribution = {k: int(v) for k, v in counts.items()}
     else:
-        summary = {}
+        frame_distribution = {}
 
     # detailed_logs 생성
     if mode == "samples":
-        detailed_logs = [{"frame": f, "label": lb} for f, lb in zip(sampled_frames, per_frame_labels)]
+        detailed_logs = [{"frame": int(f), "label": lb} for f, lb in zip(sampled_frames, per_frame_labels)]
     else:
         detailed_logs = _compress_runs(sampled_frames, per_frame_labels, step=sample_every)
 
+    # 최종 리포트
     report = {
         "timestamp": datetime.datetime.now().isoformat(),
-        "total_frames_read": total_frames_read,
-        "total_samples": total_samples,
-        "source_fps": float(source_fps) if source_fps else 0.0,
-        "frame_step": sample_every,
-        "effective_fps": (float(source_fps) / sample_every) if source_fps else None,
-        "summary": summary,
+        "total_frames": int(total_frames_read),
+        "frame_distribution": frame_distribution,
         "detailed_logs": detailed_logs,
-        "mode": mode,
     }
     return report

@@ -2,142 +2,248 @@
 from __future__ import annotations
 
 import sys
-import io
 import os
 import tempfile
-import importlib
+import json
 from pathlib import Path
-from functools import lru_cache
-from typing import Callable, Optional, Any, Dict
+from typing import Optional, Any, Dict
 
-
-# === repo 루트 / Gaze_TR_pro 경로 등록 ===
-ROOT = Path(__file__).resolve().parents[2]       # repo 루트 (ai-server 기준)
-GAZE_DIR = ROOT / "Gaze_TR_pro"
+# === Gaze_TR_pro 경로 등록 ===
+AI_SERVER_ROOT = Path(__file__).resolve().parents[2]  # ai-server 디렉토리
+GAZE_DIR = AI_SERVER_ROOT / "Gaze_TR_pro"
 sys.path.append(str(GAZE_DIR))
 
-# 이 중에서 먼저 발견되는 모듈/함수를 엔트리로 사용
-ENTRY_MODULES = [
-    "simple_gaze_test",  # 가장 유력 (파일명 보였음)
-    "test_setup",        # 보였음
-    "gazetr_cam",
-    "cam",
-]
-ENTRY_FUNCS = [
-    "run_gaze_once",
-    "run_once",
-    "run",
-    "main",
-    "predict",
-]
+try:
+    from gaze_calibration import GazeCalibrator
+    from gaze_tracking import GazeTracker
+except ImportError as e:
+    print(f"Warning: Could not import gaze modules: {e}")
+    GazeCalibrator = None
+    GazeTracker = None
+
+# 전역 싱글톤 인스턴스
+_calibrator_instance = None
+_tracker_instance = None
 
 
-def _find_entrypoint() -> Callable[..., Any]:
-    """Gaze_TR_pro 내부에서 실행 함수(엔트리포인트) 자동 탐색."""
-    last_err = None
-    for modname in ENTRY_MODULES:
-        try:
-            mod = importlib.import_module(modname)
-        except Exception as e:
-            last_err = e
-            continue
-
-        # 1) 모듈에 위 후보 함수명이 있으면 그걸 사용
-        for fname in ENTRY_FUNCS:
-            fn = getattr(mod, fname, None)
-            if callable(fn):
-                return fn
-
-        # 2) 모듈에 CLI 스타일 main이 있고, input_path/비디오를 받는 형태면 그걸로 시도
-        if hasattr(mod, "__call__") and callable(mod):
-            return mod  # type: ignore
-
-    raise ImportError(
-        f"gaze entrypoint not found. tried modules={ENTRY_MODULES}, funcs={ENTRY_FUNCS}, last_err={last_err}"
-    )
+def get_calibrator(screen_width=1920, screen_height=1080, window_width=1344, window_height=756) -> 'GazeCalibrator':
+    global _calibrator_instance
+    if _calibrator_instance is None:
+        if GazeCalibrator is None:
+            raise ImportError("GazeCalibrator not available")
+        _calibrator_instance = GazeCalibrator(screen_width, screen_height, window_width, window_height)
+    return _calibrator_instance
 
 
-@lru_cache(maxsize=1)
-def get_gaze_runtime(calib_path: Optional[str] = None) -> Dict[str, Any]:
-    """
-    런타임 준비 (캘리브 파일 등). 필요 없으면 그대로 둬도 됨.
-    """
-    # 기본 캘리브 경로 추정 (있으면 사용)
-    default_calib_dir = GAZE_DIR / "calib"
-    default_calib = None
-    if default_calib_dir.exists():
-        # json, npz, yaml 등 하나 골라서 사용 (원하는 규칙으로 바꾸세요)
-        for ext in (".json", ".npz", ".yaml", ".yml"):
-            cand = next(default_calib_dir.glob(f"*{ext}"), None)
-            if cand:
-                default_calib = str(cand)
+def get_tracker(screen_width=1920, screen_height=1080, window_width=1344, window_height=756) -> 'GazeTracker':
+    global _tracker_instance
+    if _tracker_instance is None:
+        if GazeTracker is None:
+            raise ImportError("GazeTracker not available")
+        _tracker_instance = GazeTracker(screen_width, screen_height, window_width, window_height)
+    return _tracker_instance
+
+
+# === 캘리브레이션 ===
+def start_calibration(screen_width=1920, screen_height=1080, window_width=1344, window_height=756) -> Dict[str, Any]:
+    try:
+        calibrator = get_calibrator(screen_width, screen_height, window_width, window_height)
+        return {
+            "status": "success",
+            "message": "Calibration initialized",
+            "targets": calibrator.calib_targets
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def add_calibration_point(gaze_vector: list, target_point: tuple) -> Dict[str, Any]:
+    try:
+        calibrator = get_calibrator()
+        calibrator.add_calibration_point(gaze_vector, target_point)
+        return {
+            "status": "success",
+            "message": f"Added calibration point: {target_point}",
+            "total_points": len(calibrator.calib_points)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def run_calibration(mode="quick") -> Dict[str, Any]:
+    try:
+        calibrator = get_calibrator()
+        result = calibrator.run_calibration(mode=mode)
+        return {"status": "success", "calibration_result": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def save_calibration(filename: Optional[str] = None) -> Dict[str, Any]:
+    try:
+        calibrator = get_calibrator()
+        filepath = calibrator.save_calibration_data(filename)
+        return {"status": "success", "filepath": filepath}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def list_calibrations() -> Dict[str, Any]:
+    try:
+        calib_dir = GAZE_DIR / "calibration_data"
+        if not calib_dir.exists():
+            return {"status": "success", "calibrations": []}
+        calibrations = [
+            {
+                "filename": file.name,
+                "filepath": str(file),
+                "created": file.stat().st_mtime
+            }
+            for file in calib_dir.glob("*.json")
+        ]
+        return {"status": "success", "calibrations": calibrations}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# === 시선 추적 ===
+def load_calibration_from_localstorage() -> Dict[str, Any]:
+    try:
+        frontend_root = AI_SERVER_ROOT.parent / "frontend"
+        calib_file_patterns = ["gaze_calibration_data.json", "calibration_data_*.json"]
+
+        calib_path = None
+        for pattern in calib_file_patterns:
+            files = list(frontend_root.glob(pattern))
+            if files:
+                calib_path = max(files, key=lambda f: f.stat().st_mtime)
                 break
 
-    return {
-        "ready": True,
-        "calib_path": calib_path or default_calib,
-        "entrypoint": _find_entrypoint(),
-    }
+        if not calib_path or not calib_path.exists():
+            for pattern in calib_file_patterns:
+                files = list(Path.cwd().glob(pattern))
+                if files:
+                    calib_path = max(files, key=lambda f: f.stat().st_mtime)
+                    break
+
+        if not calib_path:
+            return {"status": "error", "message": "No calibration data found in local storage"}
+
+        with open(calib_path, 'r', encoding='utf-8') as f:
+            calib_data = json.load(f)
+
+        required_fields = ['calibration_vectors', 'calibration_points', 'transform_method']
+        for field in required_fields:
+            if field not in calib_data:
+                return {"status": "error", "message": f"Missing required field: {field}"}
+
+        return {
+            "status": "success",
+            "message": "Calibration data loaded from local storage",
+            "data": calib_data,
+            "file_path": str(calib_path)
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to load calibration from local storage: {str(e)}"}
 
 
-def _call_entry(fn: Callable[..., Any], input_path: str, calib_path: Optional[str]) -> Any:
+def load_calibration_for_tracking(calib_path: str = None, calib_data: dict = None) -> Dict[str, Any]:
+    try:
+        tracker = get_tracker()
+        if calib_data is None:
+            if calib_path is None:
+                return {"status": "error", "message": "No calibration data or path provided"}
+            with open(calib_path, 'r') as f:
+                calib_data = json.load(f)
+
+        tracker.calib_vectors = calib_data.get('calibration_vectors', [])
+        tracker.calib_points = calib_data.get('calibration_points', [])
+        tracker.transform_matrix = calib_data.get('transform_matrix')
+        tracker.transform_method = calib_data.get('transform_method')
+
+        return {"status": "success", "message": "Calibration loaded for tracking"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def infer_gaze(
+    video_bytes: bytes,
+    calib_path: Optional[str] = None,
+    calib_data: Optional[dict] = None,
+    use_localstorage: bool = True
+) -> Dict[str, Any]:
     """
-    엔트리 함수 시그니처가 제각각일 수 있으니, 흔한 패턴들을 순서대로 시도.
-    필요한 경우 아래 케이스를 추가하세요.
+    업로드된 비디오 바이트에서 시선 추적 수행
     """
-    # 가장 흔한 케이스들
+    print(f"[DEBUG] infer_gaze called with video_bytes length: {len(video_bytes)}")
+    print(f"[DEBUG] calib_data provided: {calib_data is not None}")
+    print(f"[DEBUG] use_localstorage: {use_localstorage}")
+    
     try:
-        return fn(input_path=input_path, calib_path=calib_path)
-    except TypeError:
-        pass
+        tracker = get_tracker()
+        calibration_loaded = False
+        calibration_source = "none"
 
-    try:
-        return fn(input_path)
-    except TypeError:
-        pass
+        # 1. 외부에서 캘리브레이션 데이터를 직접 전달받은 경우
+        if calib_data is not None:
+            load_result = load_calibration_for_tracking(calib_data=calib_data)
+            if load_result["status"] == "success":
+                calibration_loaded = True
+                calibration_source = "provided_data"
+                print("[INFO] Calibration loaded from provided calib_data")
 
-    try:
-        return fn(video_path=input_path, calib_path=calib_path)
-    except TypeError:
-        pass
+        # 2. 로컬 스토리지 자동 로드
+        elif use_localstorage:
+            localstorage_result = load_calibration_from_localstorage()
+            if localstorage_result["status"] == "success":
+                load_result = load_calibration_for_tracking(calib_data=localstorage_result["data"])
+                if load_result["status"] == "success":
+                    calibration_loaded = True
+                    calibration_source = "local_storage"
+                    print(f"[INFO] Loaded calibration from local storage: {localstorage_result['file_path']}")
 
-    try:
-        return fn(video_path=input_path)
-    except TypeError:
-        pass
+        # 3. 파일 경로 제공
+        elif calib_path:
+            load_result = load_calibration_for_tracking(calib_path=calib_path)
+            if load_result["status"] == "success":
+                calibration_loaded = True
+                calibration_source = "provided_path"
+                print(f"[INFO] Loaded calibration from provided path: {calib_path}")
+            else:
+                return load_result
 
-    try:
-        return fn(input_path, calib_path)
-    except TypeError:
-        pass
+        if not calibration_loaded:
+            print("[WARNING] No calibration data found. Using default mapping.")
 
-    # 마지막으로 인자 없이 동작(모듈 내부에서 경로를 읽는)하는 경우
-    return fn()
+        # 비디오 임시 파일 저장
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+            tmp.write(video_bytes)
+            input_path = tmp.name
 
-
-def infer_gaze(video_bytes: bytes, calib_path: Optional[str] = None) -> Dict[str, Any]:
-    """
-    업로드된 비디오 바이트 -> 임시 파일 저장 -> Gaze_TR_pro 엔트리 호출 -> 결과 반환
-    반환 타입은 엔트리 함수가 주는 구조를 그대로 감싸서 돌려줍니다.
-    """
-    rt = get_gaze_runtime(calib_path=calib_path)
-    fn = rt["entrypoint"]
-
-    # 임시 mp4 파일 저장
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-        tmp.write(video_bytes)
-        input_path = tmp.name
-
-    try:
-        result = _call_entry(fn, input_path=input_path, calib_path=rt["calib_path"])
-        # 결과가 None/비구조면 간단히 래핑
-        if result is None or isinstance(result, (str, bytes)):
-            return {"ok": True, "result": result}
-        if not isinstance(result, dict):
-            return {"ok": True, "result": repr(result)}
-        return {"ok": True, **result}
-    finally:
         try:
-            os.remove(input_path)
-        except Exception:
-            pass
+            print(f"[DEBUG] Starting video processing with tracker...")
+            result = tracker.process_video_file(input_path)
+            print(f"[DEBUG] Tracker result type: {type(result)}")
+            print(f"[DEBUG] Tracker result: {result}")
+            
+            final_result = {
+                "ok": True,
+                "result": result,
+                "calibration_status": {
+                    "loaded": calibration_loaded,
+                    "source": calibration_source,
+                    "message": "Calibration applied successfully" if calibration_loaded
+                               else "No calibration applied - using default mapping"
+                }
+            }
+            print(f"[DEBUG] Final gaze result: {final_result}")
+            return final_result
+        finally:
+            try:
+                os.remove(input_path)
+            except Exception:
+                pass
+
+    except Exception as e:
+        print(f"[DEBUG] infer_gaze exception: {e}")
+        return {"ok": False, "error": str(e)}

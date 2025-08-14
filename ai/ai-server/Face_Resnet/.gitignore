@@ -30,7 +30,7 @@ venv.bak/
 env.bak/
 
 # PyTorch/ML Models
-*.pt
+
 *.pth
 *.ckpt
 *.pkl

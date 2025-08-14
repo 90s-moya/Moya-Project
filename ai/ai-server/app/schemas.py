@@ -22,7 +22,7 @@ class QuestionAnswerPairCreate(QuestionAnswerPairBase):
     session_id: UUID4
 
 class QuestionAnswerPairRead(QuestionAnswerPairBase):
-    id: int
+    id: UUID4
     session_id: UUID4
     created_at: datetime
 
@@ -32,7 +32,7 @@ class QuestionAnswerPairRead(QuestionAnswerPairBase):
 # Evaluation session
 class EvaluationSessionBase(BaseModel):
     user_id: UUID4
-    summary: Optional[str] = None
+    title:str
 
 class EvaluationSessionCreate(EvaluationSessionBase):
     pass
