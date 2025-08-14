@@ -88,7 +88,7 @@ export default function StudyCreatePage() {
       await createRoom(formData);
 
       // console.log("방 생성 API 요청에 대한 응답 : ", data);
-      navigate("/mypage/room");
+      navigate("/mypage/studyRoom");
     } catch (err) {
       console.error("스터디 생성 실패", err);
       alert("스터디가 생성 실패...");
