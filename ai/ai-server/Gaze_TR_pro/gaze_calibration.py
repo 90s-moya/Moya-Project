@@ -262,6 +262,11 @@ class GazeCalibrator:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"calibration_data_{timestamp}.json"
         
+        # calibration_data 폴더에 저장
+        calibration_dir = os.path.join(os.path.dirname(__file__), "calibration_data")
+        os.makedirs(calibration_dir, exist_ok=True)
+        filepath = os.path.join(calibration_dir, filename)
+        
         calib_data = {
             "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             "screen_settings": {
@@ -289,11 +294,11 @@ class GazeCalibrator:
         elif self.transform_method == "geometric" and self.transform_matrix is not None:
             calib_data["transform_matrix"] = self.transform_matrix.tolist()
         
-        with open(filename, 'w', encoding='utf-8') as f:
+        with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(calib_data, f, indent=2, ensure_ascii=False)
         
-        print(f"[INFO] Calibration data saved: {filename}")
-        return filename
+        print(f"[INFO] Calibration data saved: {filepath}")
+        return filepath
     
     def run_calibration(self, mode="quick"):
         """캘리브레이션 실행"""

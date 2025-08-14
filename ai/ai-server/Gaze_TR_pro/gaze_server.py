@@ -235,6 +235,73 @@ def download_calibration(filename):
             "message": str(e)
         }), 500
 
+@app.route('/api/calibration/web/save', methods=['POST'])
+def save_web_calibration():
+    """웹 캘리브레이션 데이터 저장"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "No calibration data provided"
+            }), 400
+        
+        # 필수 필드 확인
+        required_fields = ['calibration_points', 'calibration_vectors', 'user_id', 'session_name']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Missing required field: {field}"
+                }), 400
+        
+        # 캘리브레이션 데이터 구성
+        calibration_data = {
+            "metadata": {
+                "user_id": data.get('user_id', 'web_user'),
+                "session_name": data.get('session_name', f'web_session_{datetime.now().strftime("%Y%m%d_%H%M%S")}'),
+                "timestamp": data.get('timestamp', datetime.now().isoformat()),
+                "calibration_type": "web_calibration",
+                "screen_width": data.get('screen_width', 1920),
+                "screen_height": data.get('screen_height', 1080),
+                "window_width": data.get('window_width', 1344),
+                "window_height": data.get('window_height', 756)
+            },
+            "calibration_points": data.get('calibration_points', []),
+            "calibration_vectors": data.get('calibration_vectors', []),
+            "transform_method": data.get('transform_method', 'polynomial'),
+            "transform_matrix": data.get('transform_matrix'),
+            "polynomial_models": data.get('polynomial_models')
+        }
+        
+        # 파일명 생성
+        session_name = data.get('session_name', f'web_session_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+        filename = f"web_calibration_{session_name}.json"
+        filepath = os.path.join(manager.data_dir, filename)
+        
+        # 파일 저장
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(calibration_data, f, indent=2, ensure_ascii=False)
+        
+        print(f"[INFO] Web calibration saved: {filepath}")
+        
+        return jsonify({
+            "status": "success",
+            "message": "Web calibration data saved successfully",
+            "filename": filename,
+            "filepath": filepath,
+            "points_count": len(calibration_data.get('calibration_points', [])),
+            "vectors_count": len(calibration_data.get('calibration_vectors', []))
+        })
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to save web calibration: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
 @app.route('/api/tracking/init', methods=['POST'])
 def init_tracking():
     """시선 추적 초기화"""
@@ -478,11 +545,18 @@ def get_tracking_result(filename):
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        return jsonify({
+        response_data = {
             "status": "success",
             "filename": filename,
             "data": data
-        })
+        }
+        
+        # Flask JSON 설정으로 압축된 응답 생성
+        from flask import Response, current_app
+        
+        # 전체 응답을 압축하여 전송
+        json_str = json.dumps(response_data, separators=(',', ':'), ensure_ascii=False)
+        return Response(json_str, mimetype='application/json')
         
     except Exception as e:
         return jsonify({
