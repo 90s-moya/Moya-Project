@@ -465,6 +465,7 @@ async def analyze_complete(
         "video_url": qa.video_url,
         "thumbnail_url": getattr(qa, "thumbnail_url", None),
         "posture_result": qa.posture_result,
+        "thumbnail_url": getattr(qa, "thumbnail_url", None),
         "face_result": qa.face_result,
         "gaze_result": qa.gaze_result,
         "created_at": qa.created_at.isoformat() + "Z" if qa.created_at else None,
@@ -477,6 +478,7 @@ async def analyze_complete(
 async def analyze_complete_by_url(
     video_url: str = Form(...),
     session_id: str = Form(...),
+    thumbnail_url: Optional[str] = Form(None),
     order: int = Form(...),
     sub_order: int = Form(...),
     device: str = Form("cpu"),
@@ -507,8 +509,9 @@ async def analyze_complete_by_url(
     rel_video = to_files_relative(video_url)
     rel_thumb = to_files_relative(thumbnail_url)
 
-    qa = save_results_to_qa(db, qa, video_url=rel_video, thumbnail_url=rel_thumb, result=out)
 
+    # (4) 결과 + video_url 저장
+    qa = save_results_to_qa(db, qa, video_url=video_url,thumbnail_url=thumbnail_url, result=out)
 
     # (5) 응답
     return {
@@ -518,6 +521,7 @@ async def analyze_complete_by_url(
         "sub_order": qa.sub_order,
         "video_url": qa.video_url,
         "posture_result": qa.posture_result,
+        "thumbnail_url": getattr(qa, "thumbnail_url"),
         "face_result": qa.face_result,
         "gaze_result": qa.gaze_result,
         "created_at": qa.created_at.isoformat() + "Z" if qa.created_at else None,

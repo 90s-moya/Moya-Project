@@ -1,0 +1,62 @@
+{
+    "video_info": {
+        "file_path": "C:\\Users\\SSAFY\\AppData\\Local\\Temp\\tmp3d_t_8mv.webm",
+        "total_frames": 767,
+        "fps": 29,
+        "duration_seconds": 26.448275862068964,
+        "resolution": "960x540"
+    },
+    "analysis_info": {
+        "timestamp": "2025-08-14T18:14:27.511650",
+        "model_used": "Celal11/resnet-50-finetuned-FER2013-0.001",
+        "ema_alpha": 0.92,
+        "hysteresis": {
+            "enter_thr": 0.6,
+            "exit_thr": 0.5,
+            "margin_thr": 0.2,
+            "min_stable": 6
+        },
+        "face_min_px": 112,
+        "blur_threshold": 90.0,
+        "clahe": false,
+        "mediapipe": true,
+        "logit_bias": "happy=-0.4,neutral=0.2,fear=0.1",
+        "happy_guard": true
+    },
+    "frame_distribution": {
+        "불확실": {
+            "frames": 371,
+            "percentage": 48.37027379400261,
+            "duration_seconds": 12.793103448275861
+        },
+        "neutral": {
+            "frames": 42,
+            "percentage": 5.475880052151238,
+            "duration_seconds": 1.4482758620689655
+        },
+        "happy": {
+            "frames": 354,
+            "percentage": 46.15384615384615,
+            "duration_seconds": 12.206896551724139
+        }
+    },
+    "detailed_logs": [
+        {
+            "label": "neutral",
+            "start_frame": 13,
+            "end_frame": 332,
+            "duration_seconds": 11.03448275862069
+        },
+        {
+            "label": "happy",
+            "start_frame": 333,
+            "end_frame": 767,
+            "duration_seconds": 15.0
+        }
+    ],
+    "summary": {
+        "dominant_emotion": "불확실",
+        "emotion_changes": 2,
+        "average_emotion_duration": 13.017241379310345
+    }
+}
