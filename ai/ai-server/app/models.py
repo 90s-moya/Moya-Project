@@ -31,7 +31,7 @@ class QuestionAnswerPair(Base):
     sub_order = Column(Integer, nullable=False)
     question = Column(Text, nullable=False)
     video_url = Column(Text, nullable=True)
-
+    gaze_result=Column(MySQLJSON,nullable=True)
     posture_result = Column(MySQLJSON, nullable=True)
     face_result = Column(MySQLJSON, nullable=True) 
     answer = Column(Text, nullable=True)
@@ -42,11 +42,11 @@ class QuestionAnswerPair(Base):
     reason_context = Column(Text, nullable=True)
     gpt_comment = Column(Text, nullable=True)
     end_type = Column(Text, nullable=True)
-
-    speech_label = Column(Text, nullable=True)
+    thumbnail_url=Column(Text,nullable=True)
+    speech_label = Column(Text, nullable=True)  
     syll_art = Column(Text, nullable=True)
     # 필요 컬럼 추가
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
-    session = relationship("EvaluationSession", back_populates="qa_pairs")
+    session = relationship("EvaluationSession", back_populates="qa_pairs")  

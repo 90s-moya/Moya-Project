@@ -13,11 +13,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import String
 from sqlalchemy.orm import Session
-
+import httpx
 from app.database import get_db, SessionLocal
 from app.models import EvaluationSession, QuestionAnswerPair
 from app.schemas import EvaluationSessionRead
 from app.services.analysis_service import analyze_all
+from app.services.analysis_db_service import get_or_create_qa_pair, save_results_to_qa
+
 from app.services.face_service import infer_face
 from app.services.gaze_service import infer_gaze
 from app.utils.gpt import (
@@ -430,19 +432,90 @@ async def followup_question(
 @router.post("/v1/analyze/complete")
 async def analyze_complete(
     file: UploadFile = File(...),
-    device: str = "cpu",
-    stride: int = 5,
-    return_points: bool = False,
+    session_id: str = Form(...),
+    order: int = Form(...),
+    sub_order: int = Form(...),
+    device: str = Form("cpu"),
+    stride: int = Form(5),
+    return_points: bool = Form(False),
+    db: Session = Depends(get_db),
 ):
     data = await file.read()
     if not data:
-        raise HTTPException(400, "빈 파일")
+        raise HTTPException(status_code=400, detail="빈 파일")
+
+    # (1) QA 조회/생성
+    qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order)
+
+    # (2) 분석 실행
     try:
         out = analyze_all(data, device=device, stride=stride, return_points=return_points)
-        return out
     except Exception as e:
-        raise HTTPException(500, f"complete analysis 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"complete analysis 실패: {e}")
 
+    # (3) 결과 저장 (파일 업로드 자체는 외부에서 하고 URL만 따로 넣을 수 있음)
+    qa = save_results_to_qa(db, qa, video_url=qa.video_url, result=out)
+
+    # (4) 응답
+    return {
+        "result_id": qa.id,
+        "report_id": qa.session_id,
+        "order": qa.order,
+        "sub_order": qa.sub_order,
+        "video_url": qa.video_url,
+        "posture_result": qa.posture_result,
+        "face_result": qa.face_result,
+        "gaze_result": qa.gaze_result,
+        "created_at": qa.created_at.isoformat() + "Z" if qa.created_at else None,
+    }
+
+# --------------------------
+# (신규) 분석: URL 입력 + 세부키
+# --------------------------
+@router.post("/v1/analyze/complete-by-url")
+async def analyze_complete_by_url(
+    video_url: str = Form(...),
+    session_id: str = Form(...),
+    order: int = Form(...),
+    sub_order: int = Form(...),
+    device: str = Form("cpu"),
+    stride: int = Form(5),
+    return_points: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    # (1) QA 조회/생성
+    qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order)
+
+    # (2) URL에서 비디오 다운로드
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            r = await client.get(video_url)
+            r.raise_for_status()
+            data = r.content
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"URL 다운로드 실패: {e}")
+
+    # (3) 분석 실행
+    try:
+        out = analyze_all(data, device=device, stride=stride, return_points=return_points)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"URL 분석 실패: {e}")
+
+    # (4) 결과 + video_url 저장
+    qa = save_results_to_qa(db, qa, video_url=video_url, result=out)
+
+    # (5) 응답
+    return {
+        "result_id": qa.id,
+        "report_id": qa.session_id,
+        "order": qa.order,
+        "sub_order": qa.sub_order,
+        "video_url": qa.video_url,
+        "posture_result": qa.posture_result,
+        "face_result": qa.face_result,
+        "gaze_result": qa.gaze_result,
+        "created_at": qa.created_at.isoformat() + "Z" if qa.created_at else None,
+    }
 
 @router.post("/v1/face/predict")
 async def face_predict(file: UploadFile = File(...), device: str = "cpu"):
