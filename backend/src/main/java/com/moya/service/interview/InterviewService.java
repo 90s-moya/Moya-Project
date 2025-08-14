@@ -23,7 +23,7 @@ public class InterviewService {
 
     @Value("${PYTHON_PATH}")
     private String pythonPath;
-    @Value("${FILE_PATH}")
+    @Value("${VIDEO_PATH}")
     private String video_path;
     private final RestTemplate restTemplate;
     private final FileStorageService fileStorageService;
