@@ -12,7 +12,7 @@ import AnswerRecorder from "@/components/interview/AnswerRecorder"
 import { type QuestionKey } from "@/types/interview"
 
 // 추가: 질문 재생(TTS) 컴포넌트 (speakSequence 기반)
-import QuestionTTS from "@/components/interview/QuestionTTS"
+// import QuestionTTS from "@/components/interview/QuestionTTS"
 
 export default function InterviewScreen() {
   const [isMicOn, setIsMicOn] = useState(true)
