@@ -7,7 +7,7 @@ export interface FeedbackRoom {
   maxUser: number;
   joinUser: number;
   categoryName: string;
-  openAt: string;
+  createdAt: string;
 }
 
 export interface FeedbackApiResponse {
