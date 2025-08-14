@@ -44,7 +44,8 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
 
   // ImageCapture 지원 시 우선 사용
   try {
-    if (window.ImageCapture && typeof (window as any).ImageCapture === 'function') {
+    const win = window as any;
+    if (win.ImageCapture && typeof win.ImageCapture === 'function') {
       const cap = new ImageCapture(track);
       const bitmap: ImageBitmap = await cap.grabFrame();
 
