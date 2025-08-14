@@ -27,7 +27,7 @@ export default function StudyListPage() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [visibleCount, setVisibleCount] = useState(6);
 
-  const [activeTab, setActiveTab] = useState<"deadline" | "recent">("deadline");
+  const [activeTab, setActiveTab] = useState<"deadline" | "recent">("recent");
 
   useEffect(() => {
     const requestRooms = async () => {
@@ -46,21 +46,28 @@ export default function StudyListPage() {
   // 현재 날짜
   const now = new Date();
 
-  // 종료일이 지나지 않은 스터디만 필터링
+  // 시작일시가 현재 시간보다 미래인 스터디만 필터링
   const activeRooms = rooms.filter((room) => {
-    if (!room.expiredAt) return true; // 종료일이 없는 경우 포함
-    return new Date(room.expiredAt) > now; // 종료일이 현재보다 미래인 경우만 포함
+    // 시작일시가 현재 시간보다 지난 경우 제외
+    if (new Date(room.openAt) <= now) {
+      return false;
+    }
+
+    return true;
   });
 
-  // 최신순으로 정렬된 rooms (시작 시간 기준)
+  // 최신순으로 정렬된 rooms (생성 시간 기준)
   const recentSortedRooms = [...activeRooms].sort(
-    (a, b) => new Date(b.openAt).getTime() - new Date(a.openAt).getTime()
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
-  // 종료순으로 정렬된 rooms
-  const deadlineSortedRooms = [...activeRooms].sort(
-    (a, b) => new Date(a.expiredAt).getTime() - new Date(b.expiredAt).getTime()
-  );
+  // 마감순으로 정렬된 rooms (시작일시가 현재 시간에 가장 가까운 순서)
+  const deadlineSortedRooms = [...activeRooms].sort((a, b) => {
+    const now = new Date().getTime();
+    const aTimeDiff = Math.abs(new Date(a.openAt).getTime() - now);
+    const bTimeDiff = Math.abs(new Date(b.openAt).getTime() - now);
+    return aTimeDiff - bTimeDiff;
+  });
 
   // activeTab에 따라서 변하는 sortedRooms
   const sortedRooms =
@@ -175,7 +182,7 @@ export default function StudyListPage() {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-[#1b1c1f] mb-2 flex items-center gap-2">
               <Users className="w-6 h-6 text-[#2b7fff]" />
-              시작 시간이 얼마 안 남았어요 !
+              면접 스터디 목록
             </h2>
             <p className="text-[#4b4e57] text-lg">
               다양한 면접 스터디를 둘러보고 얼른 참여해보세요
@@ -183,21 +190,7 @@ export default function StudyListPage() {
           </div>
 
           {/* Sorting Tabs */}
-          {/* <div className="flex space-x-8 mb-8">
-            <button
-              onClick={() => {
-                setActiveTab("deadline");
-                setVisibleCount(6);
-              }}
-              className={`flex items-center gap-2 text-xl font-semibold pb-3 border-b-2 transition-colors ${
-                activeTab === "deadline"
-                  ? "text-[#2b7fff] border-[#2b7fff]"
-                  : "text-[#6f727c] border-transparent hover:text-[#2b7fff] hover:border-[#2b7fff]"
-              }`}
-            >
-              <Clock className="w-5 h-5" />
-              종료순
-            </button>
+          <div className="flex space-x-8 mb-8">
             <button
               onClick={() => {
                 setActiveTab("recent");
@@ -210,9 +203,23 @@ export default function StudyListPage() {
               }`}
             >
               <Calendar className="w-5 h-5" />
-              시작순
+              최근 생성순
             </button>
-          </div> */}
+            <button
+              onClick={() => {
+                setActiveTab("deadline");
+                setVisibleCount(6);
+              }}
+              className={`flex items-center gap-2 text-xl font-semibold pb-3 border-b-2 transition-colors ${
+                activeTab === "deadline"
+                  ? "text-[#2b7fff] border-[#2b7fff]"
+                  : "text-[#6f727c] border-transparent hover:text-[#2b7fff] hover:border-[#2b7fff]"
+              }`}
+            >
+              <Clock className="w-5 h-5" />
+              마감순
+            </button>
+          </div>
 
           {/* Study Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-[16px]">

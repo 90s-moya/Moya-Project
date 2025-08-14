@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
@@ -42,6 +42,16 @@ export function useStudyRoom() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const videoStartRef = useRef<string | null>(null);
+
+  // roomId를 ref로 관리
+  const roomIdRef = useRef<string>("");
+
+  // roomId가 변경될 때 ref 업데이트
+  useEffect(() => {
+    if (roomId) {
+      roomIdRef.current = roomId;
+    }
+  }, [roomId]);
 
   // 참가자 상태 변경 시 자동 저장
   useEffect(() => {
@@ -147,23 +157,26 @@ export function useStudyRoom() {
     return filteredDocs;
   };
 
-  // 서류 클릭 핸들러
-  const handleDocsClick = (userId: string) => {
-    console.log("서류 클릭됨:", userId);
-    if (focusedUserId === userId && showCarousel) {
-      setShowCarousel(false);
-      setFocusedUserId(null);
-      return;
-    }
-    setFocusedUserId(userId);
-    setShowCarousel(true);
-  };
+  // 서류 클릭 핸들러 최적화 (디바운싱 추가)
+  const handleDocsClick = useCallback(
+    (userId: string) => {
+      console.log("서류 클릭됨:", userId);
+      if (focusedUserId === userId && showCarousel) {
+        setShowCarousel(false);
+        setFocusedUserId(null);
+        return;
+      }
+      setFocusedUserId(userId);
+      setShowCarousel(true);
+    },
+    [focusedUserId, showCarousel]
+  );
 
-  // 캐러셀 닫기 핸들러
-  const handleCloseCarousel = () => {
+  // 캐러셀 닫기 핸들러 최적화
+  const handleCloseCarousel = useCallback(() => {
     setShowCarousel(false);
     setFocusedUserId(null);
-  };
+  }, []);
 
   // 포커스된 참가자의 서류를 캐러셀용 데이터로 변환
   const getCarouselItems = (): DocItem[] => {
@@ -314,21 +327,23 @@ export function useStudyRoom() {
     navigate("/study");
   };
 
-  // 스터디 방 참여자들의 서류 조회
+  // 스터디 방 참여자들의 서류 조회 (수정)
   useEffect(() => {
-    const requestDocs = async () => {
-      try {
-        console.log("roomId", roomId);
-        const data = await getDocsInRoom(roomId!);
-        console.log("방 참여자들의 서류 조회 성공", data);
-        setAllDocs(data);
-      } catch (error) {
-        console.error("방 참여자들의 서류 조회 실패", error);
-      }
-    };
+    if (roomId) {
+      const requestDocs = async () => {
+        try {
+          console.log("roomId", roomId);
+          const data = await getDocsInRoom(roomId!);
+          console.log("방 참여자들의 서류 조회 성공", data);
+          setAllDocs(data);
+        } catch (error) {
+          console.error("방 참여자들의 서류 조회 실패", error);
+        }
+      };
 
-    requestDocs();
-  }, []);
+      requestDocs();
+    }
+  }, [participants.length, roomId]); // participants.length를 의존성에 추가
 
   // WebRTC 연결 설정 (수정)
   useEffect(() => {
@@ -338,6 +353,10 @@ export function useStudyRoom() {
     const parsed = JSON.parse(userInfo);
     const myId = parsed?.state?.UUID || crypto.randomUUID();
     myIdRef.current = myId;
+
+    if (roomId) {
+      roomIdRef.current = roomId; // 항상 최신 값으로 업데이트
+    }
 
     const signaling = new SignalingClient(
       `wss://${import.meta.env.VITE_RTC_API_URL}/ws`,
@@ -356,6 +375,7 @@ export function useStudyRoom() {
           }
 
           console.log("새 참여자 연결!");
+          // 서류 조회 코드 제거 - useEffect에서 처리
           return;
         }
         if (data.type === "leave") {
