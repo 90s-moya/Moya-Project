@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
 import { getDocsInRoom, uploadVideo } from "@/api/studyApi";
+import { useMediaStore } from "@/store/useMediaStore";
 // 날짜 처리
 import dayjs from "dayjs";
 
@@ -30,6 +31,9 @@ export function useStudyRoom() {
   const navigate = useNavigate();
   const { roomId } = useParams();
 
+  // 미디어 스토어 사용 - micStream도 가져오기
+  const { cameraStream, micStream, stopAll } = useMediaStore();
+
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [allDocs, setAllDocs] = useState<ParticipantsDocs[]>([]);
@@ -42,11 +46,9 @@ export function useStudyRoom() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const videoStartRef = useRef<string | null>(null);
-
-  // roomId를 ref로 관리
   const roomIdRef = useRef<string>("");
 
-  // roomId가 변경될 때 ref 업데이트
+  // roomId를 ref로 관리
   useEffect(() => {
     if (roomId) {
       roomIdRef.current = roomId;
@@ -194,10 +196,11 @@ export function useStudyRoom() {
   // 참가자 수에 따라 동적으로 그리드 열 개수 결정
   const getGridColumns = (count: number) => {
     if (count <= 2) return 2;
-    if (count === 3) return 3;
+    if (count === 3) return 2; // 3명일 때도 2열로 변경 (화면 크기 최적화)
     if (count === 4) return 2;
-    if (count === 5) return 3;
-    return 3;
+    if (count <= 6) return 3;
+    if (count <= 8) return 4; // 7-8명일 때는 4열
+    return 4; // 9명 이상도 4열 유지
   };
 
   // 서류 타입별 제목 반환
@@ -242,10 +245,8 @@ export function useStudyRoom() {
       const d = new Date();
       const ms = d.getTime() - d.getTimezoneOffset() * 60_000; // 로컬 오프셋 보정
       const localDateTime = new Date(ms).toISOString().slice(0, 19);
-      videoStartRef.current = localDateTime;
+      if (!videoStartRef.current == null) videoStartRef.current = localDateTime;
       console.log(localDateTime);
-                
-          
 
       console.log("녹화 시작");
     } catch (error) {
@@ -276,8 +277,8 @@ export function useStudyRoom() {
             formData.append("file", file);
             if (!roomId) return;
             formData.append("roomId", roomId);
-            formData.append("videoStart", videoStartRef.current ??"");
-            console.log("ghkrdls=========", formData)
+            formData.append("videoStart", videoStartRef.current ?? "");
+            console.log("ghkrdls=========", formData);
 
             await uploadVideo(formData);
           }
@@ -296,10 +297,6 @@ export function useStudyRoom() {
   const cleanUpMediaAndConnections = () => {
     peerManagerRef.current?.removeLocalTracks();
 
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
-    }
-
     document.querySelectorAll("video").forEach((video) => {
       (video as HTMLVideoElement).srcObject = null;
     });
@@ -313,10 +310,8 @@ export function useStudyRoom() {
     signalingRef.current?.close();
   };
 
-  // 방 나가기 (수정)
+  // 방 나가기
   const handleLeaveRoom = async () => {
-    console.log("disconnection video", localStream);
-
     // 저장된 참가자 정보 삭제
     if (roomId) {
       localStorage.removeItem(`room-${roomId}-participants`);
@@ -324,6 +319,10 @@ export function useStudyRoom() {
 
     await stopRecordingAndUpload();
     cleanUpMediaAndConnections();
+
+    // 전역 스토어의 스트림도 정리
+    stopAll();
+
     navigate("/study");
   };
 
@@ -355,7 +354,7 @@ export function useStudyRoom() {
     myIdRef.current = myId;
 
     if (roomId) {
-      roomIdRef.current = roomId; // 항상 최신 값으로 업데이트
+      roomIdRef.current = roomId;
     }
 
     const signaling = new SignalingClient(
@@ -374,8 +373,22 @@ export function useStudyRoom() {
             peerManagerRef.current?.setLocalStream(localStream);
           }
 
+          // 새 참가자를 participants 상태에 추가
+          setParticipants((prev) => {
+            const existingParticipant = prev.find(
+              (p) => p.id === data.senderId
+            );
+            if (!existingParticipant) {
+              console.log("새 참가자 추가:", data.senderId);
+              return [
+                ...prev,
+                { id: data.senderId, stream: null, isLocal: false },
+              ];
+            }
+            return prev;
+          });
+
           console.log("새 참여자 연결!");
-          // 서류 조회 코드 제거 - useEffect에서 처리
           return;
         }
         if (data.type === "leave") {
@@ -408,14 +421,25 @@ export function useStudyRoom() {
     };
 
     (async () => {
-      const local = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 960, max: 960 },
-          height: { ideal: 540, max: 540 },
-          frameRate: { ideal: 30, max: 30 },
-        },
-        audio: true,
-      });
+      let local: MediaStream;
+
+      // StudySetupPage에서 전달된 스트림이 있는지 확인
+      if (cameraStream || micStream) {
+        // cameraStream과 micStream이 같은 스트림인 경우
+        local = cameraStream || micStream!;
+        console.log("StudySetupPage에서 전달된 스트림 사용");
+      } else {
+        // 스트림이 없으면 새로 생성
+        local = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 960, max: 960 },
+            height: { ideal: 540, max: 540 },
+            frameRate: { ideal: 30, max: 30 },
+          },
+          audio: true,
+        });
+        console.log("새로운 스트림 생성");
+      }
 
       setLocalStream(local);
       startRecording(local);
@@ -427,7 +451,7 @@ export function useStudyRoom() {
       peerManager.setLocalStream(local);
       signaling.send({ type: "join", senderId: myId });
     })();
-  }, []);
+  }, []); // 의존성 배열을 비워서 한 번만 실행
 
   return {
     participants,

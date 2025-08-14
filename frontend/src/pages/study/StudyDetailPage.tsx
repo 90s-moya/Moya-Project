@@ -125,7 +125,7 @@ export default function StudyDetailPage() {
       const data = await registerForRoom(roomId);
       console.log("스터디 참여 등록 성공:", data);
 
-      navigate(`/mypage/room`);
+      navigate(`/mypage/studyRoom`);
     } catch (error) {
       console.error("스터디 등록 에러: ", error);
     }

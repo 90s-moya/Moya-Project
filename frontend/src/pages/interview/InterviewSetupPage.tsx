@@ -8,15 +8,46 @@ import Header from "@/components/common/Header"
 import ReadyModal from "@/components/interview/ReadyModal"
 import WebCalibration from "@/components/interview/WebCalibration"
 
-enum TestStatus { NotStarted, Testing, Completed, EyeTracking }
 
-function CountdownOverlay({ seconds, onDone }: { seconds: number; onDone: () => void }) {
+enum TestStatus {
+  NotStarted,
+  Testing,
+  Completed,
+  EyeTracking
+}
+
+
+function CountdownOverlay({
+  seconds,
+  onDone,
+}: {
+  seconds: number
+  onDone: () => void
+}) {
   const [left, setLeft] = useState(seconds)
-  useEffect(() => { setLeft(seconds); const id = setInterval(() => setLeft(v => (v <= 1 ? 0 : v - 1)), 1000); return () => clearInterval(id) }, [seconds])
-  useEffect(() => { if (left === 0) onDone() }, [left, onDone])
+
+  useEffect(() => {
+    setLeft(seconds)
+    const id = setInterval(() => {
+      setLeft(v => (v <= 1 ? 0 : v - 1))
+    }, 1000)
+
+    return () => clearInterval(id)
+  }, [seconds])
+
+  // 완료는 렌더 이후에만 콜백
+  useEffect(() => {
+    if (left === 0) onDone()
+  }, [left, onDone])
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
-      <div aria-live="assertive" className="text-white text-[96px] md:text-[120px] font-bold leading-none select-none drop-shadow">{left}</div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div
+        aria-live="assertive"
+        className="text-white text-[100px] md:text-[120px] font-bold leading-none select-none"
+      >
+        {left}
+      </div>
     </div>
   )
 }
@@ -33,6 +64,9 @@ export default function InterviewSetupPage() {
   const [countdownOn, setCountdownOn] = useState(false)
   const [calibrationOpen, setCalibrationOpen] = useState(false)
   const [eyeTrackingReady, setEyeTrackingReady] = useState(false)
+  const [calibrationKey, setCalibrationKey] = useState(0) // 캘리브레이션 컴포넌트 강제 리마운트용
+
+
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -67,13 +101,56 @@ export default function InterviewSetupPage() {
     })
   }
 
-  const startEyeTracking = () => { if (testStatus !== TestStatus.Completed) return; setCalibrationOpen(true) }
-  const handleCalibrationComplete = (calibrationData: any) => { console.log('Calibration completed:', calibrationData); setEyeTrackingReady(true); setCalibrationOpen(false) }
-  const handleCalibrationCancel = () => { setCalibrationOpen(false) }
+  // 시선추적 캘리브레이션 시작
+  const startEyeTracking = () => {
+    if (testStatus !== TestStatus.Completed) return
+    setCalibrationKey(prev => prev + 1) // 컴포넌트 강제 리마운트
+    setCalibrationOpen(true)
+    console.log('[SETUP] Starting calibration with fresh component (key:', calibrationKey + 1, ')')
+  }
 
+  // 캘리브레이션 완료 처리
+  const handleCalibrationComplete = (calibrationData: any) => {
+    console.log('Calibration completed:', calibrationData)
+    
+    // 로컬 스토리지에 캐시하여 다음에 사용
+    try {
+      localStorage.setItem('gaze_calibration_data', JSON.stringify({
+        ...calibrationData,
+        cached_at: new Date().toISOString()
+      }));
+      console.log('[SETUP] Calibration data cached locally');
+    } catch (error) {
+      console.warn('[SETUP] Failed to cache calibration data:', error);
+    }
+    
+    setEyeTrackingReady(true)
+    setCalibrationOpen(false)
+  }
+
+  // 캘리브레이션 취소
+  const handleCalibrationCancel = () => {
+    setCalibrationOpen(false)
+  }
+
+  // 시선 추적 재설정
+  const resetEyeTracking = () => {
+    localStorage.removeItem('gaze_calibration_data');
+    setEyeTrackingReady(false);
+    setCalibrationKey(prev => prev + 1); // 컴포넌트 강제 리마운트 준비
+    console.log('[SETUP] Calibration data cleared, component will be remounted on next start');
+  }
+
+  // 준비 안내 열기 (오디오 자동재생 정책 우회용 사용자 클릭 시점)
   const openReady = () => {
     if (testStatus !== TestStatus.EyeTracking) return
-    try { /* @ts-ignore */ if (window?.webAudioCtx && window.webAudioCtx.state === "suspended") { /* @ts-ignore */ window.webAudioCtx.resume() } } catch {}
+    try {
+      // @ts-ignore
+      if (window?.webAudioCtx && window.webAudioCtx.state === "suspended") {
+        // @ts-ignore
+        window.webAudioCtx.resume()
+      }
+    } catch {}
     setReadyOpen(true)
   }
   const handleReadyStart = () => { setReadyOpen(false); setCountdownOn(true) }
@@ -87,7 +164,7 @@ export default function InterviewSetupPage() {
     : isReadyToStart ? "bg-emerald-50 text-emerald-700"
     : "bg-blue-50 text-blue-700"
 
-  return (
+   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
       <Header scrollBg={false} />
 
@@ -167,7 +244,17 @@ export default function InterviewSetupPage() {
               </div>
 
               <div className={`rounded-xl p-4 border ${eyeTrackingReady ? "border-emerald-500 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                <div className="text-sm font-semibold text-slate-900">시선 추적</div>
+                              <div className="text-gray-800 font-semibold flex items-center gap-2"> 시선 추적
+                              {eyeTrackingReady && (
+                  <button 
+                    onClick={resetEyeTracking}
+                    className="text-xs bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-yellow-700"
+                    title="재캘리브레이션"
+                  >
+                    재설정
+                  </button>
+                )}
+                </div>
                 <div className="mt-1 text-xs text-slate-600">
                   {eyeTrackingReady ? "캘리브레이션 완료! 시선 추적이 준비되었습니다." : "시선 추적 캘리브레이션이 필요합니다."}
                 </div>
@@ -222,7 +309,8 @@ export default function InterviewSetupPage() {
       {/* 모달/오버레이/캘리브레이션 (로직 그대로) */}
       <ReadyModal open={readyOpen} onClose={() => setReadyOpen(false)} onStart={handleReadyStart} />
       {countdownOn && <CountdownOverlay seconds={3} onDone={handleCountdownDone} />}
-      <WebCalibration isOpen={calibrationOpen} onComplete={handleCalibrationComplete} onCancel={handleCalibrationCancel} />
+      <WebCalibration key={calibrationKey} isOpen={calibrationOpen} onComplete={handleCalibrationComplete} onCancel={handleCalibrationCancel} />
     </div>
   )
 }
+
