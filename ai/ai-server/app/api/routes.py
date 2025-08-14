@@ -465,7 +465,7 @@ async def analyze_complete(
 
     # (2) 분석 실행
     try:
-        out = analyze_all(data, device=device, stride=stride, return_points=return_points)
+        out = analyze_all(data, device=device, stride=stride, return_points=return_points, calib_data=parsed_calib_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"complete analysis 실패: {e}")
 
@@ -528,7 +528,7 @@ async def analyze_complete_by_url(
 
     # (3) 분석 실행
     try:
-        out = analyze_all(data, device=device, stride=stride, return_points=return_points)
+        out = analyze_all(data, device=device, stride=stride, return_points=return_points, calib_data=parsed_calib_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"URL 분석 실패: {e}")
     rel_video = to_files_relative(video_url)

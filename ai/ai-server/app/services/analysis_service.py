@@ -12,8 +12,10 @@ def analyze_all(
     device: str = "cpu",
     stride: int = 5,
     return_points: bool = False,
+    calib_data: dict = None,
 ):
-    """하나의 업로드 영상으로 Posture + Emotion + Gaze 동시 실행"""
+
+
     # 1) Posture 분석
     posture = analyze_video_bytes(video_bytes)
 
@@ -23,7 +25,13 @@ def analyze_all(
     # 3) Gaze 분석
     gaze = infer_gaze(video_bytes)
 
-    return {
+    print(f"[DEBUG] analyze_all results:")
+    print(f"[DEBUG] posture type: {type(posture)}")
+    print(f"[DEBUG] face type: {type(face)}")
+    print(f"[DEBUG] gaze type: {type(gaze)}")
+    print(f"[DEBUG] gaze content: {gaze}")
+
+    result = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "device": device,
         "stride": stride,
@@ -31,4 +39,7 @@ def analyze_all(
         "emotion": face,      # dominant + distribution (+ timeline)
         "gaze": gaze,         # 시선 추적 결과
     }
+    
+    print(f"[DEBUG] Final analyze_all result: {result}")
+    return result
 
