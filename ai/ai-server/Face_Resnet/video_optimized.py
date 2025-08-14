@@ -169,7 +169,9 @@ def analyze_video_bytes(
 ):
     import tempfile
     import os
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+    
+    # webm 파일도 지원하도록 일반적인 확장자 사용
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm')
     temp_file.write(video_bytes)
     temp_file.flush()
     temp_file.close()
@@ -228,7 +230,14 @@ def analyze_video(
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print(f"동영상 파일을 열 수 없습니다: {video_path}")
-        return
+        # webm 파일인 경우 다른 백엔드 시도
+        if video_path.endswith('.webm'):
+            cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+            if not cap.isOpened():
+                print(f"FFMPEG 백엔드로도 동영상 파일을 열 수 없습니다: {video_path}")
+                return
+        else:
+            return
 
     fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -237,7 +246,11 @@ def analyze_video(
 
     out = None
     if output_path:
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        # webm 출력 지원
+        if output_path.endswith('.webm'):
+            fourcc = cv2.VideoWriter_fourcc(*'VP80')  # VP8 코덱
+        else:
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
     detector = init_face_detector(min_conf=face_min_conf, model_selection=face_model_selection)
