@@ -2,7 +2,7 @@
 import axios from "axios"
 import type { CalibrationRequest, CalibrationResponse, TrackingInitRequest, GazeAnalysisResult } from '@/types/gaze'
 
-const GAZE_SERVER_URL = "http://localhost:5000"
+const GAZE_SERVER_URL = ""
 
 // 캘리브레이션 시작
 export const startCalibration = async (data: CalibrationRequest): Promise<CalibrationResponse> => {
