@@ -20,7 +20,7 @@ class ResNet18_Emotion(nn.Module):
 def load_model(ckpt_path: str | None, device="cpu", num_classes=7):
         model = ResNet18_Emotion(num_classes=num_classes, pretrained=True).to(device)
         if ckpt_path:
-            state = torch.load(ckpt_path, map_location=device)
+            state = torch.load(ckpt_path, map_location=device, weights_only=False)
             sd = state.get("state_dict", state)
             new_sd = {}
             for k, v in sd.items():
