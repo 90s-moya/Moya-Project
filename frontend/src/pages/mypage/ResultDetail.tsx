@@ -158,7 +158,7 @@ const ResultDetail: React.FC = () => {
                 {reportData?.video_url ? (
                   <video
                     ref={videoRef}
-                    src={reportData.video_url}
+                    src={`${import.meta.env.VITE_FILE_URL}${reportData.video_url}`}
                     controls
                     className="w-full h-full object-contain rounded-lg"
                   >
