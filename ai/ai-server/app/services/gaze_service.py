@@ -5,10 +5,10 @@ import sys
 import io
 import os
 import tempfile
-import importlib
+import json
 from pathlib import Path
 from functools import lru_cache
-from typing import Callable, Optional, Any, Dict
+from typing import Optional, Any, Dict
 
 
 # === Gaze_TR_pro 경로 등록 ===
@@ -19,127 +19,155 @@ AI_SERVER_ROOT = Path(__file__).resolve().parents[2]  # ai-server 디렉토리
 GAZE_DIR = AI_SERVER_ROOT / "Gaze_TR_pro"
 sys.path.append(str(GAZE_DIR))
 
-# 이 중에서 먼저 발견되는 모듈/함수를 엔트리로 사용
-ENTRY_MODULES = [
-    "gaze_wrapper",      # 외부 서비스용 래퍼 모듈 (우선)
-    "gaze_tracking",     # 시선 추적 메인 모듈
-    "gaze_calibration",  # 캘리브레이션 모듈
-    "run_simple_gui",    # 실행기
-]
-ENTRY_FUNCS = [
-    "infer_gaze",        # gaze_wrapper.infer_gaze (메인 함수)
-    "run_gaze_once",     # gaze_wrapper.run_gaze_once
-    "process_video_file", # gaze_wrapper.process_video_file
-    "main",
-    "run",
-]
+# 캘리브레이션과 시선 추적 모듈 직접 임포트
+try:
+    from gaze_calibration import GazeCalibrator
+    from gaze_tracking import GazeTracker
+except ImportError as e:
+    print(f"Warning: Could not import gaze modules: {e}")
+    GazeCalibrator = None
+    GazeTracker = None
 
 
-def _find_entrypoint() -> Callable[..., Any]:
-    """Gaze_TR_pro 내부에서 실행 함수(엔트리포인트) 자동 탐색."""
-    last_err = None
-    for modname in ENTRY_MODULES:
-        try:
-            mod = importlib.import_module(modname)
-        except Exception as e:
-            last_err = e
-            continue
-
-        # 1) 모듈에 위 후보 함수명이 있으면 그걸 사용
-        for fname in ENTRY_FUNCS:
-            fn = getattr(mod, fname, None)
-            if callable(fn):
-                return fn
-
-        # 2) 모듈에 CLI 스타일 main이 있고, input_path/비디오를 받는 형태면 그걸로 시도
-        if hasattr(mod, "__call__") and callable(mod):
-            return mod  # type: ignore
-
-    raise ImportError(
-        f"gaze entrypoint not found. tried modules={ENTRY_MODULES}, funcs={ENTRY_FUNCS}, last_err={last_err}"
-    )
+# 전역 캘리브레이터와 트래커 인스턴스
+_calibrator_instance = None
+_tracker_instance = None
 
 
-@lru_cache(maxsize=1)
-def get_gaze_runtime(calib_path: Optional[str] = None) -> Dict[str, Any]:
-    """
-    런타임 준비 (캘리브 파일 등). 필요 없으면 그대로 둬도 됨.
-    """
-    # 시선 추적 캘리브레이션 파일 찾기 (calibration_data 폴더에서)
-    default_calib_dir = GAZE_DIR / "calibration_data"
-    default_calib = None
-    if default_calib_dir.exists():
-        # JSON 캘리브레이션 파일만 찾기 (시선 추적용)
-        cand = next(default_calib_dir.glob("*.json"), None)
-        if cand:
-            default_calib = str(cand)
-
-    return {
-        "ready": True,
-        "calib_path": calib_path or default_calib,
-        "entrypoint": _find_entrypoint(),
-    }
+def get_calibrator(screen_width=1920, screen_height=1080, window_width=1344, window_height=756) -> 'GazeCalibrator':
+    """캘리브레이터 인스턴스 획득 (싱글톤)"""
+    global _calibrator_instance
+    if _calibrator_instance is None:
+        if GazeCalibrator is None:
+            raise ImportError("GazeCalibrator not available")
+        _calibrator_instance = GazeCalibrator(screen_width, screen_height, window_width, window_height)
+    return _calibrator_instance
 
 
-def _call_entry(fn: Callable[..., Any], input_path: str, calib_path: Optional[str]) -> Any:
-    """
-    엔트리 함수 시그니처가 제각각일 수 있으니, 흔한 패턴들을 순서대로 시도.
-    gaze_wrapper.infer_gaze(video_path, calib_path) 시그니처를 우선으로 한다.
-    """
-    # gaze_wrapper 모듈의 표준 시그니처
+def get_tracker(screen_width=1920, screen_height=1080, window_width=1344, window_height=756) -> 'GazeTracker':
+    """트래커 인스턴스 획득 (싱글톤)"""
+    global _tracker_instance
+    if _tracker_instance is None:
+        if GazeTracker is None:
+            raise ImportError("GazeTracker not available")
+        _tracker_instance = GazeTracker(screen_width, screen_height, window_width, window_height)
+    return _tracker_instance
+
+
+# === 캘리브레이션 관련 함수들 ===
+def start_calibration(screen_width=1920, screen_height=1080, window_width=1344, window_height=756) -> Dict[str, Any]:
+    """캘리브레이션 시작"""
     try:
-        return fn(video_path=input_path, calib_path=calib_path)
-    except TypeError:
-        pass
+        calibrator = get_calibrator(screen_width, screen_height, window_width, window_height)
+        return {
+            "status": "success",
+            "message": "Calibration initialized",
+            "targets": calibrator.calib_targets
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
+
+def add_calibration_point(gaze_vector: list, target_point: tuple) -> Dict[str, Any]:
+    """캘리브레이션 포인트 추가"""
     try:
-        return fn(video_path=input_path)
-    except TypeError:
-        pass
+        calibrator = get_calibrator()
+        calibrator.add_calibration_point(gaze_vector, target_point)
+        return {
+            "status": "success", 
+            "message": f"Added calibration point: {target_point}",
+            "total_points": len(calibrator.calib_points)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
-    # 다른 일반적인 케이스들
+
+def run_calibration(mode="quick") -> Dict[str, Any]:
+    """캘리브레이션 실행"""
     try:
-        return fn(input_path=input_path, calib_path=calib_path)
-    except TypeError:
-        pass
+        calibrator = get_calibrator()
+        result = calibrator.run_calibration(mode=mode)
+        return {"status": "success", "calibration_result": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
+
+def save_calibration(filename: Optional[str] = None) -> Dict[str, Any]:
+    """캘리브레이션 데이터 저장"""
     try:
-        return fn(input_path)
-    except TypeError:
-        pass
+        calibrator = get_calibrator()
+        filepath = calibrator.save_calibration_data(filename)
+        return {"status": "success", "filepath": filepath}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
+
+def list_calibrations() -> Dict[str, Any]:
+    """저장된 캘리브레이션 목록"""
     try:
-        return fn(input_path, calib_path)
-    except TypeError:
-        pass
+        calib_dir = GAZE_DIR / "calibration_data"
+        if not calib_dir.exists():
+            return {"status": "success", "calibrations": []}
+        
+        calibrations = []
+        for file in calib_dir.glob("*.json"):
+            calibrations.append({
+                "filename": file.name,
+                "filepath": str(file),
+                "created": file.stat().st_mtime
+            })
+        
+        return {"status": "success", "calibrations": calibrations}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
-    # 마지막으로 인자 없이 동작하는 경우
-    return fn()
+
+# === 시선 추적 관련 함수들 ===
+def load_calibration_for_tracking(calib_path: str) -> Dict[str, Any]:
+    """시선 추적용 캘리브레이션 로드"""
+    try:
+        tracker = get_tracker()
+        with open(calib_path, 'r') as f:
+            calib_data = json.load(f)
+        
+        # 캘리브레이션 데이터를 트래커에 로드
+        tracker.calib_vectors = calib_data.get('calib_vectors', [])
+        tracker.calib_points = calib_data.get('calib_points', [])
+        tracker.transform_matrix = calib_data.get('transform_matrix')
+        tracker.transform_method = calib_data.get('transform_method')
+        
+        return {"status": "success", "message": "Calibration loaded for tracking"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 def infer_gaze(video_bytes: bytes, calib_path: Optional[str] = None) -> Dict[str, Any]:
     """
-    업로드된 비디오 바이트 -> 임시 파일 저장 -> Gaze_TR_pro 엔트리 호출 -> 결과 반환
-    반환 타입은 엔트리 함수가 주는 구조를 그대로 감싸서 돌려줍니다.
+    업로드된 비디오 바이트에서 시선 추적 수행
     """
-    rt = get_gaze_runtime(calib_path=calib_path)
-    fn = rt["entrypoint"]
-
-    # 임시 mp4 파일 저장
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-        tmp.write(video_bytes)
-        input_path = tmp.name
-
     try:
-        result = _call_entry(fn, input_path=input_path, calib_path=rt["calib_path"])
-        # 결과가 None/비구조면 간단히 래핑
-        if result is None or isinstance(result, (str, bytes)):
-            return {"ok": True, "result": result}
-        if not isinstance(result, dict):
-            return {"ok": True, "result": repr(result)}
-        return {"ok": True, **result}
-    finally:
+        tracker = get_tracker()
+        
+        # 캘리브레이션 파일이 제공된 경우 로드
+        if calib_path:
+            load_result = load_calibration_for_tracking(calib_path)
+            if load_result["status"] == "error":
+                return load_result
+        
+        # 임시 mp4 파일 저장
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+            tmp.write(video_bytes)
+            input_path = tmp.name
+
         try:
-            os.remove(input_path)
-        except Exception:
-            pass
+            # 시선 추적 실행
+            result = tracker.process_video_file(input_path)
+            return {"ok": True, "result": result}
+        finally:
+            try:
+                os.remove(input_path)
+            except Exception:
+                pass
+                
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
