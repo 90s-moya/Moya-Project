@@ -1,5 +1,4 @@
 import { Button } from '@/components/ui/button';
-import { useAnswerRecorder } from '@/lib/recording/useAnswerRecorder';
 import { type QuestionKey } from '@/types/interview';
 import { useInterviewAnswerStore } from '@/store/interviewAnswerStore';
 import { useEffect, useRef } from 'react';
@@ -8,11 +7,15 @@ type Props = {
   keyInfo: QuestionKey;
   // TTS 컴포넌트에서 내려주는 완료 플래그
   ttsFinished: boolean;
+  // 상위에서 내려받은 녹음 제어/상태
+  start: () => void;
+  stop: () => void;
+  isRecording: boolean;
+  error: string | null;
+  videoStream: MediaStream | null;
 };
 
-export default function AnswerRecorder({ keyInfo, ttsFinished }: Props) {
-  const { start, stop, isRecording, seconds, error, videoStream } =
-    useAnswerRecorder({ key: keyInfo });
+export default function AnswerRecorder({ keyInfo, ttsFinished, start, stop, isRecording, error, videoStream }: Props) {
   const saved = useInterviewAnswerStore((s) => s.getByKey(keyInfo));
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -52,15 +55,15 @@ export default function AnswerRecorder({ keyInfo, ttsFinished }: Props) {
 
   return (
     <div>
-      <div className="flex items-center gap-3">
-        <div className="text-sm tabular-nums">{seconds}s</div>
-
+      <div className="flex items-center gap-3"> 
         {/* 시작 버튼 삭제, 종료만 남김 */}
-        {isRecording && (
+        {/* {isRecording && (
           <Button variant="destructive" onClick={stop}>
-            녹음 종료
+            녹음 종
           </Button>
-        )}
+              
+
+        )} */}
 
         {error && <span className="text-red-600 text-xs">{error}</span>}
         {saved?.syncStatus === 'synced' && (
@@ -80,10 +83,6 @@ export default function AnswerRecorder({ keyInfo, ttsFinished }: Props) {
         />
       )}
 
-      {/* 로컬 미리듣기 */}
-      {saved?.localBlobUrl && (
-        <audio className="mt-2 w-full" controls src={saved.localBlobUrl} />
-      )}
     </div>
   );
 }
