@@ -41,7 +41,7 @@ public class InterviewService {
             UUID sessionId, int order, int subOrder, MultipartFile audio
     ) throws IOException {
 
-        // --- text parts
+        // ---------- 텍스트 파트 ----------
         HttpHeaders textHeaders = new HttpHeaders();
         textHeaders.setContentType(MediaType.TEXT_PLAIN);
 
@@ -50,20 +50,55 @@ public class InterviewService {
         body.add("order",      new HttpEntity<>(String.valueOf(order), textHeaders));
         body.add("sub_order",  new HttpEntity<>(String.valueOf(subOrder), textHeaders));
 
-        // --- file part
+        // ---------- 파일 파트 (WAV만 허용) ----------
         String filename = (audio.getOriginalFilename() != null && !audio.getOriginalFilename().isBlank())
                 ? audio.getOriginalFilename() : "audio.wav";
 
-        HttpHeaders fileHeaders = new HttpHeaders();
-        fileHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        fileHeaders.setContentDisposition(ContentDisposition.formData().name("audio").filename(filename).build());
+        // 파일 바이트 미리 로드
+        byte[] bytes = audio.getBytes();
+        if (bytes.length == 0) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "빈 파일");
+        }
 
-        ByteArrayResource resource = new ByteArrayResource(audio.getBytes()) {
+        // 1) MIME 1차 검사: WAV만 허용
+        String ct = (audio.getContentType() != null) ? audio.getContentType().toLowerCase() : "";
+        boolean isWavMime = ct.equals("audio/wav") || ct.equals("audio/x-wav") || ct.equals("audio/wave");
+        if (!isWavMime) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                    "WAV(PCM) 파일만 업로드 가능합니다. 현재 Content-Type=" + (ct.isEmpty() ? "<none>" : ct)
+            );
+        }
+
+        // 2) 헤더 2차 검사: 'RIFF....WAVE' 시그니처 확인
+        boolean isWavHeader = bytes.length >= 12
+                && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes[8] == 'W' && bytes[9] == 'A' && bytes[10] == 'V' && bytes[11] == 'E';
+        if (!isWavHeader) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                    "WAV(PCM) 파일만 지원합니다 (RIFF/WAVE 헤더 없음)"
+            );
+        }
+
+        // 3) 파일 파트: 원본 Content-Type 유지 (octet-stream으로 덮어쓰지 말 것)
+        HttpHeaders fileHeaders = new HttpHeaders();
+        try {
+            fileHeaders.setContentType(MediaType.parseMediaType(ct));
+        } catch (Exception ignore) {
+            fileHeaders.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        }
+        fileHeaders.setContentDisposition(
+                ContentDisposition.formData().name("audio").filename(filename).build()
+        );
+
+        ByteArrayResource resource = new ByteArrayResource(bytes) {
             @Override public String getFilename() { return filename; }
         };
         body.add("audio", new HttpEntity<>(resource, fileHeaders));
 
-        // --- whole request
+        // ---------- 전체 요청 ----------
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
@@ -78,7 +113,6 @@ public class InterviewService {
         );
         return resp.getBody();
     }
-
     public InterviewVideoCommand createInterviewVideo(UploadInterviewVideoRequest request, String folder) throws IOException {
         MultipartFile file = request.getFile();
         MultipartFile thumbnail = request.getThumbnail();
