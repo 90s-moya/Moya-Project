@@ -34,6 +34,7 @@ public class RoomMemberService {
         UUID roomId = uploadRequest.getRoomId();
         MultipartFile file = uploadRequest.getFile();
         LocalDateTime videoStart = uploadRequest.getVideoStart();
+        int  videoFps = uploadRequest.getVideoFps();
 
         // 존재하는 방인지 확인
         Room room = roomRepository.findById(roomId).orElseThrow(() -> new RuntimeException("존재하지 않는 방입니다."));
@@ -45,7 +46,7 @@ public class RoomMemberService {
         String filePath = fileStorageService.saveOther(file, "study");
 
         // DB에 저장
-        roomMemberRepository.saveVideo(userId, roomId, filePath, videoStart);
+        roomMemberRepository.saveVideo(userId, roomId, filePath, videoStart, videoFps);
 
         return filePath;
     }

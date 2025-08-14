@@ -13,4 +13,5 @@ public class UploadVideoRequest {
     private MultipartFile file;
     private UUID roomId;
     private LocalDateTime videoStart;
+    private int videoFps;
 }
