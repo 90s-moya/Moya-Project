@@ -1,5 +1,5 @@
 // src/components/interview/QuestionTTS.tsx
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBrowserTTS, type Segment } from "@/hooks/useBrowserTTS";
 
 type Props = {
@@ -29,7 +29,7 @@ export default function QuestionTTS({
   debug = false,
   nonce = 0,
 }: Props) {
-  const { ready, speakSequence, cancel } = useBrowserTTS(lang);
+  const { ready, speakSequence, cancel, userInteracted } = useBrowserTTS(lang);
 
   // 레이스 컨디션 방지 토큰
   const tokenRef = useRef(0);
@@ -66,6 +66,8 @@ export default function QuestionTTS({
   };
 
   useEffect(() => {
+    console.log("[QuestionTTS] useEffect 시작:", { autoplay, ready, storageKey, lang, voiceName, style });
+    
     // 이전 타이머 정리
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -73,29 +75,38 @@ export default function QuestionTTS({
     }
 
     if (!autoplay || !ready) {
-      if (debug) console.log("[QuestionTTS] skip autoplay:", { autoplay, ready });
+      console.log("[QuestionTTS] skip autoplay:", { autoplay, ready });
       return;
     }
 
+    // 즉시 재생 모드 - 인터랙션 체크 제거
+
     const text = (localStorage.getItem(storageKey) || "").trim();
+    console.log("[QuestionTTS] localStorage에서 가져온 텍스트:", text);
+    
     if (!text) {
-      if (debug) console.warn(`[QuestionTTS] '${storageKey}' 값이 비어있음`);
+      console.warn(`[QuestionTTS] '${storageKey}' 값이 비어있음`);
       return;
     }
 
     const my = ++tokenRef.current;
     const segments = toSegments(text);
+    console.log("[QuestionTTS] 생성된 segments:", segments);
 
     // 새 시퀀스 시작 전 큐/타이머 정리는 hook의 speakSequence에서 처리
     (async () => {
       try {
-        if (debug) console.log("[QuestionTTS] speakSequence start", { style, lang, voiceName, segments });
+        console.log("[QuestionTTS] speakSequence 시작 호출", { style, lang, voiceName, segments });
         onStart?.();
         await speakSequence(segments, { lang, voiceName });
-        if (tokenRef.current !== my) return;
-        if (debug) console.log("[QuestionTTS] speakSequence end →", delayMs, "ms 대기");
+        if (tokenRef.current !== my) {
+          console.log("[QuestionTTS] 토큰 불일치로 중단됨");
+          return;
+        }
+        console.log("[QuestionTTS] speakSequence 완료 →", delayMs, "ms 대기");
         timerRef.current = window.setTimeout(() => {
           if (tokenRef.current !== my) return;
+          console.log("[QuestionTTS] onQuestionEnd 콜백 실행");
           onQuestionEnd?.();
           if (timerRef.current) {
             clearTimeout(timerRef.current);
@@ -104,8 +115,19 @@ export default function QuestionTTS({
         }, delayMs);
       } catch (e) {
         if (tokenRef.current !== my) return;
-        if (debug) console.error("[QuestionTTS] speakSequence error", e);
-        onError?.(e);
+        console.error("[QuestionTTS] speakSequence 에러", e);
+        // not-allowed 에러는 무시하고 다음 단계로 진행
+        if (e?.error !== 'not-allowed') {
+          onError?.(e);
+        } else {
+          console.warn("[QuestionTTS] TTS 차단됨 - 다음 단계로 진행");
+          // 차단되어도 콜백 실행하여 다음 단계 진행
+          setTimeout(() => {
+            if (tokenRef.current === my) {
+              onQuestionEnd?.();
+            }
+          }, delayMs);
+        }
       }
     })();
 
@@ -120,6 +142,8 @@ export default function QuestionTTS({
     };
     // ready가 true로 바뀌거나, nonce가 바뀌면 재시도됨
   }, [autoplay, ready, storageKey, lang, voiceName, style, delayMs, debug, nonce, speakSequence, cancel, onQuestionEnd, onStart, onError]);
+
+
 
   return null;
 }

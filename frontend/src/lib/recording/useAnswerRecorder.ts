@@ -96,6 +96,9 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
     if (!mediaRecorderRef.current) return;
     if (timerRef.current) clearInterval(timerRef.current);
     setIsRecording(false);
+    // 잔여 버퍼 즉시 플러시 시도 후 정지
+    try { mediaRecorderRef.current.requestData?.(); } catch {}
+    try { videoRecorderRef.current?.requestData?.(); } catch {}
     mediaRecorderRef.current.stop();
     // 비디오도 멈춤
     if (videoRecorderRef.current?.state !== 'inactive') {
@@ -314,10 +317,7 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
           console.log("==========비디오 레츠고 ======", urls);
 
 
-          // 카메라 끄기
-          stream.getTracks().forEach((t) => t.stop());
-          setVideoStream(null)
-
+          // 카메라를 항상 유지: 트랙/스트림은 유지하고 레코더만 정리
           videoRecorderRef.current = null;
           if (drawTimerRef.current) { clearInterval(drawTimerRef.current); drawTimerRef.current = null; }
           processedStreamRef.current = null;
