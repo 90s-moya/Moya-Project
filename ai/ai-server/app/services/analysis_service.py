@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 from app.utils.posture import analyze_video_bytes
-from app.services.gaze_service import infer_gaze
+# from app.services.gaze_service import infer_gaze ## 추후 gaze 관련 복구 바랍니다.
 from app.services.face_service import infer_face_video
 
 def analyze_all(
@@ -17,11 +17,11 @@ def analyze_all(
     with ThreadPoolExecutor(max_workers=3) as ex:
         f_posture = ex.submit(analyze_video_bytes, video_bytes)
         f_face    = ex.submit(infer_face_video, video_bytes, device, stride, None, return_points)
-        f_gaze    = ex.submit(infer_gaze, video_bytes)
+        # f_gaze    = ex.submit(infer_gaze, video_bytes)
 
         posture = f_posture.result()
         face    = f_face.result()
-        gaze    = f_gaze.result()
+        # gaze    = f_gaze.result()
 
     return {
         "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -29,6 +29,6 @@ def analyze_all(
         "stride": stride,
         "posture": posture,   # 자세 리포트 (요약/로그)
         "emotion": face,      # dominant + distribution (+ timeline)
-        "gaze": gaze,         # 시선 추적 결과
+        # "gaze": gaze,         # 시선 추적 결과
     }
 
