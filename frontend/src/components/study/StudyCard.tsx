@@ -35,7 +35,7 @@ export default function StudyCard({
         shouldGrayOut
           ? "bg-[#f5f5f5] border border-[#e0e0e0] opacity-50"
           : shouldHighlight
-          ? "bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-[#2B7FFF] shadow-md"
+          ? "bg-gradient-to-br border-2 border-[#2B7FFF] shadow-md"
           : "bg-[#fafafc] border border-[#dedee4]"
       }`}
     >
