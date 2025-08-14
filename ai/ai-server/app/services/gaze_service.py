@@ -5,6 +5,7 @@ import sys
 import os
 import tempfile
 import json
+import cv2
 from pathlib import Path
 from typing import Optional, Any, Dict
 
@@ -39,14 +40,8 @@ def get_tracker(screen_width=1920, screen_height=1080, window_width=1344, window
     global _tracker_instance
     if _tracker_instance is None:
         if GazeTracker is None:
-            raise ImportError("GazeTracker module not available - check Gaze_TR_pro installation")
-        
-        try:
-            _tracker_instance = GazeTracker(screen_width, screen_height, window_width, window_height)
-            print(f"[DEBUG] GazeTracker initialized: {type(_tracker_instance)}")
-        except Exception as e:
-            print(f"[ERROR] Failed to initialize GazeTracker: {e}")
-            raise ImportError(f"Failed to create GazeTracker instance: {e}")
+            raise ImportError("GazeTracker not available")
+        _tracker_instance = GazeTracker(screen_width, screen_height, window_width, window_height)
     return _tracker_instance
 
 
@@ -112,7 +107,7 @@ def list_calibrations() -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-# === 시선 추적 ===
+# === 로컬 스토리지에서 캘리브레이션 불러오기 ===
 def load_calibration_from_localstorage() -> Dict[str, Any]:
     try:
         frontend_root = AI_SERVER_ROOT.parent / "frontend"
@@ -172,6 +167,7 @@ def load_calibration_for_tracking(calib_path: str = None, calib_data: dict = Non
         return {"status": "error", "message": str(e)}
 
 
+# === 시선 추적 (프레임 기반 처리) ===
 def infer_gaze(
     video_bytes: bytes,
     calib_path: Optional[str] = None,
@@ -179,37 +175,24 @@ def infer_gaze(
     use_localstorage: bool = True
 ) -> Dict[str, Any]:
     """
-    업로드된 비디오 바이트에서 시선 추적 수행
+    업로드된 비디오 바이트에서 시선 추적 수행 (프레임 기반)
+    MARK chunk 문제를 피하기 위해 process_frames 사용
     """
     print(f"[DEBUG] infer_gaze called with video_bytes length: {len(video_bytes)}")
     print(f"[DEBUG] calib_data provided: {calib_data is not None}")
     print(f"[DEBUG] use_localstorage: {use_localstorage}")
-    
+
     try:
-        # Gaze 모듈 사용 가능성 체크
-        if GazeTracker is None:
-            print("[WARNING] GazeTracker module not available, returning mock result")
-            return {
-                "ok": False,
-                "error": "Gaze tracking module not available",
-                "calibration_status": {
-                    "loaded": False,
-                    "source": "none",
-                    "message": "GazeTracker module import failed"
-                }
-            }
-            
         tracker = get_tracker()
         calibration_loaded = False
         calibration_source = "none"
 
-        # 1. 외부에서 캘리브레이션 데이터를 직접 전달받은 경우
+        # 1. 외부에서 calib_data 직접 전달
         if calib_data is not None:
             load_result = load_calibration_for_tracking(calib_data=calib_data)
             if load_result["status"] == "success":
                 calibration_loaded = True
                 calibration_source = "provided_data"
-                print("[INFO] Calibration loaded from provided calib_data")
 
         # 2. 로컬 스토리지 자동 로드
         elif use_localstorage:
@@ -219,7 +202,6 @@ def infer_gaze(
                 if load_result["status"] == "success":
                     calibration_loaded = True
                     calibration_source = "local_storage"
-                    print(f"[INFO] Loaded calibration from local storage: {localstorage_result['file_path']}")
 
         # 3. 파일 경로 제공
         elif calib_path:
@@ -227,70 +209,39 @@ def infer_gaze(
             if load_result["status"] == "success":
                 calibration_loaded = True
                 calibration_source = "provided_path"
-                print(f"[INFO] Loaded calibration from provided path: {calib_path}")
-            else:
-                return load_result
 
-        if not calibration_loaded:
-            print("[WARNING] No calibration data found. Using default mapping.")
-
-        # 비디오 파일 형식 추정
-        if video_bytes.startswith(b'RIFF') and b'WEBP' in video_bytes[:50]:
-            suffix = ".webm"
-        else:
-            suffix = ".mp4"
-            
-        # 비디오 임시 파일 저장
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        # === 프레임 추출 ===
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
             tmp.write(video_bytes)
-            input_path = tmp.name
+            tmp_path = tmp.name
 
-        try:
-            print(f"[DEBUG] Starting video processing with tracker (file: {input_path})...")
-            
-            # GazeTracker가 제대로 초기화되었는지 확인
-            if not hasattr(tracker, 'process_video_file'):
-                raise AttributeError("GazeTracker에 process_video_file 메서드가 없습니다")
-                
-            result = tracker.process_video_file(input_path)
-            print(f"[DEBUG] Tracker result type: {type(result)}")
-            
-            # 결과가 None이거나 빈 값인 경우 처리
-            if result is None:
-                print("[WARNING] Gaze tracking returned None result")
-                result = {"error": "No gaze tracking result"}
-            
-            final_result = {
-                "ok": True,
-                "result": result,
-                "calibration_status": {
-                    "loaded": calibration_loaded,
-                    "source": calibration_source,
-                    "message": "Calibration applied successfully" if calibration_loaded
-                               else "No calibration applied - using default mapping"
-                }
+        cap = cv2.VideoCapture(tmp_path)
+        frames = []
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+        cap.release()
+        os.remove(tmp_path)
+
+        if not frames:
+            return {"ok": False, "error": "No frames extracted from video"}
+
+        print(f"[DEBUG] Extracted {len(frames)} frames, starting gaze tracking...")
+
+        result = tracker.process_frames(frames)
+
+        return {
+            "ok": True,
+            "result": result,
+            "calibration_status": {
+                "loaded": calibration_loaded,
+                "source": calibration_source,
+                "message": "Calibration applied successfully" if calibration_loaded
+                           else "No calibration applied - using default mapping"
             }
-            print(f"[DEBUG] Final gaze result prepared")
-            return final_result
-            
-        except Exception as e:
-            print(f"[ERROR] Gaze tracking failed: {str(e)}")
-            return {
-                "ok": False,
-                "error": f"Gaze tracking failed: {str(e)}",
-                "calibration_status": {
-                    "loaded": calibration_loaded,
-                    "source": calibration_source
-                }
-            }
-        finally:
-            try:
-                if os.path.exists(input_path):
-                    os.remove(input_path)
-                    print(f"[DEBUG] Cleaned up temp file: {input_path}")
-            except Exception as e:
-                print(f"[WARNING] Failed to clean up temp file: {e}")
+        }
 
     except Exception as e:
-        print(f"[DEBUG] infer_gaze exception: {e}")
         return {"ok": False, "error": str(e)}
