@@ -15,7 +15,15 @@ declare var ImageCapture: {
   prototype: ImageCapture;
   new (videoTrack: MediaStreamTrack): ImageCapture;
 };
-export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionKey; maxDurationSec?: number; }) {
+export function useAnswerRecorder({ 
+  key, 
+  maxDurationSec = 60,
+  onUploadComplete
+}: { 
+  key: QuestionKey; 
+  maxDurationSec?: number;
+  onUploadComplete?: () => void;
+}) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
@@ -36,6 +44,42 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
 
   // 썸네일 추가
   const thumbBlobRef = useRef<Blob | null>(null);
+
+  // 업로드 완료 상태 추적
+  const [audioUploaded, setAudioUploaded] = useState(false);
+  const [videoUploaded, setVideoUploaded] = useState(false);
+
+  // 질문이 바뀔 때마다 녹음 상태 리셋
+  useEffect(() => {
+    // 기존 타이머 정리
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // 상태 초기화
+    setIsRecording(false);
+    setSeconds(0);
+    setError(null);
+    setAudioUploaded(false);
+    setVideoUploaded(false);
+    
+    // 기존 레코더 정리
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    if (videoRecorderRef.current?.state === 'recording') {
+      videoRecorderRef.current.stop();
+    }
+    
+    // ref 초기화
+    mediaRecorderRef.current = null;
+    videoRecorderRef.current = null;
+    chunksRef.current = [];
+    videoChunksRef.current = [];
+    
+    // 카메라 스트림은 유지 (사용자가 명시적으로 동의한 환경)
+  }, [key.sessionId, key.order, key.subOrder]);
 
   // 썸네일 함수
   const captureThumbFromStream = async (stream: MediaStream): Promise<Blob | null> => {
@@ -230,6 +274,7 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
 
         // 응답 바디가 없다 → 성공만 표기
         markSynced(key, {});
+        setAudioUploaded(true);
       } catch (e: any) {
         setError(e?.message ?? 'upload failed');
         markFailed(key, e?.message ?? 'upload failed');
@@ -281,6 +326,7 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
 
           // 카메라를 항상 유지: 트랙/스트림은 유지하고 레코더만 정리
           videoRecorderRef.current = null;
+          setVideoUploaded(true);
 
         };
     
@@ -294,7 +340,13 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
     timerRef.current = window.setInterval(() => {
       setSeconds((s) => { const n = s + 1; if (n >= maxDurationSec) stop(); return n; });
     }, 1000);
-  }, [key, maxDurationSec, setLocalPending, markSynced, markFailed, seconds, stop, seconds]);
+  }, [key, maxDurationSec, setLocalPending, markSynced, markFailed, stop]);
+
+  useEffect(() => {
+    if (onUploadComplete && audioUploaded && videoUploaded) {
+      onUploadComplete();
+    }
+  }, [audioUploaded, videoUploaded, onUploadComplete]);
 
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
