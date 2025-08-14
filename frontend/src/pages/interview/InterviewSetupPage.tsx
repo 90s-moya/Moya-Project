@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button"
 import { useNavigate } from "react-router-dom"
 import Header from "@/components/common/Header"
 import ReadyModal from "@/components/interview/ReadyModal"
+import WebCalibration from "@/components/interview/WebCalibration"
 
 
 enum TestStatus {
   NotStarted,
   Testing,
-  Completed
+  Completed,
+  EyeTracking
 }
 
 
@@ -61,20 +63,25 @@ export default function InterviewSetupPage() {
   const [cameraLabel, setCameraLabel] = useState("")
   const [readyOpen, setReadyOpen] = useState(false)
   const [countdownOn, setCountdownOn] = useState(false)
+  const [calibrationOpen, setCalibrationOpen] = useState(false)
+  const [eyeTrackingReady, setEyeTrackingReady] = useState(false)
 
   const navigate = useNavigate()
 
   // 완료 조건 모니터링
   useEffect(() => {
-    if (micReady && cameraReady) {
+    if (micReady && cameraReady && !eyeTrackingReady) {
       setTestStatus(TestStatus.Completed)
+    } else if (micReady && cameraReady && eyeTrackingReady) {
+      setTestStatus(TestStatus.EyeTracking)
     }
-  }, [micReady, cameraReady])
+  }, [micReady, cameraReady, eyeTrackingReady])
 
   const resetState = () => {
     setMicLevel(0)
     setMicReady(false)
     setCameraReady(false)
+    setEyeTrackingReady(false)
     setTestStatus(TestStatus.NotStarted)
   }
 
@@ -115,9 +122,27 @@ export default function InterviewSetupPage() {
     })
   }
 
+  // 시선추적 캘리브레이션 시작
+  const startEyeTracking = () => {
+    if (testStatus !== TestStatus.Completed) return
+    setCalibrationOpen(true)
+  }
+
+  // 캘리브레이션 완료 처리
+  const handleCalibrationComplete = (calibrationData: any) => {
+    console.log('Calibration completed:', calibrationData)
+    setEyeTrackingReady(true)
+    setCalibrationOpen(false)
+  }
+
+  // 캘리브레이션 취소
+  const handleCalibrationCancel = () => {
+    setCalibrationOpen(false)
+  }
+
   // 준비 안내 열기 (오디오 자동재생 정책 우회용 사용자 클릭 시점)
   const openReady = () => {
-    if (testStatus !== TestStatus.Completed) return
+    if (testStatus !== TestStatus.EyeTracking) return
     try {
       // @ts-ignore
       if (window?.webAudioCtx && window.webAudioCtx.state === "suspended") {
@@ -177,12 +202,21 @@ export default function InterviewSetupPage() {
               </div>
             </div>
 
-            <div className={`rounded-lg p-3 border ${testStatus === TestStatus.Completed ? "border-green-500 bg-green-50" : "border-gray-300"}`}>
+            <div className={`rounded-lg p-3 border ${testStatus === TestStatus.Completed || testStatus === TestStatus.EyeTracking ? "border-green-500 bg-green-50" : "border-gray-300"}`}>
               <div className="text-gray-800 font-semibold">마이크</div>
               <div className="text-sm text-gray-600 mt-1">
-                {testStatus === TestStatus.Completed
+                {testStatus === TestStatus.Completed || testStatus === TestStatus.EyeTracking
                   ? "✅ 확인 성공! 마이크가 정상적으로 작동합니다."
                   : micLabel || "마이크 장치를 찾는 중..."}
+              </div>
+            </div>
+
+            <div className={`rounded-lg p-3 border ${eyeTrackingReady ? "border-green-500 bg-green-50" : "border-gray-300"}`}>
+              <div className="text-gray-800 font-semibold">시선 추적</div>
+              <div className="text-sm text-gray-600 mt-1">
+                {eyeTrackingReady
+                  ? "✅ 캘리브레이션 완료! 시선 추적이 준비되었습니다."
+                  : "시선 추적 캘리브레이션이 필요합니다."}
               </div>
             </div>
 
@@ -216,6 +250,23 @@ export default function InterviewSetupPage() {
                 테스트 다시하기
               </Button>
               <Button
+                onClick={startEyeTracking}
+                className="px-6 py-2 text-white bg-green-500 hover:bg-green-600"
+              >
+                시선 추적 설정
+              </Button>
+            </>
+          )}
+
+          {testStatus === TestStatus.EyeTracking && (
+            <>
+              <Button
+                onClick={resetState}
+                className="px-6 py-2 text-white bg-blue-500 hover:bg-blue-600"
+              >
+                테스트 다시하기
+              </Button>
+              <Button
                 onClick={openReady}
                 className="px-6 py-2 text-white bg-blue-500 hover:bg-blue-600"
               >
@@ -237,6 +288,13 @@ export default function InterviewSetupPage() {
       {countdownOn && (
         <CountdownOverlay seconds={3} onDone={handleCountdownDone} />
       )}
+      
+      {/* 시선 추적 캘리브레이션 */}
+      <WebCalibration
+        isOpen={calibrationOpen}
+        onComplete={handleCalibrationComplete}
+        onCancel={handleCalibrationCancel}
+      />
     </div>
   )
 }
