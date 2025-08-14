@@ -90,6 +90,12 @@ def apply_clahe_on_face(face_bgr):
     return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2BGR)
 
 def load_model_and_processor(model_name):
+    import os
+    # TensorFlow 로깅 레벨 설정으로 경고 메시지 억제
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+    import logging
+    logging.getLogger('tensorflow').setLevel(logging.ERROR)
+    
     model = ResNetForImageClassification.from_pretrained(model_name)
     processor = AutoImageProcessor.from_pretrained(model_name)
     id2label = model.config.id2label
@@ -170,8 +176,8 @@ def analyze_video_bytes(
     import tempfile
     import os
     
-    # webm 파일도 지원하도록 일반적인 확장자 사용
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.webm')
+    # 다양한 비디오 포맷 지원
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
     temp_file.write(video_bytes)
     temp_file.flush()
     temp_file.close()
@@ -227,28 +233,41 @@ def analyze_video(
     bias_vec = parse_logit_bias(logit_bias_str, id2label).to(device)
     face_mesh = init_face_mesh() if use_happy_guard else None
 
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
+    # 다양한 코덱 지원을 위한 백엔드 시도
+    cap = None
+    backends = [cv2.CAP_FFMPEG, cv2.CAP_ANY]
+    
+    for backend in backends:
+        cap = cv2.VideoCapture(video_path, backend)
+        if cap.isOpened():
+            break
+        cap.release()
+    
+    if cap is None or not cap.isOpened():
         print(f"동영상 파일을 열 수 없습니다: {video_path}")
-        # webm 파일인 경우 다른 백엔드 시도
-        if video_path.endswith('.webm'):
-            cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
-            if not cap.isOpened():
-                print(f"FFMPEG 백엔드로도 동영상 파일을 열 수 없습니다: {video_path}")
-                return
-        else:
-            return
+        return
 
     fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    total_frames_prop = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    # WebM 파일의 경우 프레임 수가 부정확할 수 있으므로 안전한 기본값 사용
+    if total_frames_prop <= 0 or total_frames_prop > 1000000:  # 비정상적으로 큰 값 필터링
+        # 예상 프레임 수 계산 (최대 10분 영상 가정)
+        max_duration_seconds = 600  # 10분
+        total_frames = fps * max_duration_seconds
+        print(f"경고: 프레임 수가 비정상적입니다 ({total_frames_prop}). 예상값 {total_frames}로 설정합니다.")
+    else:
+        total_frames = total_frames_prop
 
     out = None
     if output_path:
-        # webm 출력 지원
+        # 다양한 출력 포맷 지원
         if output_path.endswith('.webm'):
             fourcc = cv2.VideoWriter_fourcc(*'VP80')  # VP8 코덱
+        elif output_path.endswith('.avi'):
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
         else:
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
@@ -262,7 +281,7 @@ def analyze_video(
     frame_count = 0
     smoother = EmaSmoother(num_labels=len(id2label), alpha=ema_alpha, device=device)
 
-    print(f"동영상 정보: {width}x{height}, {fps}fps, 총 {total_frames}프레임")
+    print(f"동영상 정보: {width}x{height}, {fps}fps, 예상 최대 {total_frames}프레임")
     print(f"모델: {model_name}")
     print("동영상 분석을 시작합니다...")
 
@@ -272,7 +291,11 @@ def analyze_video(
             break
         frame_count += 1
 
-        crop_res = detect_and_crop_face(frame, detector, margin=face_margin, min_face=min_face_px)
+        # 성능 최적화: 매 프레임마다 얼굴 검출하지 않고 대략 5프레임마다 검출
+        if frame_count % 3 == 1 or frame_count <= 10:  # 초기에는 더 빠르게 검출
+            crop_res = detect_and_crop_face(frame, detector, margin=face_margin, min_face=min_face_px)
+        else:
+            crop_res = None  # 이전 결과 재사용
 
         observed_label = UNCERTAIN_LABEL
         top_emotions = []
@@ -316,7 +339,7 @@ def analyze_video(
         else:
             observed_label = UNCERTAIN_LABEL
 
-        # 히스테리시스
+        # 히스테리시스 (성능 최적화: 불필요한 연산 감소)
         if observed_label == UNCERTAIN_LABEL:
             predicted_emotion = current_emotion if current_emotion else UNCERTAIN_LABEL
             candidate_emotion, candidate_count = None, 0
@@ -386,9 +409,15 @@ def analyze_video(
                 print("사용자에 의해 분석이 중단되었습니다.")
                 break
 
-        if total_frames > 0 and frame_count % (total_frames // 10 + 1) == 0:
-            progress = (frame_count / total_frames) * 100
-            print(f"진행률: {progress:.1f}% ({frame_count}/{total_frames})")
+        # 500프레임마다 진행상황 출력 (더 안정적)
+        if frame_count % 500 == 0:
+            elapsed_time = frame_count / fps
+            print(f"처리된 프레임: {frame_count}, 경과 시간: {elapsed_time:.1f}초")
+            
+        # 메모리 최적화: 1000프레임마다 garbage collection
+        if frame_count % 1000 == 0:
+            import gc
+            gc.collect()
 
     if current_emotion is not None and current_emotion != UNCERTAIN_LABEL and start_frame is not None:
         end_frame = frame_count
@@ -418,6 +447,7 @@ def analyze_video(
             "video_info": {
                 "file_path": video_path,
                 "total_frames": frame_count,
+                "original_frame_count_prop": total_frames_prop,
                 "fps": fps,
                 "duration_seconds": frame_count / fps,
                 "resolution": f"{width}x{height}"

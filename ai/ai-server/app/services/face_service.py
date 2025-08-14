@@ -68,6 +68,7 @@ def infer_face_video(
     stride: int = 5,
     max_frames: Optional[int] = None,
     return_points: bool = False,
+    optimization_level: str = "balanced",  # "fast", "balanced", "quality"
 ) -> Dict[str, Any]:
     """
     동영상 바이트 -> 고급 감정 분석 (video_optimized.py 사용)
@@ -76,24 +77,60 @@ def infer_face_video(
     - 블러/품질 필터링
     - 면접 최적화 프리셋 적용
     """
-    # video_optimized.py의 고급 분석 사용 (면접 최적 프리셋)
+    # 최적화 레벨에 따른 설정 조정
+    if optimization_level == "fast":
+        # 빠른 처리를 위한 설정
+        config = {
+            "ema_alpha": 0.85,
+            "enter_thr": 0.55,
+            "exit_thr": 0.45,
+            "margin_thr": 0.15,
+            "min_stable": 3,
+            "face_margin": 0.15,
+            "min_face_px": 80,
+            "blur_thr": 70.0,
+            "use_clahe": False,
+            "logit_bias_str": "happy=-0.3,neutral=0.1",
+            "use_happy_guard": False
+        }
+    elif optimization_level == "quality":
+        # 고품질 분석을 위한 설정
+        config = {
+            "ema_alpha": 0.95,
+            "enter_thr": 0.65,
+            "exit_thr": 0.55,
+            "margin_thr": 0.25,
+            "min_stable": 8,
+            "face_margin": 0.30,
+            "min_face_px": 128,
+            "blur_thr": 100.0,
+            "use_clahe": True,
+            "logit_bias_str": "happy=-0.5,neutral=0.3,fear=0.2",
+            "use_happy_guard": True
+        }
+    else:  # balanced
+        # 균형 잡힌 설정 (기본값)
+        config = {
+            "ema_alpha": 0.92,
+            "enter_thr": 0.60,
+            "exit_thr": 0.50,
+            "margin_thr": 0.20,
+            "min_stable": 6,
+            "face_margin": 0.25,
+            "min_face_px": 112,
+            "blur_thr": 90.0,
+            "use_clahe": False,
+            "logit_bias_str": "happy=-0.4,neutral=0.2,fear=0.1",
+            "use_happy_guard": True
+        }
+    
+    # video_optimized.py의 고급 분석 사용
     report = analyze_video_bytes(
         video_bytes=video_bytes,
         model_name="Celal11/resnet-50-finetuned-FER2013-0.001",
         output_path=None,
         show_video=False,
-        # 면접 최적 프리셋
-        ema_alpha=0.92,
-        enter_thr=0.60,
-        exit_thr=0.50,
-        margin_thr=0.20,
-        min_stable=6,
-        face_margin=0.25,
-        min_face_px=112,
-        blur_thr=90.0,
-        use_clahe=False,
-        logit_bias_str="happy=-0.4,neutral=0.2,fear=0.1",
-        use_happy_guard=True
+        **config
     )
     
     if not report:
