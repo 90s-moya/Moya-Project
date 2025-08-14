@@ -535,8 +535,36 @@ async def gaze_predict(file: UploadFile = File(...)):
     if not data:
         raise HTTPException(400, "빈 파일")
     try:
+        import json
+        from fastapi import Response
+        
         out = infer_gaze(data)
-        return {"ok": True, "result": out}
+        
+        # heatmap_data를 직접 압축 처리
+        def compress_heatmap_data(data):
+            if isinstance(data, dict):
+                result = {}
+                for key, value in data.items():
+                    if key == "heatmap_data" and isinstance(value, list):
+                        # heatmap_data는 이미 압축된 상태로 처리
+                        result[key] = value
+                    elif isinstance(value, dict):
+                        result[key] = compress_heatmap_data(value)
+                    elif isinstance(value, list):
+                        result[key] = [compress_heatmap_data(item) if isinstance(item, dict) else item for item in value]
+                    else:
+                        result[key] = value
+                return result
+            return data
+        
+        # 결과 압축 처리
+        compressed_out = compress_heatmap_data(out)
+        result = {"ok": True, "result": compressed_out}
+        
+        # 전체를 압축된 JSON으로 변환
+        json_str = json.dumps(result, separators=(',', ':'), ensure_ascii=False)
+        
+        return Response(content=json_str, media_type="application/json")
     except Exception as e:
         raise HTTPException(500, f"gaze inference 실패: {e}")
 
