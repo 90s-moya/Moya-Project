@@ -29,10 +29,18 @@ export const useGazeAnalysis = (): UseGazeAnalysisReturn => {
     setResultFilename(null);
 
     try {
-      // 1. 캘리브레이션 파일 확인
-      const calibrationFile = localStorage.getItem('gazeCalibrationFile');
-      if (!calibrationFile) {
+      // 1. 캘리브레이션 데이터 확인
+      const calibrationDataStr = localStorage.getItem('gaze_calibration_data');
+      if (!calibrationDataStr) {
         throw new Error('캘리브레이션 데이터가 없습니다. 면접 설정에서 시선 캘리브레이션을 완료해주세요.');
+      }
+      
+      let calibrationData;
+      try {
+        calibrationData = JSON.parse(calibrationDataStr);
+        console.log('[GAZE] Using calibration data:', calibrationData.timestamp || 'no timestamp');
+      } catch (error) {
+        throw new Error('캘리브레이션 데이터가 손상되었습니다. 다시 캘리브레이션을 진행해주세요.');
       }
 
       setAnalysisProgress('시선추적 시스템 초기화 중...');
@@ -43,7 +51,8 @@ export const useGazeAnalysis = (): UseGazeAnalysisReturn => {
         screen_height: window.screen.height,
         window_width: window.innerWidth,
         window_height: window.innerHeight,
-        calibration_file: calibrationFile
+        calibration_data: calibrationData,
+        session_id: sessionId
       });
 
       setAnalysisProgress('동영상 파일 준비 중...');

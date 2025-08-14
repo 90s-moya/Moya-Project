@@ -65,8 +65,40 @@ export default function InterviewSetupPage() {
   const [countdownOn, setCountdownOn] = useState(false)
   const [calibrationOpen, setCalibrationOpen] = useState(false)
   const [eyeTrackingReady, setEyeTrackingReady] = useState(false)
+  const [calibrationKey, setCalibrationKey] = useState(0) // 캘리브레이션 컴포넌트 강제 리마운트용
 
   const navigate = useNavigate()
+
+  // 이전 캘리브레이션 데이터 확인
+  useEffect(() => {
+    const checkExistingCalibration = () => {
+      try {
+        const cached = localStorage.getItem('gaze_calibration_data');
+        if (cached) {
+          const calibData = JSON.parse(cached);
+          const cachedAt = new Date(calibData.cached_at);
+          const now = new Date();
+          const hoursDiff = (now.getTime() - cachedAt.getTime()) / (1000 * 60 * 60);
+          
+          // 24시간 이내의 캘리브레이션 데이터가 있으면 재사용
+          if (hoursDiff < 24) {
+            console.log(`[SETUP] Found existing calibration data (age: ${hoursDiff.toFixed(1)}h)`);
+            console.log('[SETUP] Reusing existing calibration data');
+            setEyeTrackingReady(true);
+          } else {
+            console.log('[SETUP] Calibration data too old, will require new calibration');
+            localStorage.removeItem('gaze_calibration_data');
+            setEyeTrackingReady(false);
+          }
+        }
+      } catch (error) {
+        console.warn('[SETUP] Error checking existing calibration:', error);
+        localStorage.removeItem('gaze_calibration_data');
+      }
+    };
+    
+    checkExistingCalibration();
+  }, []);
 
   // 완료 조건 모니터링
   useEffect(() => {
@@ -78,11 +110,16 @@ export default function InterviewSetupPage() {
   }, [micReady, cameraReady, eyeTrackingReady])
 
   const resetState = () => {
+    // 모든 상태 초기화
     setMicLevel(0)
     setMicReady(false)
     setCameraReady(false)
     setEyeTrackingReady(false)
     setTestStatus(TestStatus.NotStarted)
+    
+    // 캘리브레이션 데이터도 삭제
+    localStorage.removeItem('gaze_calibration_data');
+    console.log('[SETUP] All state and calibration data reset');
   }
 
   const startTest = async () => {
@@ -125,12 +162,26 @@ export default function InterviewSetupPage() {
   // 시선추적 캘리브레이션 시작
   const startEyeTracking = () => {
     if (testStatus !== TestStatus.Completed) return
+    setCalibrationKey(prev => prev + 1) // 컴포넌트 강제 리마운트
     setCalibrationOpen(true)
+    console.log('[SETUP] Starting calibration with fresh component (key:', calibrationKey + 1, ')')
   }
 
   // 캘리브레이션 완료 처리
   const handleCalibrationComplete = (calibrationData: any) => {
     console.log('Calibration completed:', calibrationData)
+    
+    // 로컬 스토리지에 캐시하여 다음에 사용
+    try {
+      localStorage.setItem('gaze_calibration_data', JSON.stringify({
+        ...calibrationData,
+        cached_at: new Date().toISOString()
+      }));
+      console.log('[SETUP] Calibration data cached locally');
+    } catch (error) {
+      console.warn('[SETUP] Failed to cache calibration data:', error);
+    }
+    
     setEyeTrackingReady(true)
     setCalibrationOpen(false)
   }
@@ -138,6 +189,14 @@ export default function InterviewSetupPage() {
   // 캘리브레이션 취소
   const handleCalibrationCancel = () => {
     setCalibrationOpen(false)
+  }
+
+  // 시선 추적 재설정
+  const resetEyeTracking = () => {
+    localStorage.removeItem('gaze_calibration_data');
+    setEyeTrackingReady(false);
+    setCalibrationKey(prev => prev + 1); // 컴포넌트 강제 리마운트 준비
+    console.log('[SETUP] Calibration data cleared, component will be remounted on next start');
   }
 
   // 준비 안내 열기 (오디오 자동재생 정책 우회용 사용자 클릭 시점)
@@ -212,7 +271,18 @@ export default function InterviewSetupPage() {
             </div>
 
             <div className={`rounded-lg p-3 border ${eyeTrackingReady ? "border-green-500 bg-green-50" : "border-gray-300"}`}>
-              <div className="text-gray-800 font-semibold">시선 추적</div>
+              <div className="text-gray-800 font-semibold flex items-center gap-2">
+                시선 추적
+                {eyeTrackingReady && (
+                  <button 
+                    onClick={resetEyeTracking}
+                    className="text-xs bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-yellow-700"
+                    title="재캘리브레이션"
+                  >
+                    재설정
+                  </button>
+                )}
+              </div>
               <div className="text-sm text-gray-600 mt-1">
                 {eyeTrackingReady
                   ? "✅ 캘리브레이션 완료! 시선 추적이 준비되었습니다."
@@ -277,6 +347,7 @@ export default function InterviewSetupPage() {
         </div>
 
         <div className="text-center mt-6 text-gray-600 text-lg font-medium">3/4</div>
+        
       </div>
 
       {/* 준비 안내 모달 & 카운트다운 */}
@@ -291,6 +362,7 @@ export default function InterviewSetupPage() {
       
       {/* 시선 추적 캘리브레이션 */}
       <WebCalibration
+        key={calibrationKey} // 재설정 시 컴포넌트 강제 리마운트
         isOpen={calibrationOpen}
         onComplete={handleCalibrationComplete}
         onCancel={handleCalibrationCancel}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Webcam from 'react-webcam';
+import { saveWebCalibration } from '@/api/gazeApi';
 
 interface CalibrationPoint {
   x: number;
@@ -43,6 +44,23 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
   const [points, setPoints] = useState<CalibrationPoint[]>(calibrationPoints);
   const currentPoint = points[currentPointIndex];
 
+  // isOpen이 true로 변경될 때마다 모든 상태 초기화
+  useEffect(() => {
+    if (isOpen) {
+      console.log('[CALIBRATION] Opening - resetting all states to initial values');
+      setCurrentPointIndex(0);
+      setIsRecording(false);
+      setSamplesCollected(0);
+      setCalibrationData({
+        points: [],
+        gazeVectors: []
+      });
+      setPoints(calibrationPoints.map(p => ({ ...p, completed: false })));
+      console.log('[CALIBRATION] State reset complete - starting from point 1');
+    }
+  }, [isOpen]);
+
+  // 키보드 이벤트 처리
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       if (event.code === 'Space' && !isRecording && currentPointIndex < points.length) {
@@ -169,8 +187,8 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
           
           console.log(`[INFO] Calibration complete! Collected ${finalPoints.length} points`);
           
-          setTimeout(() => {
-            onComplete({
+          setTimeout(async () => {
+            const calibrationData = {
               timestamp: new Date().toISOString().replace('T', ' ').split('.')[0],
               screen_settings: {
                 screen_width: screen.width,
@@ -182,8 +200,31 @@ export const WebCalibration: React.FC<Props> = ({ onComplete, onCancel, isOpen }
               calibration_points: finalPoints,
               transform_method: 'rbf',
               samples_per_point: 2,
-              total_points: finalPoints.length
-            });
+              total_points: finalPoints.length,
+              user_id: 'interview_user',
+              session_name: `interview_session_${Date.now()}`
+            };
+            
+            try {
+              console.log('[CALIB] Saving calibration data to server...');
+              const saveResult = await saveWebCalibration(calibrationData);
+              console.log('[CALIB] Calibration saved successfully:', saveResult);
+              
+              onComplete({
+                ...calibrationData,
+                server_saved: true,
+                save_result: saveResult
+              });
+            } catch (error) {
+              console.error('[CALIB] Failed to save calibration:', error);
+              
+              // 서버 저장 실패 시에도 로컬로 진행
+              onComplete({
+                ...calibrationData,
+                server_saved: false,
+                save_error: error
+              });
+            }
           }, 1000);
         }
       }, 1000);
