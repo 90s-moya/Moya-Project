@@ -106,9 +106,9 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
     const stream = await navigator.mediaDevices.getUserMedia({ 
       audio: true,
       video: {
-        width: { ideal: 960, max: 960 },
-        height: { ideal: 540, max: 540 },
-        frameRate: { ideal: 30, max: 30 },
+        width: { exact: 960 },
+        height: { exact: 540 },
+        frameRate: { exact: 30 },
       }
       });
       // 썸네일
@@ -117,7 +117,7 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
         await vtrack.applyConstraints({
           width: { exact: 960 },
           height: { exact: 540 },
-          frameRate: { ideal: 30, max: 30 },
+          frameRate: { exact: 30 },
         });
       } catch { /* 미지원이면 협상된 값 사용 */ }
 
@@ -243,19 +243,17 @@ export function useAnswerRecorder({ key, maxDurationSec = 60 }: { key: QuestionK
       videoMR.ondataavailable = (e) => { if (e.data.size) videoChunksRef.current.push(e.data); };
 
       videoMR.onstop = async () => {
-          // 자동 저장(다운로드)만 수행
-          const vmime = videoMR.mimeType || 'video/webm';
-          const vblob = new Blob(videoChunksRef.current, { type: vmime });
+          const vblob = new Blob(videoChunksRef.current, { type: "video/mp4" });
           if(vblob.size===0){
             console.warn('녹화 비디오 없음')
             return;
           }
-          
+        
           const file = new File([vblob],
-            `${key.order}_${key.subOrder}.webm`,
-            {type:vmime}
+            `${key.order}_${key.subOrder}.mp4`,
+            {type:"video/mp4"}
           )
-
+        
           const formData = new FormData();
           formData.append("file", file);
           formData.append("interviewSessionId", localStorage.getItem("interviewSessionId") ?? "");
