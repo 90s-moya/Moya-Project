@@ -498,9 +498,8 @@ async def analyze_complete_by_url(
     device: str = Form("cpu"),
     stride: int = Form(5),
     return_points: bool = Form(False),
-    thumbnail_url: Optional[str] = None,
+    thumbnail_url: Optional[str] = Form(None),
     calib_data: Optional[str] = Form(None),
-
     db: Session = Depends(get_db),
 ):
     parsed_calib_data = None
