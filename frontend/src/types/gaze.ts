@@ -36,5 +36,6 @@ export interface TrackingInitRequest {
   screen_height: number
   window_width: number
   window_height: number
-  calibration_file: string
+  calibration_data: any
+  session_id: string
 }
