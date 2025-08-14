@@ -17,11 +17,20 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libgl1 \
     libglib2.0-0 \
+    wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # requirements.txt 먼저 복사 → 캐시 최대 활용
 COPY requirements.txt /app/requirements.txt
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+
+# PTGaze 모델 디렉토리 생성 및 모델 파일 다운로드
+RUN mkdir -p /root/.ptgaze/models && \
+    wget -O /root/.ptgaze/models/eth-xgaze_resnet18.pth \
+    "https://github.com/hysts/pytorch_mpiigaze/releases/download/v0.1.0/eth-xgaze_resnet18.pth" || \
+    curl -L -o /root/.ptgaze/models/eth-xgaze_resnet18.pth \
+    "https://github.com/hysts/pytorch_mpiigaze/releases/download/v0.1.0/eth-xgaze_resnet18.pth"
 
 # 소스 코드 복사
 COPY . .
@@ -41,9 +50,13 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# builder에서 설치된 Python 패키지만 복사
+# builder에서 설치된 Python 패키지와 모델 파일 복사
 COPY --from=builder /usr/local /usr/local
+COPY --from=builder /root/.ptgaze /root/.ptgaze
 COPY --from=builder /app /app
+
+# 모델 파일 권한 설정
+RUN chmod -R 644 /root/.ptgaze/models/
 
 EXPOSE 8000
 
