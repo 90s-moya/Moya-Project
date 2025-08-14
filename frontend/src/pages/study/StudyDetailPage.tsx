@@ -135,16 +135,16 @@ export default function StudyDetailPage() {
     <div className="min-h-screen bg-white">
       <Header scrollBg={false} />
 
-      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-[17px] leading-relaxed">
+      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-base leading-relaxed">
         {/* Back to List */}
         <StudyBackToList />
 
         {/* Title Section */}
         <div className="mb-10">
-          <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">
+          <h1 className="text-2xl font-semibold text-[#2B7FFF] mb-2">
             스터디 상세보기
           </h1>
-          <p className="text-[#4b4e57] text-lg">
+          <p className="text-[#4b4e57] text-base">
             스터디의 상세 정보를 확인하고 참여해보세요!
           </p>
         </div>
@@ -156,7 +156,7 @@ export default function StudyDetailPage() {
             {/* 스터디 제목 카드 */}
             <Card className="p-8">
               <div className="text-center">
-                <h2 className="text-2xl font-bold text-[#1b1c1f]">
+                <h2 className="text-xl font-semibold text-[#1b1c1f]">
                   {roomDetail?.title || "제목을 불러오는 중..."}
                 </h2>
               </div>
@@ -164,7 +164,7 @@ export default function StudyDetailPage() {
 
             {/* 스터디 정보 카드 */}
             <Card className="p-8">
-              <h3 className="text-xl font-bold text-[#1b1c1f] mb-6 flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-[#1b1c1f] mb-6 flex items-center gap-2">
                 <Info className="w-5 h-5 text-[#2b7fff]" />
                 스터디 정보
               </h3>
@@ -214,7 +214,7 @@ export default function StudyDetailPage() {
 
             {/* 참여자 정보 카드 */}
             <Card className="p-8">
-              <h3 className="text-xl font-bold text-[#1b1c1f] mb-6 flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-[#1b1c1f] mb-6 flex items-center gap-2">
                 <Users className="w-5 h-5 text-[#2b7fff]" />
                 참여자 목록
               </h3>
@@ -233,7 +233,7 @@ export default function StudyDetailPage() {
 
             {/* 상세 설명 카드 */}
             <Card className="p-8">
-              <h3 className="text-xl font-bold text-[#1b1c1f] mb-6 flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-[#1b1c1f] mb-6 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-[#2b7fff]" />
                 상세 설명
               </h3>
@@ -249,7 +249,7 @@ export default function StudyDetailPage() {
           <div className="space-y-6">
             {/* 방장 정보 카드 */}
             <Card className="p-6">
-              <h3 className="text-xl font-bold text-[#1b1c1f] mb-6 flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-[#1b1c1f] mb-6 flex items-center gap-2">
                 <User className="w-5 h-5 text-[#2b7fff]" />
                 방장 정보
               </h3>
@@ -295,21 +295,21 @@ export default function StudyDetailPage() {
                 {!isAlreadyRegistered ? (
                   <Button
                     onClick={handleRegisterForRoom}
-                    className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+                    className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white py-3 text-lg font-semibold rounded-lg transition-all duration-200 h-10"
                   >
                     <div className="flex items-center justify-center gap-2">
-                      <Users className="w-5 h-5" />
+                      <Users className="w-4 h-4" />
                       스터디 등록하기
                     </div>
                   </Button>
                 ) : (
                   <Button
-                    onClick={() => navigate("/mypage/room")}
-                    className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+                    onClick={() => navigate("/mypage/studyRoom")}
+                    className="w-full bg-[#2b7fff] hover:bg-blue-600 text-white py-3 text-lg font-semibold rounded-lg transition-all duration-200 h-10"
                   >
                     <div className="flex items-center justify-center gap-2">
-                      <User className="w-5 h-5" />
-                      등록한 스터디 목록 가기
+                      <User className="w-4 h-4" />
+                      스터디 등록 목록 가기
                     </div>
                   </Button>
                 )}
@@ -317,10 +317,10 @@ export default function StudyDetailPage() {
                 {isMine && (
                   <Button
                     onClick={handleDeleteRoom}
-                    className="w-full bg-red-500 hover:bg-red-600 text-white py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+                    className="w-full bg-red-500 hover:bg-red-600 text-white py-3 text-lg font-semibold rounded-lg transition-all duration-200 h-10"
                   >
                     <div className="flex items-center justify-center gap-2">
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="w-4 h-4" />
                       스터디 삭제하기
                     </div>
                   </Button>
@@ -330,8 +330,8 @@ export default function StudyDetailPage() {
 
             {/* 안내 카드 */}
             <Card className="p-6 bg-blue-50 border-blue-200">
-              <h3 className="text-lg font-bold text-[#1b1c1f] mB-0 flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-[#2b7fff]" />
+              <h3 className="text-base font-semibold text-[#1b1c1f] mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-[#2b7fff]" />
                 안내
               </h3>
               <ul className="space-y-2 text-sm text-[#4b4e57]">

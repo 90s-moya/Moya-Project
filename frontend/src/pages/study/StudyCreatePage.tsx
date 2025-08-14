@@ -99,16 +99,16 @@ export default function StudyCreatePage() {
     <div className="min-h-screen bg-white">
       <Header scrollBg={false} />
 
-      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-[17px] leading-relaxed">
+      <main className="max-w-[1180px] mx-auto px-4 md:px-6 lg:px-8 pt-[120px] pb-12 text-base leading-relaxed">
         {/* Back to List */}
         <StudyBackToList />
 
         {/* Title Section */}
         <div className="mb-10">
-          <h1 className="text-4xl font-bold text-[#1b1c1f] mb-2">
+          <h1 className="text-2xl font-semibold text-[#2B7FFF] mb-2">
             스터디 방 생성하기
           </h1>
-          <p className="text-[#4b4e57] text-lg">
+          <p className="text-[#4b4e57] text-base">
             새로운 면접 스터디를 만들어보세요!
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function StudyCreatePage() {
                 <div className="space-y-3">
                   <Label
                     htmlFor="title"
-                    className="text-xl font-bold text-[#1b1c1f] flex items-center gap-2"
+                    className="text-xl font-semibold text-[#1b1c1f] flex items-center gap-2"
                   >
                     <FileText className="w-5 h-5 text-[#2b7fff]" />
                     스터디 제목
@@ -145,7 +145,7 @@ export default function StudyCreatePage() {
                 <div className="space-y-3">
                   <Label
                     htmlFor="body"
-                    className="text-xl font-bold text-[#1b1c1f] flex items-center gap-2"
+                    className="text-xl font-semibold text-[#1b1c1f] flex items-center gap-2"
                   >
                     <FileText className="w-5 h-5 text-[#2b7fff]" />
                     스터디 설명
@@ -165,7 +165,7 @@ export default function StudyCreatePage() {
 
                 {/* 카테고리 */}
                 <div className="space-y-3">
-                  <Label className="text-xl font-bold text-[#1b1c1f] flex items-center gap-2">
+                  <Label className="text-xl font-semibold text-[#1b1c1f] flex items-center gap-2">
                     <Tag className="w-5 h-5 text-[#2b7fff]" />
                     카테고리
                   </Label>
@@ -193,7 +193,7 @@ export default function StudyCreatePage() {
                 <div className="space-y-3">
                   <Label
                     htmlFor="openAt"
-                    className="text-xl font-bold text-[#1b1c1f] flex items-center gap-2"
+                    className="text-xl font-semibold text-[#1b1c1f] flex items-center gap-2"
                   >
                     <Calendar className="w-5 h-5 text-[#2b7fff]" />
                     스터디 시작 일시
@@ -252,7 +252,7 @@ export default function StudyCreatePage() {
                 <div className="space-y-3">
                   <Label
                     htmlFor="expiredAt"
-                    className="text-xl font-bold text-[#1b1c1f] flex items-center gap-2"
+                    className="text-xl font-semibold text-[#1b1c1f] flex items-center gap-2"
                   >
                     <Calendar className="w-5 h-5 text-[#2b7fff]" />
                     스터디 종료 일시
@@ -313,7 +313,7 @@ export default function StudyCreatePage() {
                 <div className="space-y-3">
                   <Label
                     htmlFor="maxUser"
-                    className="text-xl font-bold text-[#1b1c1f] flex items-center gap-2"
+                    className="text-xl font-semibold text-[#1b1c1f] flex items-center gap-2"
                   >
                     <Users className="w-5 h-5 text-[#2b7fff]" />
                     최대 참여 인원
@@ -341,7 +341,7 @@ export default function StudyCreatePage() {
                 <div className="flex justify-end items-center pt-6">
                   <Button
                     type="submit"
-                    className="bg-[#2b7fff] hover:bg-blue-600 text-white px-8 py-4 rounded-lg text-lg font-semibold"
+                    className="bg-[#2b7fff] hover:bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-semibold h-10"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? "생성 중..." : "스터디 생성하기"}
@@ -355,14 +355,14 @@ export default function StudyCreatePage() {
           <div className="space-y-6">
             {/* 미리보기 카드 */}
             <Card className="p-6">
-              <h3 className="text-xl font-bold text-[#1b1c1f] mb-4 flex items-center gap-2">
+              <h3 className="text-xl font-semibold text-[#1b1c1f] mb-4 flex items-center gap-2">
                 <Info className="w-5 h-5 text-[#2b7fff]" />
                 스터디 미리보기
               </h3>
               <div className="space-y-4">
                 {/* 제목 */}
                 <div className="min-h-[5.5rem]">
-                  <h3 className="font-semibold text-2xl leading-snug text-[#1b1c1f]">
+                  <h3 className="font-semibold text-xl leading-snug text-[#1b1c1f]">
                     {watchedValues.title || "스터디 제목을 입력해주세요"}
                   </h3>
                 </div>
@@ -405,8 +405,8 @@ export default function StudyCreatePage() {
 
             {/* 안내 카드 */}
             <Card className="p-6 bg-blue-50 border-blue-200">
-              <h3 className="text-lg font-bold text-[#1b1c1f] mb-3 flex items-center gap-2">
-                <Info className="w-5 h-5 text-[#2b7fff]" />
+              <h3 className="text-base font-semibold text-[#1b1c1f] mb-3 flex items-center gap-2">
+                <Info className="w-4 h-4 text-[#2b7fff]" />
                 스터디 생성 안내
               </h3>
               <ul className="space-y-2 text-sm text-[#4b4e57]">
