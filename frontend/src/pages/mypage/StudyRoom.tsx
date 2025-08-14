@@ -5,13 +5,13 @@ import type { MyRegisteredRoom } from "@/types/study";
 import { useNavigate } from "react-router-dom";
 import { formatDateTime } from "@/util/date";
 
-type SortOption = "latest" | "deadline";
+type SortOption = "deadline";
 
 const StudyRoom: React.FC = () => {
   const [registeredRooms, setRegisteredRooms] = useState<MyRegisteredRoom[]>(
     []
   );
-  const [sortOption, setSortOption] = useState<SortOption>("latest");
+  const [sortOption, setSortOption] = useState<SortOption>("deadline");
   const navigate = useNavigate();
 
   // 등록한 방 목록 조회
@@ -32,20 +32,14 @@ const StudyRoom: React.FC = () => {
   const sortedRooms = useMemo(() => {
     const sorted = [...registeredRooms];
 
-    switch (sortOption) {
-      case "latest":
-        return sorted.sort(
-          (a, b) => new Date(b.openAt).getTime() - new Date(a.openAt).getTime()
-        );
-      case "deadline":
-        return sorted.sort(
-          (a, b) =>
-            new Date(a.expiredAt).getTime() - new Date(b.expiredAt).getTime()
-        );
-      default:
-        return sorted;
-    }
-  }, [registeredRooms, sortOption]);
+    // 마감순 (openAt 기준으로 현재 시간에 가장 가까운 순서)
+    return sorted.sort((a, b) => {
+      const now = new Date().getTime();
+      const aTimeDiff = Math.abs(new Date(a.openAt).getTime() - now);
+      const bTimeDiff = Math.abs(new Date(b.openAt).getTime() - now);
+      return aTimeDiff - bTimeDiff;
+    });
+  }, [registeredRooms]);
 
   // 룸 상세 페이지로 이동 핸들러
   // const handleRoomClick = (roomId: string) => {
@@ -65,32 +59,11 @@ const StudyRoom: React.FC = () => {
 
   return (
     <MypageLayout activeMenu="studyroom">
-      {/* 페이지 제목과 정렬 옵션 */}
+      {/* 페이지 제목 */}
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-2xl font-semibold text-[#2B7FFF] leading-[1.4]">
           등록한 스터디 목록
         </h3>
-
-        {/* 정렬 드롭다운 */}
-        {registeredRooms.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label
-              htmlFor="sort-select"
-              className="text-lg text-[#6F727C] font-medium"
-            >
-              정렬:
-            </label>
-            <select
-              id="sort-select"
-              value={sortOption}
-              onChange={handleSortChange}
-              className="px-3 py-2 border border-[#EFEFF3] rounded-lg text-lg font-medium text-[#1B1C1F] bg-white hover:border-[#2B7FFF] focus:outline-none focus:border-[#2B7FFF] transition-colors"
-            >
-              <option value="latest">최신순</option>
-              <option value="deadline">마감순</option>
-            </select>
-          </div>
-        )}
       </div>
 
       {/* 참여한 스터디 리스트 */}
