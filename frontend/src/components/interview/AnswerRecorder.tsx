@@ -50,6 +50,7 @@ export default function AnswerRecorder({ keyInfo }: { keyInfo: QuestionKey }) {
           autoPlay
           muted
           playsInline
+          style={{ transform: "scaleX(-1)" }}
         />
       )}
       {/* 선택: 로컬 미리듣기 */}
