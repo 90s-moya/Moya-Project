@@ -38,12 +38,12 @@ export default function StudyCard({
   return (
     <div
       onClick={handleClick}
-      className={`group rounded-lg p-6 h-full flex flex-col justify-between min-h-[260px] text-base transition-all  ${
+      className={`group rounded-lg p-6 h-full flex flex-col justify-between min-h-[260px] text-base transition-all ${
         shouldGrayOut
           ? "bg-[#f5f5f5] border border-[#e0e0e0] opacity-50 cursor-default"
           : shouldHighlight
-          ? "bg-gradient-to-br border-2 border-[#2B7FFF] shadow-md cursor-pointer hover:shadow-lg hover:-translate-y-1"
-          : "bg-[#fafafc] border border-[#dedee4] cursor-pointer hover:shadow-lg hover:-translate-y-1"
+          ? "bg-gradient-to-br border-2 border-[#f5f5f5] shadow-md cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-[#2b7fff] "
+          : "bg-[#fafafc] border-0 cursor-pointer hover:shadow-lg hover:-translate-y-1 hover:border-2 hover:border-[#2b7fff]"
       }`}
     >
       <div>
