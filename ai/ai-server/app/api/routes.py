@@ -447,18 +447,25 @@ async def analyze_complete(
     device: str = Form("cpu"),
     stride: int = Form(5),
     return_points: bool = Form(False),
+    calib_data: Optional[str] = Form(None),
     db: Session = Depends(get_db),
 ):
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="빈 파일")
+    parsed_calib_data = None
+    if calib_data:
+        try:
+            parsed_calib_data = json.loads(calib_data)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid calib_data JSON: {e}")
 
     # (1) QA 조회/생성
     qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order)
 
     # (2) 분석 실행
     try:
-        out = analyze_all(data, device=device, stride=stride, return_points=return_points)
+        out = analyze_all(data, device=device, stride=stride, return_points=return_points, calib_data=parsed_calib_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"complete analysis 실패: {e}")
 
@@ -492,8 +499,19 @@ async def analyze_complete_by_url(
     stride: int = Form(5),
     return_points: bool = Form(False),
     thumbnail_url: Optional[str] = None,
+    calib_data: Optional[str] = Form(None),
+
     db: Session = Depends(get_db),
 ):
+    parsed_calib_data = None
+    if calib_data:
+        try:
+            parsed_calib_data = json.loads(calib_data)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid calib_data JSON: {e}")
+    """
+    비디오 URL을 직접 받아서 다운로드 → 분석 → 결과 DB 저장
+    """
     # (1) QA 조회/생성
     qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order)
 
@@ -510,7 +528,7 @@ async def analyze_complete_by_url(
 
     # (3) 분석 실행
     try:
-        out = analyze_all(data, device=device, stride=stride, return_points=return_points)
+        out = analyze_all(data, device=device, stride=stride, return_points=return_points, calib_data=parsed_calib_data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"URL 분석 실패: {e}")
     rel_video = to_files_relative(video_url)

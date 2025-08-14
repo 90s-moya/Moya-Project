@@ -175,6 +175,10 @@ def infer_gaze(
     """
     업로드된 비디오 바이트에서 시선 추적 수행
     """
+    print(f"[DEBUG] infer_gaze called with video_bytes length: {len(video_bytes)}")
+    print(f"[DEBUG] calib_data provided: {calib_data is not None}")
+    print(f"[DEBUG] use_localstorage: {use_localstorage}")
+    
     try:
         tracker = get_tracker()
         calibration_loaded = False
@@ -217,8 +221,12 @@ def infer_gaze(
             input_path = tmp.name
 
         try:
+            print(f"[DEBUG] Starting video processing with tracker...")
             result = tracker.process_video_file(input_path)
-            return {
+            print(f"[DEBUG] Tracker result type: {type(result)}")
+            print(f"[DEBUG] Tracker result: {result}")
+            
+            final_result = {
                 "ok": True,
                 "result": result,
                 "calibration_status": {
@@ -228,6 +236,8 @@ def infer_gaze(
                                else "No calibration applied - using default mapping"
                 }
             }
+            print(f"[DEBUG] Final gaze result: {final_result}")
+            return final_result
         finally:
             try:
                 os.remove(input_path)
@@ -235,4 +245,5 @@ def infer_gaze(
                 pass
 
     except Exception as e:
+        print(f"[DEBUG] infer_gaze exception: {e}")
         return {"ok": False, "error": str(e)}

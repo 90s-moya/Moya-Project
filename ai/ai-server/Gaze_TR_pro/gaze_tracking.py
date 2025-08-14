@@ -391,13 +391,50 @@ class GazeTracker:
         
         print(f"[INFO] Video processing complete: {successful_tracks}/{frame_count} frames tracked")
         
-        # 결과 저장
+        # 결과 저장 및 반환
         if successful_tracks > 0:
-            self.save_tracking_results(output_prefix)
-            return True
+            # 결과 파일 저장
+            saved_files = self.save_tracking_results(output_prefix)
+            
+            # 히트맵 데이터와 분석 결과 반환
+            center_ratio = self.calculate_center_gaze_ratio()
+            
+            result = {
+                "success": True,
+                "total_frames": frame_count,
+                "tracked_frames": successful_tracks,
+                "tracking_ratio": successful_tracks / frame_count if frame_count > 0 else 0,
+                "heatmap_data": self.gaze_heatmap_2d.tolist() if self.gaze_heatmap_2d is not None else None,
+                "metadata": {
+                    "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "screen_size": {
+                        "width": self.WINDOW_WIDTH,
+                        "height": self.WINDOW_HEIGHT
+                    },
+                    "grid_size": {
+                        "width": self.HEATMAP_GRID_W,
+                        "height": self.HEATMAP_GRID_H
+                    },
+                    "total_gaze_samples": int(np.sum(self.gaze_heatmap_2d)) if self.gaze_heatmap_2d is not None else 0,
+                    "center_gaze_ratio": round(center_ratio, 2)
+                },
+                "analysis": {
+                    "center_gaze_percentage": round(center_ratio, 2),
+                    "peripheral_gaze_percentage": round(100 - center_ratio, 2),
+                    "gaze_distribution": "concentrated" if center_ratio > 60 else "distributed" if center_ratio > 30 else "scattered"
+                },
+                "saved_files": saved_files if isinstance(saved_files, list) else []
+            }
+            
+            return result
         else:
             print("[WARNING] No gaze data was successfully tracked")
-            return False
+            return {
+                "success": False,
+                "error": "No gaze data was successfully tracked",
+                "total_frames": frame_count,
+                "tracked_frames": 0
+            }
     
     def process_webcam_live(self, duration_seconds=None):
         """웹캠에서 실시간 시선 추적"""
@@ -550,6 +587,7 @@ class GazeTracker:
             os.makedirs("results")
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        saved_files = []
         
         # 히트맵 JSON 저장
         if self.gaze_heatmap_2d is not None and np.sum(self.gaze_heatmap_2d) > 0:
@@ -598,6 +636,7 @@ class GazeTracker:
                 
                 f.write(json_str)
             
+            saved_files.append(heatmap_filename)
             print(f"[INFO] Heatmap saved: {heatmap_filename}")
         
         # 상세 시선 데이터 저장
@@ -606,9 +645,11 @@ class GazeTracker:
             with open(detailed_filename, 'w', encoding='utf-8') as f:
                 json.dump(self.gaze_data, f, indent=2, ensure_ascii=False)
             
+            saved_files.append(detailed_filename)
             print(f"[INFO] Detailed gaze data saved: {detailed_filename}")
         
         print(f"[INFO] Tracking results saved with prefix: {prefix}")
+        return saved_files
 
 if __name__ == "__main__":
     tracker = GazeTracker()

@@ -12,18 +12,25 @@ def analyze_all(
     device: str = "cpu",
     stride: int = 5,
     return_points: bool = False,
+    calib_data: dict = None,
 ):
     """하나의 업로드 영상으로 Posture + Emotion + Gaze 동시 실행"""
     with ThreadPoolExecutor(max_workers=3) as ex:
         f_posture = ex.submit(analyze_video_bytes, video_bytes)
         f_face    = ex.submit(infer_face_video, video_bytes, device, stride, None, return_points)
-        f_gaze    = ex.submit(infer_gaze, video_bytes)
+        f_gaze    = ex.submit(infer_gaze, video_bytes, calib_data=calib_data)
 
         posture = f_posture.result()
         face    = f_face.result()
         gaze    = f_gaze.result()
 
-    return {
+    print(f"[DEBUG] analyze_all results:")
+    print(f"[DEBUG] posture type: {type(posture)}")
+    print(f"[DEBUG] face type: {type(face)}")
+    print(f"[DEBUG] gaze type: {type(gaze)}")
+    print(f"[DEBUG] gaze content: {gaze}")
+
+    result = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "device": device,
         "stride": stride,
@@ -31,4 +38,7 @@ def analyze_all(
         "emotion": face,      # dominant + distribution (+ timeline)
         "gaze": gaze,         # 시선 추적 결과
     }
+    
+    print(f"[DEBUG] Final analyze_all result: {result}")
+    return result
 

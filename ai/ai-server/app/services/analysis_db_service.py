@@ -41,13 +41,18 @@ def save_results_to_qa(
     # analyze_all 결과 -> DB 컬럼 매핑
     # posture_result ← result["posture"]
     # face_result    ← result["emotion"]  (감정/표정 결과)
+    print(f"[DEBUG] save_results_to_qa received result: {result}")
+    print(f"[DEBUG] result.get('gaze'): {result.get('gaze')}")
+    
     if video_url:
         qa.video_url = video_url
     if thumbnail_url:
         qa.thumbnail_url=thumbnail_url
     qa.posture_result = result.get("posture")
     qa.face_result    = result.get("emotion")
-    # gaze_result는 현재 분석 안 하므로 유지 (추후 gaze 추가 시 qa.gaze_result = result.get("gaze"))
+    qa.gaze_result    = result.get("gaze")
+    
+    print(f"[DEBUG] qa.gaze_result after assignment: {qa.gaze_result}")
 
     qa.updated_at = datetime.utcnow()
     db.commit()
