@@ -6,7 +6,40 @@ os.environ['TORCH_WEIGHTS_ONLY'] = 'FALSE'
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 import json
+
+# 커스텀 JSON 응답 클래스
+class CompactJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        # 히트맵 데이터를 압축 포맷으로 변환
+        def format_heatmap_data(obj):
+            if isinstance(obj, dict):
+                if 'heatmap_data' in obj and obj['heatmap_data'] is not None:
+                    heatmap = obj['heatmap_data']
+                    if isinstance(heatmap, list) and len(heatmap) > 0 and isinstance(heatmap[0], list):
+                        # 각 행을 한 줄로 포맷팅
+                        formatted_rows = []
+                        for row in heatmap:
+                            formatted_rows.append('[' + ','.join(map(str, row)) + ']')
+                        obj['heatmap_data'] = '[\n' + ',\n'.join(formatted_rows) + '\n]'
+                
+                for key, value in obj.items():
+                    obj[key] = format_heatmap_data(value)
+            elif isinstance(obj, list):
+                return [format_heatmap_data(item) for item in obj]
+            return obj
+        
+        # 컨텐츠 포맷팅
+        formatted_content = format_heatmap_data(content)
+        
+        return json.dumps(
+            formatted_content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=2,
+            separators=(',', ': ')
+        ).encode('utf-8')
 from app.api.routes import router
 import sys
 from pathlib import Path
@@ -42,27 +75,11 @@ def test():
     return {"msg": "CORS OK!"}
 
 
-# JSON 응답을 압축하도록 기본 설정
-@app.middleware("http")
-async def compress_json_middleware(request, call_next):
-    response = await call_next(request)
-    
-    # JSON 응답인 경우 압축 처리
-    if (hasattr(response, 'media_type') and response.media_type == "application/json" and 
-        hasattr(response, 'body')):
-        try:
-            # 응답 본문을 압축
-            body = response.body.decode('utf-8')
-            if '"heatmap_data":' in body:
-                # JSON을 파싱한 후 다시 압축
-                data = json.loads(body)
-                compressed_body = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
-                response.body = compressed_body.encode('utf-8')
-                response.headers['content-length'] = str(len(response.body))
-        except:
-            pass  # 실패하면 원본 응답 유지
-    
-    return response
+# JSON 응답 포맷팅 미들웨어 (비활성화됨)
+# @app.middleware("http")
+# async def format_json_middleware(request, call_next):
+#     response = await call_next(request)
+#     return response
 
 app.include_router(router, prefix="")  # or prefix="/api"
 app.include_router(report_router.router)
