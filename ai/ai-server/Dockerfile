@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
 
 # requirements.txt 먼저 복사 → 캐시 최대 활용
 COPY requirements.txt /app/requirements.txt
-
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 RUN mkdir -p /root/.ptgaze/models && \
     wget -O /root/.ptgaze/models/eth-xgaze_resnet18.pth \
