@@ -1,67 +1,57 @@
-# app/services/analysis_service.py (예시)
-import cv2, tempfile, os, torch, torch.nn.functional as F
+# app/services/analysis_service.py
 from datetime import datetime
-from app.services.gaze_service import infer_gaze
-from app.services.face_service import infer_face_video
+from typing import Optional, Dict, Any, List
 
-def preprocess_video_torch(video_bytes: bytes, target_fps=30, max_frames=1800, resize_to=(960,540)) -> bytes:
-    cv2.setNumThreads(1)
+from app.utils.frame_iter import collect_frames_from_bytes
+from app.services.face_service import infer_face_frames
+from app.services.gaze_service import infer_gaze_frames
+from app.utils.posture import analyze_frames
 
-    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
-        tmp.write(video_bytes); tmp_path = tmp.name
+def analyze_all(
+    video_bytes: bytes,
+    device: str = "cuda",
+    stride: int = 5,                 # (현재 프레임 기반에선 미사용, 하위호환용)
+    return_points: bool = False,
+    calib_data: Optional[dict] = None,
+    include_posture: bool = False,   # 필요시 True
+) -> Dict[str, Any]:
+    """
+    1) 비디오 → 30FPS / 960x540 프레임으로 '한 번만' 변환
+    2) 그 프레임을 얼굴/시선/자세 모두가 재사용 → CPU 디코딩 스파이크 방지
+    """
+    frames = collect_frames_from_bytes(
+        video_bytes,
+        target_fps=30,
+        resize_to=(960, 540),
+        max_frames=1800,
+        bgr=True,
+    )
 
-    cap = cv2.VideoCapture(tmp_path)
-    if not cap.isOpened():
-        raise RuntimeError("비디오 파일을 열 수 없습니다.")
-    src_fps = cap.get(cv2.CAP_PROP_FPS) or target_fps
-    if src_fps <= 0 or src_fps > 240: src_fps = target_fps
-    frame_interval = max(1, int(round(src_fps/target_fps)))
+    # 프레임 없으면 바로 리턴
+    if not frames:
+        return {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "device": device,
+            "stride": stride,
+            "posture": None,
+            "emotion": {"label":"neutral","score":0.0,"probs":{}, "samples":0, "fps":30.0},
+            "gaze": {"ok": False, "error": "no frames"},
+        }
 
-    out_path = tmp_path + "_processed.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out_writer = None
+    # 얼굴 감정
+    face = infer_face_frames(frames, device=device, return_points=return_points, fps=30.0)
 
-    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    processed, count = 0, 0
+    # 시선 추적
+    gaze = infer_gaze_frames(frames, calib_data=calib_data)
 
-    try:
-        while True:
-            ret, bgr = cap.read()
-            if not ret: break
-            if count % frame_interval == 0:
-                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-                t = torch.from_numpy(rgb).to(dev, non_blocking=True)          # HWC uint8
-                t = t.permute(2,0,1).unsqueeze(0).float()/255.0               # 1,3,H,W
-                if resize_to:
-                    t = F.interpolate(t, size=(resize_to[1], resize_to[0]), mode="bilinear", align_corners=False)
-                out_np = (t.squeeze(0).clamp(0,1)*255).byte().permute(1,2,0).cpu().numpy()
-                out_bgr = cv2.cvtColor(out_np, cv2.COLOR_RGB2BGR)
-                if out_writer is None:
-                    h,w = out_bgr.shape[:2]
-                    out_writer = cv2.VideoWriter(out_path, fourcc, target_fps, (w,h))
-                out_writer.write(out_bgr)
-                processed += 1
-                if processed >= max_frames: break
-            count += 1
-    finally:
-        cap.release()
-        if out_writer: out_writer.release()
+    # 자세 (옵션)
+    posture = analyze_frames(frames, sample_every=30) if include_posture else None
 
-    with open(out_path, "rb") as f:
-        data = f.read()
-    os.remove(tmp_path); os.remove(out_path)
-    return data
-
-def analyze_all(video_bytes: bytes, device: str="cuda", stride: int=5, return_points: bool=False, calib_data: dict|None=None):
-    processed_bytes = preprocess_video_torch(video_bytes, target_fps=30, max_frames=1800, resize_to=(960,540))
-    # posture = None  # 임시 비활성화 (원인 분리)
-    face = infer_face_video(processed_bytes, device=device, stride=stride, max_frames=None, return_points=return_points)
-    gaze = infer_gaze(processed_bytes, calib_data=calib_data)
     return {
-        "timestamp": datetime.utcnow().isoformat()+"Z",
+        "timestamp": datetime.utcnow().isoformat() + "Z",
         "device": device,
         "stride": stride,
-        "posture": None,
+        "posture": posture,
         "emotion": face,
         "gaze": gaze,
     }
