@@ -106,95 +106,50 @@ export class PeerConnectionManager {
    * RTCPeerConnection 생성 및 트랙/이벤트 바인딩
    */
   private async createConnection(peerId: string, initiator: boolean) {
-    if (this.connections.has(peerId)) {
-      console.log(`연결이 이미 존재합니다: ${peerId}`);
-      return;
-    }
+    if (this.connections.has(peerId)) return;
 
-    try {
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: "stun:stun.l.google.com:19302" },
-          { urls: "stun:stun1.l.google.com:19302" },
-        ],
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    });
+
+    this.connections.set(peerId, pc);
+
+    const remoteStream = new MediaStream();
+    this.remoteStreams.set(peerId, remoteStream);
+
+    pc.ontrack = (event) => {
+      event.streams[0].getTracks().forEach((track) => {
+        remoteStream.addTrack(track);
       });
+      this.onRemoteStream(peerId, remoteStream);
+    };
 
-      this.connections.set(peerId, pc);
-
-      const remoteStream = new MediaStream();
-      this.remoteStreams.set(peerId, remoteStream);
-
-      // 연결 상태 모니터링
-      pc.onconnectionstatechange = () => {
-        console.log(`연결 상태 변경 ${peerId}: ${pc.connectionState}`);
-
-        if (pc.connectionState === "failed") {
-          console.error(`연결 실패: ${peerId}`);
-          this.removeConnection(peerId);
-        } else if (pc.connectionState === "connected") {
-          console.log(`연결 성공: ${peerId}`);
-        }
-      };
-
-      pc.ontrack = (event) => {
-        console.log(`트랙 수신: ${peerId}`, event.track.kind);
-        event.streams[0].getTracks().forEach((track) => {
-          remoteStream.addTrack(track);
-        });
-        this.onRemoteStream(peerId, remoteStream);
-      };
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          console.log(`ICE 후보 전송: ${peerId}`);
-          this.signaling.send({
-            type: "ice",
-            senderId: this.myId,
-            targetId: peerId,
-            candidate: event.candidate,
-          });
-        }
-      };
-
-      // ICE 연결 상태 모니터링
-      pc.oniceconnectionstatechange = () => {
-        console.log(`ICE 연결 상태 ${peerId}: ${pc.iceConnectionState}`);
-
-        if (pc.iceConnectionState === "failed") {
-          console.error(`ICE 연결 실패: ${peerId}, 재시도 중...`);
-          // ICE 재시작 시도
-          pc.restartIce();
-        }
-      };
-
-      // 로컬 미디어 트랙 전송
-      if (this.localStream) {
-        this.localStream.getTracks().forEach((track) => {
-          try {
-            pc.addTrack(track, this.localStream!);
-            console.log(`트랙 추가됨 ${peerId}: ${track.kind}`);
-          } catch (error) {
-            console.error(`트랙 추가 실패 ${peerId}:`, error);
-          }
-        });
-      }
-
-      if (initiator) {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        console.log(`Offer 전송: ${peerId}`);
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
         this.signaling.send({
-          type: "offer",
+          type: "ice",
           senderId: this.myId,
           targetId: peerId,
-          offer,
+          candidate: event.candidate,
         });
       }
-    } catch (error) {
-      console.error(`연결 생성 실패 ${peerId}:`, error);
-      this.removeConnection(peerId);
-      throw error;
+    };
+
+    // 로컬 미디어 트랙 전송
+    this.localStream?.getTracks().forEach((track) => {
+      pc.addTrack(track, this.localStream!);
+    });
+
+    if (initiator) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      this.signaling.send({
+        type: "offer",
+        senderId: this.myId,
+        targetId: peerId,
+        offer,
+      });
     }
   }
 }
