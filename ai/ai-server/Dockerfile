@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt /app/requirements.txt
 RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
+# PTGaze 모델 디렉토리 생성 및 모델 파일 다운로드
 RUN mkdir -p /root/.ptgaze/models && \
     wget -O /root/.ptgaze/models/eth-xgaze_resnet18.pth \
     "https://github.com/hysts/pytorch_mpiigaze/releases/download/v0.1.0/eth-xgaze_resnet18.pth" || \
