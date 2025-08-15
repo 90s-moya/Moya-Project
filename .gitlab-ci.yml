@@ -180,7 +180,7 @@ deploy-ai-dev-gpu:
     - docker stop ai-dev || true
     - docker rm ai-dev || true
     - >
-      docker run -d --name ai-dev --network monitoring -p 8001:8000
+      docker run -d --name ai-dev -p 8001:8000 --gpus all
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
       -e DB_HOST="$DB_HOST"
@@ -229,7 +229,7 @@ deploy-ai-prod-gpu:
     - docker stop ai-main || true
     - docker rm ai-main || true
     - >
-      docker run -d --name ai-main --network monitoring -p 8000:8000
+      docker run -d --name ai-main -p 8000:8000 --gpus all
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
       -e DB_HOST="$DB_HOST"
