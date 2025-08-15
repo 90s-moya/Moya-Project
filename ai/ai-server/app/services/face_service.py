@@ -35,13 +35,13 @@ _preprocess = transforms.Compose([
 ])
 
 @lru_cache(maxsize=1)
-def get_face_model(device: str = "cpu"):
+def get_face_model(device: str = "cuda"):
     dev = "cuda" if device == "cuda" and torch.cuda.is_available() else "cpu"
     model = load_model(CKPT_PATH, device=dev, num_classes=len(CLASS_NAMES))
     model.eval()
     return model, dev
 
-def infer_face(image_bytes: bytes, device: str = "cpu") -> dict:
+def infer_face(image_bytes: bytes, device: str = "cuda") -> dict:
     """이미지 바이트 -> 감정 분류"""
     model, dev = get_face_model(device)
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
@@ -64,7 +64,7 @@ def _bytes_to_temp_video(b: bytes, suffix: str = ".mp4") -> str:
 
 def infer_face_video(
     video_bytes: bytes,
-    device: str = "cpu",
+    device: str = "cuda",
     stride: int = 5,
     max_frames: Optional[int] = None,
     return_points: bool = False,
