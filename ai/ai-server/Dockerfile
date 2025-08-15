@@ -23,9 +23,11 @@ RUN apt-get update && apt-get install -y \
 
 # requirements.txt 먼저 복사 → 캐시 최대 활용
 COPY requirements.txt /app/requirements.txt
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
-# PTGaze 모델 디렉토리 생성 및 모델 파일 다운로드
+RUN pip uninstall -y opencv-python opencv-python-headless opencv-contrib-python || true && \
+    pip install --no-cache-dir --extra-index-url https://pypi.nvidia.com opencv-python-headless==4.10.0.84 && \
+    pip install --no-cache-dir -r requirements.txt
+
 RUN mkdir -p /root/.ptgaze/models && \
     wget -O /root/.ptgaze/models/eth-xgaze_resnet18.pth \
     "https://github.com/hysts/pytorch_mpiigaze/releases/download/v0.1.0/eth-xgaze_resnet18.pth" || \
