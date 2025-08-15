@@ -21,18 +21,36 @@ VAD_AGGR = 2       # 0(느슨)~3(공격적)
 # 빠른 경로: 최소 STT (bytes 기반)
 # -------------------------------
 async def transcribe_audio_bytes(contents: bytes, filename: str = "audio.wav", content_type: str = "audio/wav") -> str:
-    async with httpx.AsyncClient(timeout=60) as client:
-        files = {
-            "file": (filename, contents, content_type),
-            "model": (None, "whisper-1")
-        }
-        response = await client.post(
-            f"{GMS_API_URL.rstrip('/')}/audio/transcriptions",
-            headers={"Authorization": f"Bearer {GMS_API_KEY}"},
-            files=files
-        )
-        response.raise_for_status()
-        return response.json()["text"]
+    import asyncio
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                files = {
+                    "file": (filename, contents, content_type),
+                    "model": (None, "whisper-1")
+                }
+                response = await client.post(
+                    f"{GMS_API_URL.rstrip('/')}/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {GMS_API_KEY}"},
+                    files=files
+                )
+                response.raise_for_status()
+                return response.json()["text"]
+        except httpx.HTTPStatusError as e:
+            print(f"[STT] API 호출 실패 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                # 마지막 시도에서 실패하면 기본값 반환
+                print("[STT] 모든 재시도 실패, 기본 응답 반환")
+                return "[음성 인식 실패]"
+            # 재시도 전 대기
+            await asyncio.sleep(1)
+        except Exception as e:
+            print(f"[STT] 예상치 못한 오류 (시도 {attempt + 1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                return "[음성 인식 실패]"
+            await asyncio.sleep(1)
 
 # -------------------------------
 # (레거시) UploadFile 기반 함수들 — 필요 시 유지

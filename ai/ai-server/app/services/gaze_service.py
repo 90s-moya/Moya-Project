@@ -5,6 +5,7 @@ import sys
 import os
 import tempfile
 import json
+import cv2
 from pathlib import Path
 from typing import Optional, Any, Dict
 
@@ -106,7 +107,7 @@ def list_calibrations() -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-# === 시선 추적 ===
+# === 로컬 스토리지에서 캘리브레이션 불러오기 ===
 def load_calibration_from_localstorage() -> Dict[str, Any]:
     try:
         frontend_root = AI_SERVER_ROOT.parent / "frontend"
@@ -166,6 +167,7 @@ def load_calibration_for_tracking(calib_path: str = None, calib_data: dict = Non
         return {"status": "error", "message": str(e)}
 
 
+# === 시선 추적 (프레임 기반 처리) ===
 def infer_gaze(
     video_bytes: bytes,
     calib_path: Optional[str] = None,
@@ -173,24 +175,24 @@ def infer_gaze(
     use_localstorage: bool = True
 ) -> Dict[str, Any]:
     """
-    업로드된 비디오 바이트에서 시선 추적 수행
+    업로드된 비디오 바이트에서 시선 추적 수행 (프레임 기반)
+    MARK chunk 문제를 피하기 위해 process_frames 사용
     """
     print(f"[DEBUG] infer_gaze called with video_bytes length: {len(video_bytes)}")
     print(f"[DEBUG] calib_data provided: {calib_data is not None}")
     print(f"[DEBUG] use_localstorage: {use_localstorage}")
-    
+
     try:
         tracker = get_tracker()
         calibration_loaded = False
         calibration_source = "none"
 
-        # 1. 외부에서 캘리브레이션 데이터를 직접 전달받은 경우
+        # 1. 외부에서 calib_data 직접 전달
         if calib_data is not None:
             load_result = load_calibration_for_tracking(calib_data=calib_data)
             if load_result["status"] == "success":
                 calibration_loaded = True
                 calibration_source = "provided_data"
-                print("[INFO] Calibration loaded from provided calib_data")
 
         # 2. 로컬 스토리지 자동 로드
         elif use_localstorage:
@@ -200,7 +202,6 @@ def infer_gaze(
                 if load_result["status"] == "success":
                     calibration_loaded = True
                     calibration_source = "local_storage"
-                    print(f"[INFO] Loaded calibration from local storage: {localstorage_result['file_path']}")
 
         # 3. 파일 경로 제공
         elif calib_path:
@@ -208,42 +209,39 @@ def infer_gaze(
             if load_result["status"] == "success":
                 calibration_loaded = True
                 calibration_source = "provided_path"
-                print(f"[INFO] Loaded calibration from provided path: {calib_path}")
-            else:
-                return load_result
 
-        if not calibration_loaded:
-            print("[WARNING] No calibration data found. Using default mapping.")
-
-        # 비디오 임시 파일 저장
+        # === 프레임 추출 ===
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
             tmp.write(video_bytes)
-            input_path = tmp.name
+            tmp_path = tmp.name
 
-        try:
-            print(f"[DEBUG] Starting video processing with tracker...")
-            result = tracker.process_video_file(input_path)
-            print(f"[DEBUG] Tracker result type: {type(result)}")
-            print(f"[DEBUG] Tracker result: {result}")
-            
-            final_result = {
-                "ok": True,
-                "result": result,
-                "calibration_status": {
-                    "loaded": calibration_loaded,
-                    "source": calibration_source,
-                    "message": "Calibration applied successfully" if calibration_loaded
-                               else "No calibration applied - using default mapping"
-                }
+        cap = cv2.VideoCapture(tmp_path)
+        frames = []
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frames.append(frame)
+        cap.release()
+        os.remove(tmp_path)
+
+        if not frames:
+            return {"ok": False, "error": "No frames extracted from video"}
+
+        print(f"[DEBUG] Extracted {len(frames)} frames, starting gaze tracking...")
+
+        result = tracker.process_frames(frames)
+
+        return {
+            "ok": True,
+            "result": result,
+            "calibration_status": {
+                "loaded": calibration_loaded,
+                "source": calibration_source,
+                "message": "Calibration applied successfully" if calibration_loaded
+                           else "No calibration applied - using default mapping"
             }
-            print(f"[DEBUG] Final gaze result: {final_result}")
-            return final_result
-        finally:
-            try:
-                os.remove(input_path)
-            except Exception:
-                pass
+        }
 
     except Exception as e:
-        print(f"[DEBUG] infer_gaze exception: {e}")
         return {"ok": False, "error": str(e)}

@@ -4,6 +4,8 @@ stages:
 
 variables:
   DOCKER_IMAGE: gyujh630/moya-be
+  DOCKER_BUILDKIT: 1
+  BUILDKIT_PROGRESS: plain
 
 before_script:
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
@@ -102,11 +104,17 @@ deploy-fe:
     - master
 
 
-variables:
-  DOCKER_BUILDKIT: 1
-  BUILDKIT_PROGRESS: plain
 
-build-ai:
+# ===============================================================
+# AI 서버 파이프라인 (EC2 & GCP 동시 배포 - 하드코딩 방식)
+# ===============================================================
+
+# ----------------------------------------------------
+# AI 빌드 (EC2와 GCP에서 각각 실행)
+# ----------------------------------------------------
+
+# EC2에서 AI 빌드 실행
+build-ai-ec2:
   stage: build
   script:
     - docker pull gyujh630/moya-ai:cache || true
@@ -116,10 +124,34 @@ build-ai:
     - docker push gyujh630/moya-ai:cache
   tags:
     - ec2
+  only:
+    - ai-dev
+    - ai-main
+    - master
+
+# GCP 서버에서 AI 빌드 실행
+build-ai-gpu:
+  stage: build
+  script:
+    - docker pull gyujh630/moya-ai:cache || true
+    - docker build --cache-from=gyujh630/moya-ai:cache --build-arg BUILDKIT_INLINE_CACHE=1 -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai/ai-server
+    - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
+    - docker push gyujh630/moya-ai:cache
+  tags:
+    - gcp # 태그를 'gcp'로 수정
+  only:
+    - ai-dev
+    - ai-main
+    - master
 
 
-# AI - 개발 환경 배포 (8001 포트)
-deploy-ai-dev:
+# ----------------------------------------------------
+# AI 개발 환경 배포 (EC2, GCP에서 각각 실행)
+# ----------------------------------------------------
+
+# EC2에 개발 버전 배포
+deploy-ai-dev-ec2:
   stage: deploy
   script:
     - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
@@ -140,8 +172,34 @@ deploy-ai-dev:
   only:
     - ai-dev
 
-# AI - 운영 환경 배포 (8000 포트)
-deploy-ai-prod:
+# GCP 서버에 개발 버전 배포
+deploy-ai-dev-gpu:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-dev || true
+    - docker rm ai-dev || true
+    - >
+      docker run -d --name ai-dev -p 8001:8000 --gpus all
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_DEV"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+  tags:
+    - gcp
+  only:
+    - ai-dev
+
+# ----------------------------------------------------
+# AI 운영 환경 배포 (EC2, GCP에서 각각 실행)
+# ----------------------------------------------------
+
+# EC2에 운영 버전 배포
+deploy-ai-prod-ec2:
   stage: deploy
   script:
     - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
@@ -159,6 +217,29 @@ deploy-ai-prod:
       gyujh630/moya-ai:$CI_COMMIT_BRANCH
   tags:
     - ec2
+  only:
+    - ai-main
+    - master
+
+# GCP 서버에 운영 버전 배포
+deploy-ai-prod-gpu:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-main || true
+    - docker rm ai-main || true
+    - >
+      docker run -d --name ai-main -p 8000:8000 --gpus all
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_PROD"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+  tags:
+    - gcp
   only:
     - ai-main
     - master
