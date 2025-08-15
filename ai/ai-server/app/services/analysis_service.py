@@ -5,12 +5,18 @@ from datetime import datetime
 from app.utils.posture import analyze_video_bytes
 from app.services.gaze_service import infer_gaze
 from app.services.face_service import infer_face_video
+import torch
+import torch.nn.functional as F
 
 
-def preprocess_video_gpu(video_bytes: bytes, target_fps: int = 30, max_frames: int = 1800, resize_to=(960, 540)) -> bytes:
-    """GPU(OpenCV CUDA)로 영상 FPS 제한, 해상도 축소, 최대 프레임 제한"""
-    
-    # 임시 저장 (원본)
+
+def preprocess_video_gpu(video_bytes: bytes, target_fps: int = 30, max_frames: int = 1800, resize_to=(960, 540), device: str = "cuda") -> bytes:
+    """CUDA OpenCV 없이도 GPU(Torch)로 리사이즈/전처리 가속"""
+
+    # CPU 스파이크 완화
+    cv2.setNumThreads(1)
+
+    # 원본 저장
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         tmp.write(video_bytes)
         tmp_path = tmp.name
@@ -28,42 +34,45 @@ def preprocess_video_gpu(video_bytes: bytes, target_fps: int = 30, max_frames: i
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out_writer = None
 
+    dev = torch.device("cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu")
+
     frame_count = 0
     processed_frames = 0
 
-    gpu_frame = cv2.cuda_GpuMat()
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        if frame_count % frame_interval == 0:
-            # GPU 업로드
-            gpu_frame.upload(frame)
-
-            # 리사이즈도 GPU에서 처리
-            if resize_to:
-                gpu_frame = cv2.cuda.resize(gpu_frame, resize_to)
-
-            # CPU로 다운로드 최소화 (VideoWriter가 CPU 기반이라 필요)
-            frame_resized = gpu_frame.download()
-
-            if out_writer is None:
-                h, w = frame_resized.shape[:2]
-                out_writer = cv2.VideoWriter(out_path, fourcc, target_fps, (w, h))
-
-            out_writer.write(frame_resized)
-            processed_frames += 1
-
-            if processed_frames >= max_frames:
+    try:
+        while True:
+            ret, frame_bgr = cap.read()
+            if not ret:
                 break
 
-        frame_count += 1
+            if frame_count % frame_interval == 0:
+                # BGR -> RGB -> torch tensor (H,W,3) -> (1,3,H,W)
+                rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+                t = torch.from_numpy(rgb).to(dev, non_blocking=True)       # uint8
+                t = t.permute(2, 0, 1).unsqueeze(0).float() / 255.0        # 1,3,H,W float32
 
-    cap.release()
-    if out_writer:
-        out_writer.release()
+                if resize_to:
+                    # resize_to=(W,H) 이므로 torch는 (H,W)로 전달
+                    t = F.interpolate(t, size=(resize_to[1], resize_to[0]), mode="bilinear", align_corners=False)
+
+                # back to uint8 CPU
+                out_np = (t.squeeze(0).clamp(0, 1) * 255.0).byte().permute(1, 2, 0).to("cpu").numpy()
+                out_bgr = cv2.cvtColor(out_np, cv2.COLOR_RGB2BGR)
+
+                if out_writer is None:
+                    h, w = out_bgr.shape[:2]
+                    out_writer = cv2.VideoWriter(out_path, fourcc, target_fps, (w, h))
+
+                out_writer.write(out_bgr)
+                processed_frames += 1
+                if processed_frames >= max_frames:
+                    break
+
+            frame_count += 1
+    finally:
+        cap.release()
+        if out_writer:
+            out_writer.release()
 
     with open(out_path, "rb") as f:
         processed_bytes = f.read()
