@@ -6,27 +6,23 @@ from app.utils.posture import analyze_video_bytes
 from app.services.gaze_service import infer_gaze
 from app.services.face_service import infer_face_video
 
-def preprocess_video(video_bytes: bytes, target_fps: int = 30, max_frames: int = 1800, resize_to=(960, 540)) -> bytes:
-    """영상 FPS 제한, 해상도 축소, 최대 프레임 제한 (OpenCV 전용, webm 포함)"""
-    
-    # 1) 원본을 임시파일로 저장 (webm도 바로 가능)
+def preprocess_video_cuda(video_bytes: bytes, target_fps: int = 30, max_frames: int = 1800, resize_to=(960, 540)) -> bytes:
+    """영상 FPS 제한 + 해상도 축소 (CUDA 가속 OpenCV 사용)"""
+
+    # 1) 원본 임시 저장
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         tmp.write(video_bytes)
         tmp_path = tmp.name
 
     cap = cv2.VideoCapture(tmp_path)
-
     if not cap.isOpened():
-        raise RuntimeError("비디오 파일을 열 수 없습니다 (OpenCV)")
+        raise RuntimeError("비디오 파일을 열 수 없습니다 (CUDA 전처리)")
 
-    # 원본 FPS
     fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps <= 0 or fps > 240:  # FPS 값이 이상하면 기본값 사용
+    if fps <= 0 or fps > 240:
         fps = 30
 
     frame_interval = max(1, int(round(fps / target_fps)))
-
-    # 출력 mp4 경로 (처리 후 분석용)
     out_path = tmp_path + "_processed.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     out_writer = None
@@ -39,16 +35,23 @@ def preprocess_video(video_bytes: bytes, target_fps: int = 30, max_frames: int =
         if not ret:
             break
 
-        # FPS 다운샘플링
         if frame_count % frame_interval == 0:
+            # --- CUDA Mat로 업로드 ---
+            gpu_frame = cv2.cuda_GpuMat()
+            gpu_frame.upload(frame)
+
+            # --- CUDA Resize ---
             if resize_to:
-                frame = cv2.resize(frame, resize_to)
+                gpu_frame = cv2.cuda.resize(gpu_frame, resize_to)
+
+            # --- CPU로 다시 다운로드 (VideoWriter는 CPU 기반) ---
+            frame_resized = gpu_frame.download()
 
             if out_writer is None:
-                h, w = frame.shape[:2]
+                h, w = frame_resized.shape[:2]
                 out_writer = cv2.VideoWriter(out_path, fourcc, target_fps, (w, h))
 
-            out_writer.write(frame)
+            out_writer.write(frame_resized)
             processed_frames += 1
 
             if processed_frames >= max_frames:
@@ -60,16 +63,13 @@ def preprocess_video(video_bytes: bytes, target_fps: int = 30, max_frames: int =
     if out_writer:
         out_writer.release()
 
-    # mp4로 변환된 파일을 bytes로 읽기
     with open(out_path, "rb") as f:
         processed_bytes = f.read()
 
-    # 임시 파일 정리
     os.remove(tmp_path)
     os.remove(out_path)
 
     return processed_bytes
-
 
 def analyze_all(
     video_bytes: bytes,
