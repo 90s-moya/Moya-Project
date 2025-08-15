@@ -51,7 +51,6 @@ export function useStudyRoom() {
   const recordedChunksRef = useRef<Blob[]>([]);
   const videoStartRef = useRef<string | null>(null);
   const roomIdRef = useRef<string>("");
-  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const stopFixedRef = useRef<() => void>(() => {});
 
@@ -78,24 +77,22 @@ export function useStudyRoom() {
     }
   }, [roomId]);
 
-  // 참가자 상태 변경 시 자동 저장 (개선된 버전)
+  // 참가자 상태 변경 시 자동 저장
   useEffect(() => {
     if (participants.length > 0 && roomId) {
       const participantsToSave = participants.map((p) => ({
         id: p.id,
         isLocal: p.isLocal,
-        hasStream: p.stream !== null,
-        timestamp: Date.now(), // 타임스탬프 추가로 최신 상태 확인
+        // stream은 저장할 수 없으므로 제외
       }));
       localStorage.setItem(
         `room-${roomId}-participants`,
         JSON.stringify(participantsToSave)
       );
-      console.log("참가자 상태 저장됨:", participantsToSave);
     }
   }, [participants, roomId]);
 
-  // 방 입장 시 저장된 참가자 정보 복구 (개선된 버전)
+  // 방 입장 시 저장된 참가자 정보 복구
   useEffect(() => {
     if (!roomId) return;
 
@@ -107,50 +104,24 @@ export function useStudyRoom() {
         const parsed = JSON.parse(savedParticipants);
         console.log("저장된 참가자 정보 복구:", parsed);
 
-        // 저장된 시간이 너무 오래된 경우 무시 (5분 이상)
-        const now = Date.now();
-        const validParticipants = parsed.filter(
-          (p: { id: string; isLocal?: boolean; timestamp?: number }) => {
-            const age = now - (p.timestamp || 0);
-            return age < 5 * 60 * 1000; // 5분
-          }
-        );
-
-        if (validParticipants.length === 0) {
-          console.log("저장된 참가자 정보가 너무 오래됨, 무시");
-          localStorage.removeItem(`room-${roomId}-participants`);
-          return;
-        }
-
         // peerManager가 준비된 후에 재연결 시도
         const attemptReconnect = () => {
-          if (peerManagerRef.current && signalingRef.current) {
-            validParticipants.forEach(
-              (
-                participant: { id: string; isLocal?: boolean },
-                index: number
-              ) => {
-                if (
-                  !participant.isLocal &&
-                  participant.id !== myIdRef.current
-                ) {
-                  console.log(`재연결 시도: ${participant.id}`);
-                  // 순차적으로 지연 추가 (연결 충돌 방지)
-                  setTimeout(() => {
-                    peerManagerRef.current?.createConnectionWith(
-                      participant.id
-                    );
-                  }, (index + 1) * 500); // 500ms씩 순차적 지연
-                }
+          if (peerManagerRef.current) {
+            parsed.forEach((participant: { id: string; isLocal?: boolean }) => {
+              if (!participant.isLocal && participant.id !== myIdRef.current) {
+                console.log(`재연결 시도: ${participant.id}`);
+                // 약간의 지연 추가 (연결 충돌 방지)
+                setTimeout(() => {
+                  peerManagerRef.current?.createConnectionWith(participant.id);
+                }, Math.random() * 1000); // 0-1초 랜덤 지연
               }
-            );
+            });
           } else {
-            setTimeout(attemptReconnect, 300);
+            setTimeout(attemptReconnect, 200); // 100ms → 200ms로 증가
           }
         };
 
-        // 초기화가 완료된 후 재연결 시도
-        setTimeout(attemptReconnect, 1000);
+        attemptReconnect();
       } catch (error) {
         console.error("저장된 참가자 정보 파싱 실패:", error);
         localStorage.removeItem(`room-${roomId}-participants`);
@@ -392,65 +363,8 @@ export function useStudyRoom() {
     });
   };
 
-  // 연결 상태 건강성 체크
-  const performHealthCheck = useCallback(() => {
-    console.log("=== 연결 상태 헬스체크 ===");
-    console.log("현재 참가자 수:", participants.length);
-    console.log(
-      "현재 참가자 목록:",
-      participants.map((p) => ({
-        id: p.id,
-        hasStream: !!p.stream,
-        isLocal: p.isLocal,
-      }))
-    );
-    console.log("서버 문서 수:", allDocs.length);
-    console.log(
-      "로컬 스토리지 참가자:",
-      localStorage.getItem(`room-${roomId}-participants`)
-    );
-
-    // 스트림이 없는 비로컬 참가자 찾기
-    const participantsWithoutStream = participants.filter(
-      (p) => !p.isLocal && !p.stream
-    );
-    if (participantsWithoutStream.length > 0) {
-      console.warn(
-        "스트림이 없는 참가자들:",
-        participantsWithoutStream.map((p) => p.id)
-      );
-    }
-
-    console.log("=== 헬스체크 완료 ===");
-  }, [participants, allDocs, roomId]);
-
-  // 주기적 건강성 체크
-  useEffect(() => {
-    if (participants.length > 1) {
-      healthCheckIntervalRef.current = setInterval(performHealthCheck, 10000); // 10초마다
-    } else {
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current);
-        healthCheckIntervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current);
-        healthCheckIntervalRef.current = null;
-      }
-    };
-  }, [participants.length, performHealthCheck]);
-
   // 미디어 및 연결 정리
   const cleanUpMediaAndConnections = () => {
-    // 헬스체크 정리
-    if (healthCheckIntervalRef.current) {
-      clearInterval(healthCheckIntervalRef.current);
-      healthCheckIntervalRef.current = null;
-    }
-
     peerManagerRef.current?.removeLocalTracks();
 
     document.querySelectorAll("video").forEach((video) => {
@@ -526,44 +440,31 @@ export function useStudyRoom() {
         if (data.type === "join") {
           console.log("새 참가자 join입니다.", data.senderId);
 
-          try {
-            // 먼저 참가자를 추가하고 연결 상태를 추적
-            setParticipants((prev) => {
-              const exists = prev.some((p) => p.id === data.senderId);
+          // 연결 생성과 participants 추가를 더 신중하게 처리
+          await peerManager.createConnectionWith(data.senderId);
 
-              if (exists) {
-                console.log("이미 존재하는 참가자입니다.", data.senderId);
-                return prev;
-              }
+          // 현재 localStream이 있으면 즉시 설정
+          if (localStream) {
+            peerManagerRef.current?.setLocalStream(localStream);
+          }
 
-              console.log("새 참가자 추가합니다.", data.senderId);
-              return [
-                ...prev,
-                { id: data.senderId, stream: null, isLocal: false },
-              ];
-            });
+          // 참가자 추가 시 중복 체크 강화화
+          setParticipants((prev) => {
+            const exists = prev.some((p) => p.id === data.senderId);
 
-            // 현재 localStream이 있으면 즉시 설정
-            if (localStream) {
-              peerManagerRef.current?.setLocalStream(localStream);
+            if (exists) {
+              console.log("이미 존재하는 참가자입니다.", data.senderId);
+              return prev;
             }
 
-            // 연결 생성 (약간의 지연 추가하여 상태 안정화)
-            setTimeout(async () => {
-              try {
-                await peerManager.createConnectionWith(data.senderId);
-                console.log("새 참여자와 연결 성공!");
-              } catch (error) {
-                console.error("연결 생성 실패:", error);
-                // 연결 실패 시 참가자 제거
-                setParticipants((prev) =>
-                  prev.filter((p) => p.id !== data.senderId)
-                );
-              }
-            }, 100);
-          } catch (error) {
-            console.error("참가자 처리 중 오류:", error);
-          }
+            console.log("새 참가자 추가합니다.", data.senderId);
+            return [
+              ...prev,
+              { id: data.senderId, stream: null, isLocal: false },
+            ];
+          });
+
+          console.log("새 참여자 연결!");
           return;
         }
         if (data.type === "leave") {
@@ -598,20 +499,10 @@ export function useStudyRoom() {
         if (existingIndex >= 0) {
           // 기존 참가자의 스트림 업데이트
           const updated = [...prev];
-          if (updated[existingIndex].stream) {
-            // 기존 스트림이 있으면 정리
-            updated[existingIndex].stream
-              ?.getTracks()
-              .forEach((track) => track.stop());
-          }
           updated[existingIndex] = { ...updated[existingIndex], stream };
-          console.log(`참가자 ${peerId}의 스트림 업데이트됨`);
           return updated;
         } else {
           // 새 참가자 추가 (join 이벤트를 놓친 경우)
-          console.log(
-            `참가자 ${peerId} 스트림과 함께 추가됨 (join 이벤트 누락)`
-          );
           return [...prev, { id: peerId, stream, isLocal: false }];
         }
       });
@@ -656,8 +547,7 @@ export function useStudyRoom() {
       peerManager.setLocalStream(fixed30); // 다른 참가자들에게
       signaling.send({ type: "join", senderId: myId });
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 의존성 배열을 비워서 한 번만 실행 (초기화 로직)
+  }, []); // 의존성 배열을 비워서 한 번만 실행
 
   return {
     participants,
