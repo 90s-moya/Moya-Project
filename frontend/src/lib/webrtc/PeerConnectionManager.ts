@@ -109,7 +109,13 @@ export class PeerConnectionManager {
     if (this.connections.has(peerId)) return;
 
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        { urls: "stun:stun3.l.google.com:19302" },
+      ],
+      iceCandidatePoolSize: 10,
     });
 
     this.connections.set(peerId, pc);
