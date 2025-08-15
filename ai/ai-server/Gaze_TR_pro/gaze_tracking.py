@@ -88,7 +88,7 @@ class GazeTracker:
         
         config = OmegaConf.create({
             "mode": "ETH-XGaze",
-            "device": "cpu",
+            "device": "cuda" if __import__('torch').cuda.is_available() else "cpu",
             "model": {"name": "resnet18"},
             "face_detector": {
                 "mode": "mediapipe",
@@ -297,6 +297,132 @@ class GazeTracker:
         }
         self.gaze_data.append(gaze_entry)
     
+    def process_frames(self, frames):
+        """프레임 리스트에서 시선 추적"""
+        if not frames:
+            print("[ERROR] No frames provided")
+            return {
+                "success": False,
+                "error": "No frames provided",
+                "total_frames": 0,
+                "tracked_frames": 0
+            }
+        
+        print(f"[INFO] Processing {len(frames)} frames for gaze tracking")
+        
+        # 히트맵 초기화
+        self.initialize_gaze_heatmap()
+        self.gaze_data.clear()
+        
+        frame_count = 0
+        successful_tracks = 0
+        
+        try:
+            for frame_idx, frame in enumerate(frames):
+                frame_count += 1
+                timestamp = frame_idx / 30.0  # 30fps 가정
+                
+                # 프레임 크기 조정
+                frame = cv2.resize(frame, (self.WINDOW_WIDTH, self.WINDOW_HEIGHT))
+                
+                if self.FLIP_CAMERA:
+                    frame = cv2.flip(frame, 1)
+                
+                # 얼굴 탐지
+                faces = self.landmark_estimator.detect_faces(frame)
+                if len(faces) == 0:
+                    continue
+                
+                face = faces[0]
+                
+                # 시선 추정
+                try:
+                    self.gaze_estimator.estimate_gaze(frame, face)
+                    gaze_vector = face.gaze_vector
+                    if gaze_vector is None:
+                        continue
+                    
+                    # 시선 좌표 변환
+                    raw_point = self.gaze_to_screen_coords(gaze_vector)
+                    calibrated_point = self.apply_transform(gaze_vector)
+                    
+                    # 화면 범위 내로 제한
+                    raw_point = (
+                        max(0, min(raw_point[0], self.WINDOW_WIDTH - 1)),
+                        max(0, min(raw_point[1], self.WINDOW_HEIGHT - 1))
+                    )
+                    
+                    # 데이터 기록
+                    self.record_gaze_data(raw_point, calibrated_point, timestamp)
+                    successful_tracks += 1
+                    
+                    if frame_count % 50 == 0:
+                        print(f"[INFO] Processed {frame_count}/{len(frames)} frames ({frame_count/len(frames)*100:.1f}%)")
+                
+                except Exception as e:
+                    continue
+        
+        except Exception as e:
+            print(f"[ERROR] Error processing frames: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "total_frames": frame_count,
+                "tracked_frames": successful_tracks
+            }
+        
+        print(f"[INFO] Frame processing complete: {successful_tracks}/{frame_count} frames tracked")
+        
+        # 결과 반환
+        if successful_tracks > 0:
+            # 히트맵 데이터와 분석 결과 반환
+            center_ratio = self.calculate_center_gaze_ratio()
+            
+            # 히트맵 데이터를 압축 형태로 포맷팅
+            heatmap_formatted = None
+            if self.gaze_heatmap_2d is not None:
+                heatmap_array = self.gaze_heatmap_2d.tolist()
+                heatmap_lines = []
+                for row in heatmap_array:
+                    heatmap_lines.append(json.dumps(row, separators=(',', ':')))
+                heatmap_formatted = '[\n' + ',\n'.join(heatmap_lines) + '\n]'
+            
+            result = {
+                "success": True,
+                "total_frames": frame_count,
+                "tracked_frames": successful_tracks,
+                "tracking_ratio": successful_tracks / frame_count if frame_count > 0 else 0,
+                "heatmap_data": heatmap_formatted,
+                "metadata": {
+                    "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "screen_size": {
+                        "width": self.WINDOW_WIDTH,
+                        "height": self.WINDOW_HEIGHT
+                    },
+                    "grid_size": {
+                        "width": self.HEATMAP_GRID_W,
+                        "height": self.HEATMAP_GRID_H
+                    },
+                    "total_gaze_samples": int(np.sum(self.gaze_heatmap_2d)) if self.gaze_heatmap_2d is not None else 0,
+                    "center_gaze_ratio": round(center_ratio, 2)
+                },
+                "analysis": {
+                    "center_gaze_percentage": round(center_ratio, 2),
+                    "peripheral_gaze_percentage": round(100 - center_ratio, 2),
+                    "gaze_distribution": "concentrated" if center_ratio > 60 else "distributed" if center_ratio > 30 else "scattered"
+                }
+            }
+            
+            return result
+        else:
+            print("[WARNING] No gaze data was successfully tracked")
+            return {
+                "success": False,
+                "error": "No gaze data was successfully tracked",
+                "total_frames": frame_count,
+                "tracked_frames": 0
+            }
+
     def process_video_file(self, video_path, output_prefix=None, auto_load_calibration=True):
         """동영상 파일에서 시선 추적"""
         if not os.path.exists(video_path):
@@ -561,6 +687,19 @@ class GazeTracker:
             print("[WARNING] No gaze data was recorded")
             return False
     
+    def format_heatmap_compact(self, heatmap_2d):
+        """히트맵을 압축된 형태로 포맷팅"""
+        if heatmap_2d is None:
+            return None
+        
+        # 각 행을 문자열로 변환
+        rows = []
+        for row in heatmap_2d:
+            row_str = '[' + ','.join(map(str, row)) + ']'
+            rows.append(row_str)
+        
+        return '[\n' + ',\n'.join(rows) + '\n]'
+    
     def calculate_center_gaze_ratio(self):
         """중앙 영역 응시 비율 계산"""
         if self.gaze_heatmap_2d is None or np.sum(self.gaze_heatmap_2d) == 0:
@@ -619,22 +758,7 @@ class GazeTracker:
             
             heatmap_filename = f"results/{prefix}_heatmap_{timestamp}.json"
             with open(heatmap_filename, 'w', encoding='utf-8') as f:
-                # heatmap_data만 따로 처리
-                heatmap_array = heatmap_data.pop('heatmap_data')
-                
-                # 메타데이터와 분석 정보를 먼저 저장
-                json_str = json.dumps(heatmap_data, indent=2, ensure_ascii=False)
-                
-                # heatmap_data를 각 행별로 한 줄씩 처리
-                heatmap_lines = []
-                for row in heatmap_array:
-                    heatmap_lines.append('    ' + json.dumps(row, separators=(',', ':')))
-                heatmap_str = '[\n' + ',\n'.join(heatmap_lines) + '\n  ]'
-                
-                # 마지막 }를 제거하고 heatmap_data 추가
-                json_str = json_str.rstrip('\n}') + ',\n  "heatmap_data": ' + heatmap_str + '\n}'
-                
-                f.write(json_str)
+                json.dump(heatmap_data, f, indent=2, ensure_ascii=False, separators=(',', ': '))
             
             saved_files.append(heatmap_filename)
             print(f"[INFO] Heatmap saved: {heatmap_filename}")

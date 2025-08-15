@@ -73,7 +73,7 @@ def preprocess_video(video_bytes: bytes, target_fps: int = 30, max_frames: int =
 
 def analyze_all(
     video_bytes: bytes,
-    device: str = "cpu",
+    device: str = "cuda",
     stride: int = 5,
     return_points: bool = False,
     calib_data: dict | None = None,
