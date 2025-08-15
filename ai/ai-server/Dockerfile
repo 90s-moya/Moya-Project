@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y \
 
 # requirements.txt 먼저 복사 → 캐시 최대 활용
 COPY requirements.txt /app/requirements.txt
-
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 RUN pip uninstall -y opencv-python opencv-python-headless opencv-contrib-python || true && \
     pip install --no-cache-dir --extra-index-url https://pypi.nvidia.com opencv-python-headless==4.10.0.84 && \
     pip install --no-cache-dir -r requirements.txt
