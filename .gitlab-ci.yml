@@ -4,6 +4,8 @@ stages:
 
 variables:
   DOCKER_IMAGE: gyujh630/moya-be
+  DOCKER_BUILDKIT: 1
+  BUILDKIT_PROGRESS: plain
 
 before_script:
   - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
@@ -100,11 +102,6 @@ deploy-fe:
   only:
     - fe-main
     - master
-
-
-variables:
-  DOCKER_BUILDKIT: 1
-  BUILDKIT_PROGRESS: plain
 
 build-ai:
   stage: build
