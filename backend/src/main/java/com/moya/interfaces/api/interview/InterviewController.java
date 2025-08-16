@@ -43,6 +43,7 @@ public class InterviewController {
         }
         // 비디오 파일 저장
         InterviewVideoCommand fileUrls = interviewService.createInterviewVideo(uploadInterviewRequest, "video");
+        System.out.println(fileUrls.getVideoUrl());
 
         return ResponseEntity.ok(fileUrls);
     }
