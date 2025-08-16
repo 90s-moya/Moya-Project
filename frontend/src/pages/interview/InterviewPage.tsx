@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, MicOff, Settings, Loader2 } from "lucide-react"
 import aiCharacter from "@/assets/images/interviewer_version_1.jpg"
+import aiInterview from "@/assets/images/ai-character.png"
 import { useAnswerRecorder } from "@/lib/recording/useAnswerRecorder"
 import AnswerRecorder from "@/components/interview/AnswerRecorder"
 import { type QuestionKey } from "@/types/interview"
@@ -152,7 +153,7 @@ export default function InterviewScreen() {
         </div>
         {/* AI 면접 안내 + 캐릭터 이미지 */}
         <div className="flex items-center gap-2">
-          <img src={aiCharacter} alt="AI 면접관" className="w-8 h-8 rounded-full object-cover border-2 border-blue-200 shadow-sm" style={{ minWidth: 32, minHeight: 32 }} />
+          <img src={aiInterview} alt="AI 면접관" className="w-8 h-8 rounded-full object-cover border-2 border-blue-200 shadow-sm" style={{ minWidth: 32, minHeight: 32 }} />
           <span className="text-blue-700 font-extrabold tracking-tight text-base md:text-lg whitespace-nowrap">AI 면접</span>
         </div>
       </div>

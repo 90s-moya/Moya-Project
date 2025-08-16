@@ -7,6 +7,10 @@ type Props = {
   onDone: () => void
 }
 
+/**
+ * 전체 화면 카운트다운 오버레이 (기능 동일)
+ * - CSS만 커스텀: 파스텔 백그라운드, 캐릭터 응원, 팝 애니메이션
+ */
 export default function CountdownOverlay({ seconds = 3, onDone }: Props) {
   const left = useCountdown(seconds)
 
@@ -16,10 +20,7 @@ export default function CountdownOverlay({ seconds = 3, onDone }: Props) {
 
   return (
     <div className="countdown-overlay fixed inset-0 z-[100] flex items-center justify-center">
-      <div
-        aria-live="assertive"
-        className="countdown-number select-none"
-      >
+      <div aria-live="assertive" className="countdown-number select-none">
         {left}
       </div>
 
@@ -42,7 +43,7 @@ export default function CountdownOverlay({ seconds = 3, onDone }: Props) {
           bottom: 6%;
           width: 120px;
           height: 120px;
-          background-image: url('/assets/images/clover.png');
+          background-image: url('/assets/images/clover.png'); /* public 기준 경로 */
           background-size: contain;
           background-repeat: no-repeat;
           filter: drop-shadow(0 8px 16px rgba(59,130,246,0.35));
