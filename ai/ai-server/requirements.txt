@@ -43,7 +43,6 @@ networkx==3.2.1
 numpy==1.26.4
 omegaconf==2.3.0
 openai-whisper==20250625
-opencv-contrib-python-headless==4.10.0.84
 opt_einsum==3.3.0
 packaging==24.1
 pillow==10.3.0
