@@ -52,7 +52,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libswscale-dev libswresample-dev \
     xz-utils curl ca-certificates jq \
     ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -s /usr/bin/ffmpeg /usr/local/bin/ffmpeg   # 심볼릭 링크 추가
 
 # ============================ #
 # 최적화 ENV
