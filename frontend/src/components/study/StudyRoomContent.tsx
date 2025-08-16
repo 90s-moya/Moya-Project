@@ -100,6 +100,7 @@ export default function StudyRoomContent({
                     roomId={roomId}
                     userDocs={getParticipantDocs(participant.id)}
                     onDocsClick={handleDocsClick}
+                    onOpenFeedback={onOpenFeedback}
                   />
                 </div>
               ))}
