@@ -1,4 +1,23 @@
 # Face video_optimized.py
+# TensorFlow Lite CPU 델리게이트 강제 차단
+import os
+# 모든 TensorFlow CPU 델리게이트 차단 (임포트 전)
+os.environ.update({
+    'TF_DISABLE_XNNPACK': '1',
+    'TF_DISABLE_ONEDNN': '1',
+    'TF_DISABLE_MKL': '1', 
+    'TF_DISABLE_SEGMENT_REDUCTION': '1',
+    'TF_LITE_DISABLE_CPU_DELEGATE': '1',
+    'TF_LITE_DISABLE_XNNPACK': '1',
+    'TF_LITE_FORCE_GPU_DELEGATE': '1',
+    'TF_XLA_FLAGS': '--tf_xla_auto_jit=0',
+    'TF_ENABLE_ONEDNN_OPTS': '0',
+    'TF_CPP_MIN_LOG_LEVEL': '3',
+    'MEDIAPIPE_DISABLE_XNNPACK': '1',
+    'MEDIAPIPE_DISABLE_CPU_INFERENCE': '1'
+})
+print("[PRE-IMPORT] All CPU delegates disabled before module imports")
+
 # video_optimized.py (완전 교체본: 기본 실행 시 '면접 최적 프리셋' 자동 적용)
 # - 얼굴 검출+크롭(MediaPipe)
 # - 블러/크기 품질 필터
@@ -10,7 +29,6 @@
 # - 해피-가드(--happy-guard): 입꼬리/눈가 단서 없으면 happy 강등
 # - ★ bare call(옵션 없이 실행) 시 면접 프리셋 자동 적용
 
-import os
 import sys
 import cv2
 import json
@@ -82,14 +100,41 @@ GPU_AVAILABLE = init_gpu_acceleration()
 
 UNCERTAIN_LABEL = "불확실"
 
-# ===== MediaPipe 준비 =====
+# ===== MediaPipe 준비 (CPU 델리게이트 차단) =====
 # pip install mediapipe
 try:
-    import mediapipe as mp
-    MP_AVAILABLE = True
-    mp_fd = mp.solutions.face_detection
-    mp_fm = mp.solutions.face_mesh
-except Exception:
+    # MediaPipe 임포트 전 추가 CPU 델리게이트 차단
+    import os
+    os.environ['MEDIAPIPE_DISABLE_XNNPACK'] = '1'
+    os.environ['MEDIAPIPE_DISABLE_CPU_INFERENCE'] = '1'
+    os.environ['MEDIAPIPE_FORCE_GPU_ONLY'] = '1'
+    
+    # TensorFlow Lite 로그 억제
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+    
+    # absl 로그 억제
+    import logging
+    logging.getLogger('absl').setLevel(logging.ERROR)
+    
+    # stderr 리다이렉트
+    import sys
+    import io
+    from contextlib import redirect_stderr
+    
+    # MediaPipe 임포트 시 stderr 억제
+    stderr_backup = sys.stderr
+    try:
+        with redirect_stderr(io.StringIO()):
+            import mediapipe as mp
+        MP_AVAILABLE = True
+        mp_fd = mp.solutions.face_detection
+        mp_fm = mp.solutions.face_mesh
+        print("[MEDIAIPE] Imported with CPU delegate blocking")
+    finally:
+        sys.stderr = stderr_backup
+        
+except Exception as e:
+    print(f"[WARNING] MediaPipe import failed: {e}")
     MP_AVAILABLE = False
     mp_fd = None
     mp_fm = None
