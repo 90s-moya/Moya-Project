@@ -117,6 +117,21 @@ ENV CUDA_VISIBLE_DEVICES=0 \
     PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512 \
     CUDA_LAUNCH_BLOCKING=0
 
+# TensorFlow/MediaPipe GPU 가속 설정
+ENV TF_FORCE_GPU_ALLOW_GROWTH=true \
+    TF_GPU_ALLOCATOR=cuda_malloc_async \
+    TF_CPP_MIN_LOG_LEVEL=3 \
+    MEDIAPIPE_ENABLE_GPU=1 \
+    MEDIAPIPE_GPU_DEVICE=0
+
+# OpenCV GPU 가속 설정
+ENV OPENCV_DNN_BACKEND=5 \
+    OPENCV_DNN_TARGET=6
+
+# 기타 GPU 가속 라이브러리 설정
+ENV NUMBA_ENABLE_CUDASIM=0 \
+    NUMBA_CUDA_USE_NVIDIA_BINDING=1
+
 # 빌더에서 산출물 복사
 COPY --from=builder /usr/local /usr/local
 COPY --from=builder /root/.ptgaze /root/.ptgaze

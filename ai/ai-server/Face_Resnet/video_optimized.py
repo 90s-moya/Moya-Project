@@ -22,6 +22,27 @@ from datetime import datetime
 from collections import Counter
 from transformers import ResNetForImageClassification, ResNetConfig, AutoImageProcessor
 
+# Tesla T4 GPU 가속 초기화
+def init_gpu_acceleration():
+    """Tesla T4 GPU 가속 초기화"""
+    try:
+        # OpenCV GPU 백엔드 설정
+        if cv2.cuda.getCudaEnabledDeviceCount() > 0:
+            print(f"[GPU] OpenCV CUDA devices: {cv2.cuda.getCudaEnabledDeviceCount()}")
+            cv2.setUseOptimized(True)  # OpenCV 최적화 활성화
+            
+            # DNN 백엔드를 CUDA로 설정
+            cv2.dnn.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+            cv2.dnn.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+            print("[GPU] OpenCV DNN backend set to CUDA")
+        else:
+            print("[WARNING] No CUDA devices found for OpenCV")
+    except Exception as e:
+        print(f"[WARNING] GPU acceleration init failed: {e}")
+
+# GPU 가속 초기화 실행
+init_gpu_acceleration()
+
 UNCERTAIN_LABEL = "불확실"
 
 # ===== MediaPipe 준비 =====
@@ -39,13 +60,27 @@ except Exception:
 def init_face_detector(min_conf=0.5, model_selection=1):
     if not MP_AVAILABLE or mp_fd is None:
         return None
-    return mp_fd.FaceDetection(model_selection=model_selection,
-                               min_detection_confidence=min_conf)
+    # Tesla T4 GPU 가속 설정
+    return mp_fd.FaceDetection(
+        model_selection=model_selection,
+        min_detection_confidence=min_conf,
+        # GPU 가속 활성화 (Tesla T4)
+        enable_gpu=True,
+        gpu_id=0
+    )
 
 def init_face_mesh():
     if not MP_AVAILABLE or mp_fm is None:
         return None
-    return mp_fm.FaceMesh(static_image_mode=False, max_num_faces=1, refine_landmarks=True)
+    # Tesla T4 GPU 가속 설정
+    return mp_fm.FaceMesh(
+        static_image_mode=False, 
+        max_num_faces=1, 
+        refine_landmarks=True,
+        # GPU 가속 활성화 (Tesla T4)
+        enable_gpu=True,
+        gpu_id=0
+    )
 
 def detect_and_crop_face(frame_bgr, detector, margin=0.2, min_face=80):
     h, w = frame_bgr.shape[:2]
@@ -94,12 +129,22 @@ def load_model_and_processor(model_name):
     import os
     import logging
     
-    # PyTorch CUDA 최적화 설정 (Tesla T4)
+    # Tesla T4 GPU 가속 설정
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     os.environ['TORCH_CUDNN_V8_API_ENABLED'] = '1'  # cuDNN v8 최적화
     
+    # TensorFlow Lite GPU 델리게이트 설정 (MediaPipe용)
+    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+    os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # TF 로그 억제
+    
+    # MediaPipe GPU 설정
+    os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
+    os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
+    
     # 경고 메시지 억제
     logging.getLogger('transformers').setLevel(logging.ERROR)
+    logging.getLogger('tensorflow').setLevel(logging.ERROR)
     
     # Tesla T4 최적화: 메모리 효율적 모델 로드
     model = ResNetForImageClassification.from_pretrained(

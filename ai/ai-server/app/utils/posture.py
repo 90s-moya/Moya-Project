@@ -7,6 +7,17 @@ import datetime
 import tempfile
 import os
 
+# Tesla T4 GPU 가속 초기화 (Posture 분석용)
+def init_posture_gpu():
+    """자세 분석 GPU 가속 초기화"""
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
+    os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
+    print("[GPU] Posture analysis GPU acceleration initialized")
+
+# GPU 가속 초기화 실행
+init_posture_gpu()
+
 mp_pose = mp.solutions.pose
 
 def _get_center(p1, p2):
@@ -143,9 +154,16 @@ def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every:
         tmp.write(file_bytes)
         tmp_path = tmp.name
 
-    pose_ctx = mp_pose.Pose(static_image_mode=False,
-                            min_detection_confidence=0.5,
-                            model_complexity=1)
+    # Tesla T4 GPU 가속 MediaPipe Pose
+    pose_ctx = mp_pose.Pose(
+        static_image_mode=False,
+        min_detection_confidence=0.5,
+        model_complexity=1,
+        # GPU 가속 설정
+        enable_segmentation=False,  # 세그멘테이션 비활성화로 성능 향상
+        smooth_landmarks=True,      # 부드러운 랜드마크 추적
+        min_tracking_confidence=0.5
+    )
     cap = cv2.VideoCapture(tmp_path)
 
     try:
