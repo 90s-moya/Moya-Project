@@ -448,11 +448,14 @@ async def analyze_complete(
     stride: int = Form(5),
     return_points: bool = Form(False),
     calib_data: Optional[str] = Form(None),
+    # ↓↓↓ 새로 추가: 디버그를 응답에도 포함하고 싶으면 true 로
+    return_debug: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="빈 파일")
+
     parsed_calib_data = None
     if calib_data:
         try:
@@ -463,17 +466,37 @@ async def analyze_complete(
     # (1) QA 조회/생성
     qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order)
 
-    # (2) 분석 실행
+    # (2) 분석 실행 (+ 디버그)
     try:
-        out = analyze_all(data, device=device, stride=stride, return_points=return_points, calib_data=parsed_calib_data)
+        out = analyze_all(
+            data,
+            device=device,
+            stride=stride,
+            return_points=return_points,
+            calib_data=parsed_calib_data,
+            return_debug=return_debug,   # ← 전달
+        )
     except Exception as e:
+        log.exception("complete analysis 실패")
         raise HTTPException(status_code=500, detail=f"complete analysis 실패: {e}")
 
-    # (3) 결과 저장 (파일 업로드 자체는 외부에서 하고 URL만 따로 넣을 수 있음)
+    # FFmpeg/전처리 디버그를 서버 로그에 남김
+    try:
+        dbg = out.get("debug") if isinstance(out, dict) else None
+        if dbg:
+            log.info(
+                "[ffmpeg] pipeline=%s encoder=%s decoder=%s scale=%s input=%s prefer=%s",
+                dbg.get("pipeline"), dbg.get("encoder"), dbg.get("decoder"),
+                dbg.get("scale"), dbg.get("input_codec"), dbg.get("preferred_encoder"),
+            )
+    except Exception:
+        pass
+
+    # (3) 결과 저장
     qa = save_results_to_qa(db, qa, video_url=qa.video_url, result=out)
 
-    # (4) 응답
-    return {
+    # (4) 응답 (요청 시 디버그 포함)
+    resp = {
         "result_id": qa.id,
         "report_id": qa.session_id,
         "order": qa.order,
@@ -485,10 +508,12 @@ async def analyze_complete(
         "gaze_result": qa.gaze_result,
         "created_at": qa.created_at.isoformat() + "Z" if qa.created_at else None,
     }
+    if return_debug and isinstance(out, dict) and out.get("debug") is not None:
+        resp["preprocess_debug"] = out["debug"]
+    return resp
 
-# --------------------------
-# (신규) 분석: URL 입력 + 세부키
-# --------------------------
+
+# --- PATCH: /v1/analyze/complete-by-url --------------------------------------
 @router.post("/v1/analyze/complete-by-url")
 async def analyze_complete_by_url(
     video_url: str = Form(...),
@@ -500,6 +525,8 @@ async def analyze_complete_by_url(
     return_points: bool = Form(False),
     thumbnail_url: Optional[str] = Form(None),
     calib_data: Optional[str] = Form(None),
+    # ↓↓↓ 새로 추가
+    return_debug: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     parsed_calib_data = None
@@ -508,15 +535,12 @@ async def analyze_complete_by_url(
             parsed_calib_data = json.loads(calib_data)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid calib_data JSON: {e}")
-    """
-    비디오 URL을 직접 받아서 다운로드 → 분석 → 결과 DB 저장
-    """
+
     # (1) QA 조회/생성
-    qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order,calib_data=parsed_calib_data)
+    qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order, calib_data=parsed_calib_data)
 
     # (2) URL에서 비디오 다운로드
     try:
-        # URL에서 개행문자 및 공백 제거
         clean_url = video_url.strip().replace('\n', '').replace('\r', '')
         async with httpx.AsyncClient(timeout=60) as client:
             r = await client.get(clean_url)
@@ -525,19 +549,39 @@ async def analyze_complete_by_url(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"URL 다운로드 실패: {e}")
 
-    # (3) 분석 실행
+    # (3) 분석 실행 (+ 디버그)
     try:
-        out = analyze_all(data, device=device, stride=stride, return_points=return_points, calib_data=parsed_calib_data)
+        out = analyze_all(
+            data,
+            device=device,
+            stride=stride,
+            return_points=return_points,
+            calib_data=parsed_calib_data,
+            return_debug=return_debug,
+        )
     except Exception as e:
+        log.exception("URL 분석 실패")
         raise HTTPException(status_code=500, detail=f"URL 분석 실패: {e}")
+
+    # FFmpeg/전처리 디버그를 서버 로그에 남김
+    try:
+        dbg = out.get("debug") if isinstance(out, dict) else None
+        if dbg:
+            log.info(
+                "[ffmpeg] pipeline=%s encoder=%s decoder=%s scale=%s input=%s prefer=%s",
+                dbg.get("pipeline"), dbg.get("encoder"), dbg.get("decoder"),
+                dbg.get("scale"), dbg.get("input_codec"), dbg.get("preferred_encoder"),
+            )
+    except Exception:
+        pass
+
+    # (4) 저장
     rel_video = to_files_relative(video_url)
     rel_thumb = to_files_relative(thumbnail_url)
-
     qa = save_results_to_qa(db, qa, video_url=rel_video, thumbnail_url=rel_thumb, result=out)
 
-
-    # (5) 응답
-    return {
+    # (5) 응답 (요청 시 디버그 포함)
+    resp = {
         "result_id": qa.id,
         "report_id": qa.session_id,
         "order": qa.order,
@@ -549,6 +593,9 @@ async def analyze_complete_by_url(
         "gaze_result": qa.gaze_result,
         "created_at": qa.created_at.isoformat() + "Z" if qa.created_at else None,
     }
+    if return_debug and isinstance(out, dict) and out.get("debug") is not None:
+        resp["preprocess_debug"] = out["debug"]
+    return resp
 
 @router.post("/v1/face/predict")
 async def face_predict(file: UploadFile = File(...), device: str = "cpu"):
