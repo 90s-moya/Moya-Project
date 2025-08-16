@@ -158,8 +158,8 @@ def preprocess_video_to_mp4_file(
     """
     ffmpeg = _which_ffmpeg()
     # Tesla T4 (4 vCPU) 최적화 설정
-    threads = os.getenv("FFMPEG_THREADS", "3")
-    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "2")
+    threads = os.getenv("FFMPEG_THREADS", "1")
+    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
     x264_preset = os.getenv("X264_PRESET", "veryfast")
     x264_crf = int(os.getenv("X264_CRF", "28"))
 
