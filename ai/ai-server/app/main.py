@@ -1,24 +1,8 @@
 
 # app/main.py
-# >>> 이 블록을 파일 맨 위, 어떤 import 보다 먼저 둡니다 <<<
+# TensorFlow Lite CPU 델리게이트 강제 차단 (모든 임포트 전 실행)
+
 import os
-# 사전에 누가 세팅했어도 강제로 해제
-for k in ("TF_FORCE_GPU_ONLY", "MEDIAPIPE_FORCE_GPU_DELEGATE", "MEDIAPIPE_DISABLE_CPU_DELEGATE"):
-    if os.environ.get(k):
-        print(f"[CLEANUP] Unset {k}")
-        os.environ.pop(k, None)
-
-# 스레드 캡으로 CPU 스파이크 완화
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
-os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
-os.environ.setdefault("TFLITE_NUM_THREADS", "1")
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
-
-
-print("[STARTUP] GPU-only mode initialized - All CPU delegates DISABLED")
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
