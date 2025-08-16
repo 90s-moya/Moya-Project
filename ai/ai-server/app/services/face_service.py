@@ -21,8 +21,16 @@ ROOT = Path(__file__).resolve().parents[2]
 FACE_DIR = ROOT / "Face_Resnet"
 sys.path.insert(0, str(FACE_DIR))
 
-from Face_Resnet.model import load_model
-from Face_Resnet.video_optimized import analyze_video_bytes
+try:
+    from Face_Resnet.model import load_model
+    from Face_Resnet.video_optimized import analyze_video_bytes
+except ImportError as e:
+    print(f"Warning: Face_Resnet import failed: {e}")
+    # 기본 함수들 정의
+    def load_model(*args, **kwargs):
+        raise RuntimeError("Face_Resnet model not available")
+    def analyze_video_bytes(*args, **kwargs):
+        raise RuntimeError("Face_Resnet video analysis not available")
 
 CKPT_PATH = str(FACE_DIR / "best_model.pt")
 CLASS_NAMES = ["angry","disgust","fear","happy","sad","surprise","neutral"]
