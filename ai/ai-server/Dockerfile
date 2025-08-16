@@ -16,12 +16,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     default-libmysqlclient-dev pkg-config \
     libgl1 libglib2.0-0 \
     wget curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 # Python 패키지 wheel 빌드
 COPY requirements.txt /app/requirements.txt
 RUN python3.10 -m pip install --upgrade pip && \
-    python3.10 -m pip wheel --wheel-dir=/wheels -r requirements.txt
+    python3.10 -m pip wheel --wheel-dir=/wheels -r requirements.txt && \
+    rm -rf /root/.cache/pip
 
 # PTGaze 모델 다운로드
 RUN mkdir -p /root/.ptgaze/models && \
@@ -41,14 +43,16 @@ FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu22.04 AS runner
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app:$PYTHONPATH
 
 # 런타임 의존성 최소화 + ffmpeg만 설치
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10 python3-pip \
     libgl1 libglib2.0-0 \
     ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 # ============================ #
 # 최적화 ENV
@@ -69,7 +73,7 @@ ENV FFMPEG_PREFER_ORDER=h264_nvenc,libx264 \
     X264_PRESET=veryfast \
     X264_CRF=28
 
-ENV LD_LIBRARY_PATH=/usr/local/lib:/opt/ffmpeg/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=/usr/local/lib:/opt/ffmpeg/lib:/usr/lib/x86_64-linux-gnu
 
 ENV NVENC_PRESET=p1 \
     NVENC_TUNE=ull \
@@ -86,27 +90,15 @@ ENV CUDA_VISIBLE_DEVICES=0 \
 # ============================ #
 # 빌더 산출물 복사
 # ============================ #
-# wheel 기반 설치 → Runner에서 패키지만 설치
 COPY --from=builder /wheels /wheels
-RUN python3.10 -m pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
+RUN python3.10 -m pip install --no-cache-dir --no-index --find-links=/wheels /wheels/* \
+ && rm -rf /wheels /root/.cache/pip
 
 COPY --from=builder /root/.ptgaze /root/.ptgaze
 COPY --from=builder /app /app
-
-# 권한 설정
-RUN set -e; \
-    if [ -d "/root/.ptgaze/models/" ]; then \
-        chmod -R 644 /root/.ptgaze/models/ || true; \
-    fi; \
-    if [ -d "/app" ]; then \
-        find /app -type f -name "*.py" -exec chmod 644 {} \; || true; \
-        find /app -type d -exec chmod 755 {} \; || true; \
-    fi
 
 # ============================ #
 # 실행 설정
 # ============================ #
 EXPOSE 8000
-ENV PYTHONPATH=/app:${PYTHONPATH:-}
-
 CMD ["sh", "-c", "cd /app && python3.10 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level info"]
