@@ -184,22 +184,41 @@ def preprocess_video_to_mp4_bytes(
         return cmd
 
     def build_nvenc_cmd() -> list[str]:
-        # CPU 디코드 → CPU 스케일 → NVENC (GPU 스케일 제거)
-        vf_parts = []
-        if vf_scale_cpu:
-            vf_parts.append(vf_scale_cpu)
+        """
+        수정된 파이프라인: CPU 디코드 -> GPU 업로드 -> GPU 스케일 -> GPU 인코드
+        """
         cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin",
                "-y", "-i", in_path, "-threads", threads, "-filter_threads", filter_threads]
+
+        vf_parts = []
+        # GPU 스케일이 가능하고, 리사이즈가 필요한 경우
+        if resize_to and has_scale_cuda:
+            # 1. CPU에서 디코딩된 프레임을 GPU 메모리로 업로드
+            vf_parts.append("hwupload_cuda")
+            
+            # 2. GPU를 사용하여 프레임 리사이즈
+            w, h = int(resize_to[0]), int(resize_to[1])
+            scaler = "scale_cuda" if _has(ffmpeg, "filter", "scale_cuda") else "scale_npp"
+            vf_parts.append(f"{scaler}={w}:{h}")
+            
+            # 3. h264_nvenc는 GPU 메모리를 직접 처리 가능 (hwdownload 불필요)
+
+        # GPU 스케일이 불가능하거나, 리사이즈가 필요 없는 경우 CPU 스케일로 폴백
+        elif resize_to:
+            vf_parts.append(vf_scale_cpu)
+
         if vf_parts:
             cmd += ["-vf", ",".join(vf_parts)]
+            
         if target_fps and target_fps > 0:
             cmd += ["-r", str(int(target_fps))]
         if max_frames is not None:
             cmd += ["-frames:v", str(int(max_frames))]
         if drop_audio:
             cmd += ["-an"]
+            
+        # GPU 필터 체인의 출력은 h264_nvenc가 바로 처리할 수 있음
         cmd += [
-            "-pix_fmt", "yuv420p",
             "-movflags", "+faststart",
             "-c:v", "h264_nvenc",
             "-preset", nvenc_preset,
@@ -213,6 +232,7 @@ def preprocess_video_to_mp4_bytes(
             "-zerolatency", "1",      # 제로 레이턴시 모드
             "-forced-idr", "1",       # 강제 IDR 프레임
             "-aq-strength", "1",      # 적응형 양자화 최소화 (속도 우선)
+            "-extra_hw_frames", "8",  # GPU 메모리 프레임 버퍼
             out_path
         ]
         return cmd
@@ -272,11 +292,22 @@ def preprocess_video_to_mp4_bytes(
                 try:
                     _run_ffmpeg(build_nvenc_cmd())
                     nvenc_success = True
-                    debug.update({
-                        "pipeline": "cpu-scale+gpu-enc",
-                        "encoder": "h264_nvenc",
-                        "scale": "scale(cpu)" if resize_to else None,
-                    })
+                    # GPU 스케일링 사용 여부에 따른 파이프라인 정보 업데이트
+                    if resize_to and has_scale_cuda:
+                        scaler = "scale_cuda" if _has(ffmpeg, "filter", "scale_cuda") else "scale_npp"
+                        debug.update({
+                            "pipeline": "cpu-dec+gpu-scale+gpu-enc",
+                            "encoder": "h264_nvenc",
+                            "scale": scaler,
+                            "memory_path": "cpu->gpu->gpu"
+                        })
+                    else:
+                        debug.update({
+                            "pipeline": "cpu-dec+cpu-scale+gpu-enc",
+                            "encoder": "h264_nvenc", 
+                            "scale": "scale(cpu)" if resize_to else None,
+                            "memory_path": "cpu->cpu->gpu"
+                        })
                 except RuntimeError as e:
                     # NVENC 실패시 로그 남기고 libx264로 폴백
                     debug["nvenc_error"] = str(e)
