@@ -107,15 +107,7 @@ export default function StudyRoomContent({
 
           {/* 오른쪽: 서류 캐러셀 (화면의 절반) - StudyListPage 스타일 적용 */}
           <div className="w-1/2 h-full">
-            <Card className="h-full p-6">
-              {/* 서류 섹션 헤더 */}
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-[#1b1c1f] flex items-center gap-2">
-                  <FileText className="w-6 h-6 text-[#2b7fff]" />
-                  참여자 서류
-                </h2>
-              </div>
-
+            <Card className="h-full p-3 pt-1">
               {/* 서류 캐러셀 */}
               <div className="flex-1 bg-gray-50 rounded-lg overflow-hidden">
                 <Carousel
