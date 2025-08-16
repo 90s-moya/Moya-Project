@@ -11,7 +11,7 @@ from PIL import Image
 from torchvision import transforms
 import cv2
 import numpy as np
-
+from contextlib import nullcontext
 from app.utils.accelerator import init_runtime
 init_runtime()
 
@@ -33,6 +33,13 @@ _preprocess = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=(0.485,0.456,0.406), std=(0.229,0.224,0.225)),
 ])
+def _autocast_ctx(dev: str):
+    if dev == "cuda":
+        try:
+            return torch.amp.autocast("cuda")  # 신 API
+        except Exception:
+            return torch.cuda.amp.autocast()   # 구 API 폴백
+    return nullcontext()
 
 def cleanup_gpu_memory():
     if torch.cuda.is_available():
@@ -150,14 +157,12 @@ def infer_face_frames(
         nonlocal xs, frame_ids, probs_sum
         if not xs: return []
         x = torch.stack(xs, dim=0).to(dev, non_blocking=True)
-        if dev == "cuda": x = x.half()
+        if dev == "cuda":
+            x = x.half()
         with torch.no_grad():
-            if dev == "cuda":
-                with torch.cuda.amp.autocast():
-                    logits = model(x)
-            else:
+            with _autocast_ctx(dev):
                 logits = model(x)
-            p = F.softmax(logits, dim=1)  # (N,C)
+            p = F.softmax(logits, dim=1)    
         probs_sum += p.sum(dim=0)
         outs = p.detach().cpu().numpy()
         xs.clear(); ids = frame_ids[:]; frame_ids.clear()
