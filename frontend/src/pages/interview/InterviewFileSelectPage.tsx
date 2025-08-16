@@ -165,7 +165,7 @@ export default function InterviewFileSelectPage() {
               
               <div className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
                 <p className="text-lg text-slate-700 max-w-2xl">
-                  탭에서 유형을 선택해 1개 이상 고르세요. <span className="font-semibold text-blue-600">AI가 서류를 분석해 인터뷰를 준비</span>합니다 ✨
+                  탭에서 유형을 선택해 1개 이상 고르세요. <span className="font-semibold text-blue-600">AI가 서류를 분석해 인터뷰를 준비</span>합니다
                 </p>
               </div>
             </div>
@@ -272,7 +272,7 @@ export default function InterviewFileSelectPage() {
                         </div>
                         <span className="text-sm font-semibold text-slate-600">{STATUS_LABEL[d.docsStatus as DocType]}</span>
                       </div>
-                      <div
+                      {/* <div
                         className={[
                           "h-5 w-5 rounded-full border-2 transition-all duration-300",
                           checked 
@@ -280,14 +280,14 @@ export default function InterviewFileSelectPage() {
                             : "border-slate-300 bg-white group-hover:border-blue-400"
                         ].join(" ")}
                         aria-hidden
-                      />
+                      /> */}
                     </div>
 
                     <div className="mb-4 text-sm font-semibold text-slate-900 line-clamp-2 leading-relaxed">
                       {prettyFileName(display)}
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center">
                       <a
                         className="text-sm underline text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200"
                         href={display}
@@ -295,11 +295,8 @@ export default function InterviewFileSelectPage() {
                         rel="noreferrer"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        📂 열기
+                        열기
                       </a>
-                      <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
-                        클릭해서 선택
-                      </span>
                     </div>
 
                     {/* Selection indicator */}

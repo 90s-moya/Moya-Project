@@ -29,7 +29,7 @@ export default function Component() {
           <div className="text-center md:text-left space-y-6">
             <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
               <span className="inline-flex items-center rounded-full border border-blue-200 bg-white/80 backdrop-blur-sm px-4 py-2 text-sm font-semibold text-blue-700 shadow-lg shadow-blue-100/50">
-                ✨ 맞춤형 1:1 AI 인터뷰
+                개인 맞춤형 AI 인터뷰
               </span>
             </div>
             
@@ -43,7 +43,10 @@ export default function Component() {
               <p className="text-slate-700 md:text-xl font-medium leading-relaxed">
                 모야와 함께 자신감을 키우고, <span className="font-semibold text-blue-600">합격으로 가는 길</span>을 열어보세요
               </p>
+              <p className="text-sm text-slate-500">시작을 누르면 서류 선택 화면으로 이동합니다</p>
             </div>
+
+
 
             <div className="animate-fade-in-up space-y-4" style={{ animationDelay: '0.8s' }}>
               <Button
@@ -57,10 +60,6 @@ export default function Component() {
                 <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 opacity-75 blur-sm group-hover:opacity-100 transition-opacity duration-300" />
               </Button>
               
-              <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-                <span>시작을 누르면 서류 선택 화면으로 이동합니다</span>
-              </div>
             </div>
           </div>
 
