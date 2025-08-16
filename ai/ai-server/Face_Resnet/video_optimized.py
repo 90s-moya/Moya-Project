@@ -22,9 +22,22 @@ from datetime import datetime
 from collections import Counter
 from transformers import ResNetForImageClassification, ResNetConfig, AutoImageProcessor
 
-# Tesla T4 GPU 가속 초기화
+# Tesla T4 GPU 전용 초기화 (CPU 완전 차단)
 def init_gpu_acceleration():
-    """Tesla T4 GPU 가속 초기화"""
+    """Tesla T4 GPU 전용 초기화"""
+    import os
+    
+    # TensorFlow CPU 백엔드 완전 차단
+    os.environ['TF_DISABLE_XNNPACK'] = '1'
+    os.environ['TF_DISABLE_ONEDNN'] = '1'  
+    os.environ['TF_DISABLE_MKL'] = '1'
+    os.environ['TF_LITE_DISABLE_CPU_DELEGATE'] = '1'
+    os.environ['TF_FORCE_GPU_ONLY'] = '1'
+    
+    # MediaPipe GPU 강제 설정
+    os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
+    os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
+    
     try:
         # OpenCV GPU 백엔드 설정
         if cv2.cuda.getCudaEnabledDeviceCount() > 0:
@@ -35,12 +48,15 @@ def init_gpu_acceleration():
             cv2.dnn.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
             cv2.dnn.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
             print("[GPU] OpenCV DNN backend set to CUDA")
+            print("[GPU] CPU delegates DISABLED - GPU ONLY MODE")
         else:
-            print("[WARNING] No CUDA devices found for OpenCV")
+            print("[ERROR] No CUDA devices found - GPU acceleration required!")
+            raise RuntimeError("GPU required but not available")
     except Exception as e:
-        print(f"[WARNING] GPU acceleration init failed: {e}")
+        print(f"[ERROR] GPU acceleration init failed: {e}")
+        raise
 
-# GPU 가속 초기화 실행
+# GPU 전용 초기화 실행
 init_gpu_acceleration()
 
 UNCERTAIN_LABEL = "불확실"
