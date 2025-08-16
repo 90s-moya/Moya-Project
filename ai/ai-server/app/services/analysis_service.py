@@ -1,75 +1,125 @@
-import cv2
-import tempfile
+# app/services/video_pipeline.py
 import os
+import shutil
+import subprocess
+import tempfile
 from datetime import datetime
+
 from app.utils.posture import analyze_video_bytes
 from app.services.gaze_service import infer_gaze
 from app.services.face_service import infer_face_video
 
-def preprocess_video_cuda(video_bytes: bytes, target_fps: int = 30, max_frames: int = 1800, resize_to=(960, 540)) -> bytes:
-    """영상 FPS 제한 + 해상도 축소 (CUDA 가속 OpenCV 사용)"""
 
-    # 1) 원본 임시 저장
-    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
-        tmp.write(video_bytes)
-        tmp_path = tmp.name
+def _which_ffmpeg() -> str:
+    """ffmpeg 실행 파일 경로 확인"""
+    path = shutil.which("ffmpeg")
+    if not path:
+        raise RuntimeError("ffmpeg 실행 파일을 찾을 수 없습니다. 컨테이너/호스트에 ffmpeg를 설치하세요.")
+    return path
 
-    cap = cv2.VideoCapture(tmp_path)
-    if not cap.isOpened():
-        raise RuntimeError("비디오 파일을 열 수 없습니다 (CUDA 전처리)")
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps <= 0 or fps > 240:
-        fps = 30
+def _pick_encoder(ffmpeg_path: str) -> str:
+    """
+    가능한 경우 하드웨어 인코더 사용.
+    없으면 libx264로 폴백.
+    """
+    try:
+        out = subprocess.check_output(
+            [ffmpeg_path, "-hide_banner", "-v", "error", "-encoders"], text=True
+        )
+    except Exception:
+        return "libx264"
 
-    frame_interval = max(1, int(round(fps / target_fps)))
-    out_path = tmp_path + "_processed.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out_writer = None
+    # 우선순위: NVIDIA → Intel QSV → (macOS는 컨테이너에 보통 해당 없음) → CPU
+    if "h264_nvenc" in out:
+        return "h264_nvenc"
+    if "h264_qsv" in out:
+        return "h264_qsv"
+    # (videotoolbox는 리눅스 컨테이너 환경에 일반적으로 없음)
+    return "libx264"
 
-    frame_count = 0
-    processed_frames = 0
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+def preprocess_video_ffmpeg(
+    video_bytes: bytes,
+    target_fps: int = 30,
+    max_frames: int = 1800,
+    resize_to: tuple[int, int] | None = (320, 240),
+    keep_aspect: bool = False,
+    crf: int = 23,
+) -> bytes:
+    """
+    FFmpeg 기반 전처리:
+    - webm → mp4 변환
+    - FPS 제한
+    - 리사이즈 (고정/비율 유지 택1)
+    - 프레임 수 제한
+    - 가능한 경우 하드웨어 인코딩(NVENC/QSV)
+    """
+    ffmpeg = _which_ffmpeg()
+    encoder = _pick_encoder(ffmpeg)
 
-        if frame_count % frame_interval == 0:
-            # --- CUDA Mat로 업로드 ---
-            gpu_frame = cv2.cuda_GpuMat()
-            gpu_frame.upload(frame)
+    # 1) 입력 바이트 임시 파일 저장
+    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
+        tmp_in.write(video_bytes)
+        in_path = tmp_in.name
+    out_path = in_path + "_processed.mp4"
 
-            # --- CUDA Resize ---
-            if resize_to:
-                gpu_frame = cv2.cuda.resize(gpu_frame, resize_to)
+    try:
+        vf_filters = []
+        if target_fps and target_fps > 0:
+            vf_filters.append(f"fps={int(target_fps)}")
 
-            # --- CPU로 다시 다운로드 (VideoWriter는 CPU 기반) ---
-            frame_resized = gpu_frame.download()
+        if resize_to:
+            w, h = int(resize_to[0]), int(resize_to[1])
+            if keep_aspect:
+                # 종횡비 유지 축소
+                vf_filters.append(
+                    f"scale='if(gt(a,{w}/{h}),{w},-2)':'if(gt(a,{w}/{h}),-2,{h})'"
+                )
+            else:
+                # 고정 리사이즈
+                vf_filters.append(f"scale={w}:{h}")
 
-            if out_writer is None:
-                h, w = frame_resized.shape[:2]
-                out_writer = cv2.VideoWriter(out_path, fourcc, target_fps, (w, h))
+        vf = ",".join(vf_filters) if vf_filters else "null"
 
-            out_writer.write(frame_resized)
-            processed_frames += 1
+        cmd = [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel", "error",
+            "-y",
+            "-i", in_path,
+            "-an",                         # 오디오 제거(불필요하면)
+            "-vf", vf,
+            "-frames:v", str(int(max_frames)),
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            "-c:v", encoder,
+        ]
 
-            if processed_frames >= max_frames:
-                break
+        # 인코더별 기본 파라미터
+        if encoder == "libx264":
+            cmd += ["-preset", "veryfast", "-crf", str(int(crf))]
+        elif encoder == "h264_nvenc":
+            cmd += ["-preset", "fast"]
+        elif encoder == "h264_qsv":
+            cmd += ["-preset", "fast"]
 
-        frame_count += 1
+        cmd += [out_path]
+        subprocess.run(cmd, check=True)
 
-    cap.release()
-    if out_writer:
-        out_writer.release()
+        with open(out_path, "rb") as f:
+            return f.read()
 
-    with open(out_path, "rb") as f:
-        processed_bytes = f.read()
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"FFmpeg 전처리에 실패했습니다: {e}") from e
+    finally:
+        for p in (in_path, out_path):
+            try:
+                if p and os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
 
-    os.remove(tmp_path)
-    os.remove(out_path)
-
-    return processed_bytes
 
 def analyze_all(
     video_bytes: bytes,
@@ -78,18 +128,21 @@ def analyze_all(
     return_points: bool = False,
     calib_data: dict | None = None,
 ):
-    """하나의 업로드 영상으로 Posture + Emotion + Gaze 동시 실행"""
+    """
+    하나의 업로드 영상으로 Posture + Emotion + Gaze 동시 실행 (FFmpeg 전처리 버전)
+    """
+    # FFmpeg 기반 전처리 (webm→mp4, 30FPS, 320x240, 최대 1800프레임)
+    processed_bytes = preprocess_video_ffmpeg(
+        video_bytes,
+        target_fps=30,
+        max_frames=1800,
+        resize_to=(320, 240),
+        keep_aspect=False,   # 원본 비율 유지 원하면 True
+    )
 
-    # webm → mp4 변환 포함 전처리
-    processed_bytes = preprocess_video_cuda(video_bytes, target_fps=30, max_frames=1800, resize_to=(320, 240))
-
-    # 1) Posture 분석
+    # 각 서브모듈은 바이트(mp4) 입력을 받아야 함
     posture = analyze_video_bytes(processed_bytes)
-
-    # 2) Emotion 분석
     face = infer_face_video(processed_bytes, device, stride, None, return_points)
-
-    # 3) Gaze 분석
     gaze = infer_gaze(processed_bytes, calib_data=calib_data)
 
     return {
