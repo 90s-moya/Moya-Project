@@ -1,5 +1,12 @@
 
 # app/main.py
+# TensorFlow Lite CPU 델리게이트 강제 차단 (모든 임포트 전 실행)
+from app.utils.force_cpu_disable import force_disable_cpu_delegates, monkey_patch_tflite, suppress_tensorflow_warnings, hook_mediapipe_imports
+force_disable_cpu_delegates()
+monkey_patch_tflite()
+suppress_tensorflow_warnings()
+hook_mediapipe_imports()
+
 import os
 
 # Tesla T4 GPU 전용 설정 - CPU 델리게이트 완전 차단
