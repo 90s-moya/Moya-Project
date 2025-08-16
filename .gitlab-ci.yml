@@ -234,6 +234,7 @@ deploy-ai-prod-gpu:
       docker run -d --name ai-main -p 8000:8000 --gpus all
       -e NVIDIA_VISIBLE_DEVICES=all
       -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility
+      -e LD_LIBRARY_PATH=/opt/ffmpeg/lib \
       -e FFMPEG_PREFER_ORDER=h264_nvenc,libx264
       -e FFMPEG_THREADS=2
       -e FFMPEG_FILTER_THREADS=1
