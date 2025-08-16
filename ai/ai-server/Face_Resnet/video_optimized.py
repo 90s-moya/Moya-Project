@@ -1,3 +1,4 @@
+얼굴 video optimized.py
 # video_optimized.py (완전 교체본: 기본 실행 시 '면접 최적 프리셋' 자동 적용)
 # - 얼굴 검출+크롭(MediaPipe)
 # - 블러/크기 품질 필터
@@ -91,12 +92,21 @@ def apply_clahe_on_face(face_bgr):
 
 def load_model_and_processor(model_name):
     import os
-    # TensorFlow 로깅 레벨 설정으로 경고 메시지 억제
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
     import logging
-    logging.getLogger('tensorflow').setLevel(logging.ERROR)
     
-    model = ResNetForImageClassification.from_pretrained(model_name)
+    # PyTorch CUDA 최적화 설정 (Tesla T4)
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['TORCH_CUDNN_V8_API_ENABLED'] = '1'  # cuDNN v8 최적화
+    
+    # 경고 메시지 억제
+    logging.getLogger('transformers').setLevel(logging.ERROR)
+    
+    # Tesla T4 최적화: 메모리 효율적 모델 로드
+    model = ResNetForImageClassification.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16,  # Half precision for memory efficiency
+        low_cpu_mem_usage=True      # 메모리 효율적 로드
+    )
     processor = AutoImageProcessor.from_pretrained(model_name)
     id2label = model.config.id2label
     return model, processor, id2label
@@ -107,12 +117,18 @@ class EmaSmoother:
         self.device = device
         self.state = None
         self.num_labels = num_labels
+        
     def update(self, logits):
-        logits = logits.detach().to(self.device)
+        logits = logits.detach()
+        # GPU 메모리 최적화: 이미 올바른 디바이스와 타입이면 불필요한 변환 방지
+        if logits.device != self.device:
+            logits = logits.to(self.device)
+            
         if self.state is None:
-            self.state = logits
+            self.state = logits.clone()  # clone으로 메모리 분리
         else:
-            self.state = self.alpha * self.state + (1.0 - self.alpha) * logits
+            # In-place 연산으로 메모리 절약
+            self.state.mul_(self.alpha).add_(logits, alpha=(1.0 - self.alpha))
         return self.state
 
 def parse_logit_bias(bias_str, id2label):
@@ -227,10 +243,28 @@ def analyze_video(
     logit_bias_str="",
     use_happy_guard=False
 ):
+    # Tesla T4 최적화 디바이스 설정
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    if device.type == 'cuda':
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"CUDA Version: {torch.version.cuda}")
+        # Tesla T4 최적화 설정
+        torch.backends.cudnn.benchmark = True  # 고정 크기 입력에 최적화
+        torch.backends.cudnn.deterministic = False  # 성능 우선
+        
     model, processor, id2label = load_model_and_processor(model_name)
-    model.to(device).eval()
+    model.to(device)
+    
+    # Half precision 사용시 모델을 half()로 변환
+    if device.type == 'cuda':
+        model = model.half()  # FP16 추론
+    
+    model.eval()
     bias_vec = parse_logit_bias(logit_bias_str, id2label).to(device)
+    if device.type == 'cuda':
+        bias_vec = bias_vec.half()
+        
     face_mesh = init_face_mesh() if use_happy_guard else None
 
     # 다양한 코덱 지원을 위한 백엔드 시도
@@ -327,8 +361,16 @@ def analyze_video(
                 if use_clahe:
                     face = apply_clahe_on_face(face)
                 pil_image = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
-                inputs = processor(images=pil_image, return_tensors="pt").to(device)
-                with torch.no_grad():
+                inputs = processor(images=pil_image, return_tensors="pt")
+                
+                # GPU 최적화: 데이터 타입 맞춤
+                if device.type == 'cuda':
+                    inputs = {k: v.to(device, dtype=torch.float16) for k, v in inputs.items()}
+                else:
+                    inputs = {k: v.to(device) for k, v in inputs.items()}
+                
+                # GPU 추론 최적화
+                with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device.type == 'cuda')):
                     outputs = model(**inputs)
                     logits = outputs.logits[0] + bias_vec
                     smoothed_logits = smoother.update(logits)
@@ -430,10 +472,15 @@ def analyze_video(
             elapsed_time = frame_count / fps
             print(f"처리된 프레임: {frame_count}, 경과 시간: {elapsed_time:.1f}초")
             
-        # 메모리 최적화: 1000프레임마다 garbage collection
-        if frame_count % 1000 == 0:
+        # Tesla T4 메모리 최적화: 500프레임마다 GPU 메모리 정리
+        if frame_count % 500 == 0:
             import gc
             gc.collect()
+            if device.type == 'cuda':
+                torch.cuda.empty_cache()  # GPU 메모리 캐시 정리
+                memory_allocated = torch.cuda.memory_allocated(0) / 1024**3  # GB
+                memory_reserved = torch.cuda.memory_reserved(0) / 1024**3   # GB
+                print(f"GPU Memory - Allocated: {memory_allocated:.2f}GB, Reserved: {memory_reserved:.2f}GB")
 
     if current_emotion is not None and current_emotion != UNCERTAIN_LABEL and start_frame is not None:
         end_frame = frame_count
