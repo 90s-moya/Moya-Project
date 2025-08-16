@@ -5,6 +5,7 @@ import { useStudyRoom } from "@/hooks/useStudyRoom";
 import { formatDateTime } from "@/util/date";
 import { Clock, Users, User, Calendar, FileText, X } from "lucide-react";
 import { useState } from "react";
+import FeedbackPopup from "@/components/study/FeedbackPopup";
 
 export default function StudyRoomPage() {
   const {
@@ -22,6 +23,20 @@ export default function StudyRoomPage() {
     handleLeaveRoom,
     setFocusedUserId,
     setShowCarousel,
+    // 피드백 관련
+    showFeedbackPopup,
+    feedbackMessage,
+    feedbackType,
+    isSendingFeedback,
+    handleOpenFeedback,
+    handleCloseFeedback,
+    handleSubmitFeedback,
+    setFeedbackMessage,
+    // 더미 참가자 관련
+    isDevelopmentMode,
+    addDummyParticipant,
+    removeDummyParticipant,
+    removeAllDummyParticipants,
   } = useStudyRoom();
 
   const [showRoomInfo, setShowRoomInfo] = useState(false);
@@ -31,7 +46,37 @@ export default function StudyRoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#1b1c1f] flex flex-col">
+    <div className="h-screen bg-white text-[#1b1c1f] flex flex-col overflow-hidden">
+      {isDevelopmentMode && (
+        <div className="fixed top-4 right-4 z-50 bg-gray-800 text-white p-4 rounded-lg shadow-lg">
+          <div className="text-sm mb-2">
+            개발 모드 - 참가자 수: {participants.length}
+          </div>
+          <div className="flex gap-2 flex-col">
+            <button
+              onClick={addDummyParticipant}
+              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-xs"
+            >
+              더미 추가 (+1)
+            </button>
+            <button
+              onClick={removeDummyParticipant}
+              className="px-3 py-1 bg-orange-500 hover:bg-orange-600 rounded text-xs"
+            >
+              더미 제거 (-1)
+            </button>
+            <button
+              onClick={removeAllDummyParticipants}
+              className="px-3 py-1 bg-red-500 hover:bg-red-600 rounded text-xs"
+            >
+              모두 제거
+            </button>
+          </div>
+          <div className="text-xs mt-2 opacity-75">
+            열: {getGridColumns(participants.length)}
+          </div>
+        </div>
+      )}
       {/* 메인 콘텐츠 영역 */}
       <main className="flex-1 overflow-hidden relative">
         {/* 헤더 (포커스 모드일 때만 표시) */}
@@ -58,6 +103,7 @@ export default function StudyRoomPage() {
           getCarouselItems={getCarouselItems}
           getGridColumns={getGridColumns}
           roomId={roomId}
+          onOpenFeedback={handleOpenFeedback}
         />
       </main>
 
@@ -66,6 +112,17 @@ export default function StudyRoomPage() {
         localStream={localStream}
         onLeaveRoom={handleLeaveRoom}
         onShowRoomInfo={() => setShowRoomInfo(true)}
+      />
+
+      {/* 피드백 팝업  */}
+      <FeedbackPopup
+        show={showFeedbackPopup}
+        feedbackType={feedbackType}
+        message={feedbackMessage}
+        onMessageChange={setFeedbackMessage}
+        onSubmit={handleSubmitFeedback}
+        onClose={handleCloseFeedback}
+        isSending={isSendingFeedback}
       />
 
       {/* 방 정보 모달 */}
@@ -146,16 +203,6 @@ export default function StudyRoomPage() {
                       <span className="text-sm text-[#6f727c]">종료일시</span>
                       <p className="text-[#1b1c1f] font-medium">
                         {formatDateTime(roomInfo.expiredAt)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-3">
-                    <Calendar className="w-5 h-5 text-[#2b7fff]" />
-                    <div>
-                      <span className="text-sm text-[#6f727c]">방 생성일</span>
-                      <p className="text-[#1b1c1f] font-medium">
-                        {formatDateTime(roomInfo.masterInfo.createdAt)}
                       </p>
                     </div>
                   </div>

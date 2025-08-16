@@ -2,7 +2,7 @@ import { Video, VideoOff } from "lucide-react";
 import { useMemo, useState } from "react";
 
 type Props = {
-  stream: MediaStream | null; // 부모(StudyRoomPage)의 localStream을 받음
+  stream: MediaStream | null;
 };
 
 export default function CameraControlPanel({ stream }: Props) {
@@ -22,19 +22,18 @@ export default function CameraControlPanel({ stream }: Props) {
   };
 
   return (
-    <div className="relative">
-      {/* 카메라 토글 버튼 */}
-      <button
-        onClick={toggle}
-        disabled={!track}
-        className="flex items-center gap-1 text-white hover:text-white/80 transition disabled:opacity-50"
-      >
-        {isCameraOn ? (
-          <Video className="w-4 h-4" />
-        ) : (
-          <VideoOff className="w-4 h-4" />
-        )}
-      </button>
-    </div>
+    <button
+      data-camera-button
+      onClick={toggle}
+      disabled={!track}
+      className="text-white hover:text-white/80 transition-all duration-200 disabled:opacity-50"
+      title={isCameraOn ? "카메라 끄기" : "카메라 켜기"}
+    >
+      {isCameraOn ? (
+        <Video className="w-4 h-4" />
+      ) : (
+        <VideoOff className="w-4 h-4" />
+      )}
+    </button>
   );
 }

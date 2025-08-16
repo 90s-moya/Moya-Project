@@ -1,4 +1,5 @@
 import VideoTile from "./VideoTile";
+import { Users } from "lucide-react";
 
 type Participant = {
   id: string;
@@ -32,43 +33,52 @@ export default function StudyRoomHeader({
 }: StudyRoomHeaderProps) {
   if (!focusedUserId) return null;
 
+  const otherParticipants = participants
+    .filter((p) => p.id !== focusedUserId)
+    .sort((a, b) => {
+      // isLocal이 true인 참가자(나)를 제일 앞으로 정렬
+      if (a.isLocal && !b.isLocal) return -1;
+      if (!a.isLocal && b.isLocal) return 1;
+      return 0;
+    });
+
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 mt-1 mb-2 justify-center">
-      {participants
-        .filter((p) => p.id !== focusedUserId)
-        .sort((a, b) => {
-          // isLocal이 true인 참가자(나)를 제일 앞으로 정렬
-          if (a.isLocal && !b.isLocal) return -1;
-          if (!a.isLocal && b.isLocal) return 1;
-          return 0;
-        })
-        .slice(0, 5)
-        .map((p) => (
-          <button
-            key={`thumb-${p.id}`}
-            onClick={() => setFocusedUserId(p.id)}
-            className="shrink-0 w-45 h-30 rounded-md overflow-hidden border border-gray-300 hover:border-gray-400 transition-all duration-200"
-            title={p.isLocal ? "나" : p.id}
-          >
-            <div className="w-full h-full bg-black/20 relative">
-              <VideoTile
-                stream={p.stream}
-                isLocal={p.isLocal}
-                userId={p.id}
-                roomId={roomId}
-                userDocs={getParticipantDocs(p.id)}
-                onDocsClick={handleDocsClick}
-                hideOverlay
-              />
-            </div>
-          </button>
-        ))}
-      {/* 5명 초과 시 더보기 표시 (포커스된 유저 제외한 수 기준) */}
-      {participants.filter((p) => p.id !== focusedUserId).length > 5 && (
-        <div className="shrink-0 w-45 h-30 rounded-md border border-gray-300 bg-gray-100 flex items-center justify-center text-sm text-gray-600">
-          +{participants.filter((p) => p.id !== focusedUserId).length - 5}
+    <div className="bg-white/95 backdrop-blur-sm border-b border-gray-100 px-6 py-2">
+      <div className="max-w-6xl mx-auto">
+        {/* 썸네일 목록 */}
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide justify-center">
+          {otherParticipants.map((p) => (
+            <button
+              key={`thumb-${p.id}`}
+              onClick={() => setFocusedUserId(p.id)}
+              className="group shrink-0 relative"
+              title={p.isLocal ? "나" : `참여자 ${p.id.slice(0, 8)}`}
+            >
+              {/* 썸네일 비디오 */}
+              <div className="w-24 h-15 sm:w-32 sm:h-20 md:w-40 md:h-24 lg:w-45 lg:h-27 rounded-lg sm:rounded-xl overflow-hidden border-2 border-transparent group-hover:border-[#2b7fff] transition-all duration-200 shadow-sm group-hover:shadow-md">
+                <VideoTile
+                  stream={p.stream}
+                  isLocal={p.isLocal}
+                  userId={p.id}
+                  roomId={roomId}
+                  userDocs={getParticipantDocs(p.id)}
+                  onDocsClick={handleDocsClick}
+                  hideOverlay
+                />
+              </div>
+
+              {/* 호버 시 표시되는 오버레이 */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-all duration-200 flex items-center justify-center">
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div className="bg-white/90 rounded-full p-1">
+                    <Users className="w-3 h-3 text-[#2b7fff]" />
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

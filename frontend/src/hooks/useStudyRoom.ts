@@ -2,12 +2,14 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
-import { getDocsInRoom, getRoomDetail, uploadVideo } from "@/api/studyApi";
+import {
+  createFeedback,
+  getDocsInRoom,
+  getRoomDetail,
+  uploadVideo,
+} from "@/api/studyApi";
 import { useMediaStore } from "@/store/useMediaStore";
-// 날짜 처리
-import dayjs from "dayjs";
 import type { StudyRoomDetail } from "@/types/study";
-import { AsteriskIcon } from "lucide-react";
 
 type Participant = {
   id: string;
@@ -53,6 +55,15 @@ export function useStudyRoom() {
   const roomIdRef = useRef<string>("");
 
   const stopFixedRef = useRef<() => void>(() => {});
+
+  // 피드백 팝업 관련
+  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackType, setFeedbackType] = useState<
+    "POSITIVE" | "NEGATIVE" | null
+  >(null);
+  const [feedbackTargetUserId, setFeedbackTargetUserId] = useState<string>("");
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
 
   // 방 정보 가져오기
   useEffect(() => {
@@ -172,7 +183,7 @@ export function useStudyRoom() {
 
   // 참가자별 서류 매핑 함수
   const getParticipantDocs = (participantId: string) => {
-    console.log("getParticipantDocs 호출됨 - participantId:", participantId);
+    // console.log("getParticipantDocs 호출됨 - participantId:", participantId);
     console.log("allDocs:", allDocs);
 
     const filteredDocs = allDocs.filter((doc) => doc.userId === participantId);
@@ -549,6 +560,164 @@ export function useStudyRoom() {
     })();
   }, []); // 의존성 배열을 비워서 한 번만 실행
 
+  // 피드백 관련 함수들
+
+  // 피드백 팝업 열기기
+  const handleOpenFeedback = useCallback(
+    (userId: string, type: "POSITIVE" | "NEGATIVE") => {
+      setFeedbackTargetUserId(userId);
+      setFeedbackType(type);
+      setShowFeedbackPopup(true);
+    },
+    []
+  );
+
+  // 피드백 팝업 닫기
+  const handleCloseFeedback = useCallback(() => {
+    setShowFeedbackPopup(false);
+    setFeedbackMessage("");
+    setFeedbackType(null);
+    setFeedbackTargetUserId("");
+  }, []);
+
+  // 피드백 제출
+  const handleSubmitFeedback = useCallback(async () => {
+    if (
+      !feedbackType ||
+      feedbackMessage.trim() === "" ||
+      !feedbackTargetUserId ||
+      !roomId
+    )
+      return;
+
+    setIsSendingFeedback(true);
+
+    try {
+      await createFeedback({
+        roomId: roomId,
+        receiverId: feedbackTargetUserId,
+        feedbackType: feedbackType,
+        message: feedbackMessage,
+      });
+      handleCloseFeedback();
+    } catch (error) {
+      console.log("피드백 전송 실패:", error);
+    } finally {
+      setIsSendingFeedback(false);
+    }
+  }, [
+    feedbackType,
+    feedbackMessage,
+    feedbackTargetUserId,
+    roomId,
+    handleCloseFeedback,
+  ]);
+
+  // 더미 참가자를 만들기 위한 변수 및 함수들 (나중에 지워야 합니다.)
+
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(
+    import.meta.env.DEV
+  );
+
+  // 더미 비디오 스트림 생성
+  const createDummyStream = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext("2d");
+
+    // 랜덤 색상 변경
+    const colors = [
+      "#FF6B6B",
+      "#4ECDC4",
+      "#45B7D1",
+      "#96CEB4",
+      "#FFEAA7",
+      "#DDA0DD",
+      "#98D8C8",
+    ];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+    if (ctx) {
+      ctx.fillStyle = randomColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 텍스트 추가
+      ctx.fillStyle = "white";
+      ctx.font = "40px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("더미 사용자", canvas.width / 2, canvas.height / 2);
+    }
+
+    return canvas.captureStream(30);
+  };
+
+  // 더미 참가자 추가
+  const addDummyParticipant = () => {
+    const dummyId = `dummy-${Date.now()}`;
+    const dummyStream = createDummyStream();
+
+    setParticipants((prev) => [
+      ...prev,
+      { id: dummyId, stream: dummyStream, isLocal: false },
+    ]);
+
+    // 더미 서류 데이터도 추가
+    const dummyDocs: ParticipantsDocs[] = [
+      {
+        docsId: `${dummyId}-resume`,
+        userId: dummyId,
+        fileUrl: "#",
+        docsStatus: "RESUME",
+      },
+      {
+        docsId: `${dummyId}-coverletter`,
+        userId: dummyId,
+        fileUrl: "#",
+        docsStatus: "COVERLETTER",
+      },
+    ];
+
+    setAllDocs((prev) => [...prev, ...dummyDocs]);
+  };
+
+  // 더미 참가자 제거
+  const removeDummyParticipant = () => {
+    setParticipants((prev) => {
+      const dummyParticipants = prev.filter((p) => p.id.startsWith("dummy-"));
+      if (dummyParticipants.length > 0) {
+        const toRemove = dummyParticipants[dummyParticipants.length - 1];
+        // 스트림 정리
+        if (toRemove.stream) {
+          toRemove.stream.getTracks().forEach((track) => track.stop());
+        }
+        // 서류 데이터도 제거
+        setAllDocs((prevDocs) =>
+          prevDocs.filter((doc) => doc.userId !== toRemove.id)
+        );
+        return prev.filter((p) => p.id !== toRemove.id);
+      }
+      return prev;
+    });
+  };
+
+  // 모든 더미 참가자 제거
+  const removeAllDummyParticipants = () => {
+    setParticipants((prev) => {
+      const dummyParticipants = prev.filter((p) => p.id.startsWith("dummy-"));
+      dummyParticipants.forEach((dummy) => {
+        if (dummy.stream) {
+          dummy.stream.getTracks().forEach((track) => track.stop());
+        }
+      });
+      // 더미 서류 데이터도 모두 제거
+      setAllDocs((prevDocs) =>
+        prevDocs.filter((doc) => !doc.userId.startsWith("dummy-"))
+      );
+      return prev.filter((p) => !p.id.startsWith("dummy-"));
+    });
+  };
+
   return {
     participants,
     localStream,
@@ -564,5 +733,19 @@ export function useStudyRoom() {
     setFocusedUserId,
     setShowCarousel,
     roomInfo,
+    // 피드백 관련
+    showFeedbackPopup,
+    feedbackMessage,
+    feedbackType,
+    isSendingFeedback,
+    handleOpenFeedback,
+    handleCloseFeedback,
+    handleSubmitFeedback,
+    setFeedbackMessage,
+    // 더미 참가자 관련
+    isDevelopmentMode,
+    addDummyParticipant,
+    removeDummyParticipant,
+    removeAllDummyParticipants,
   };
 }
