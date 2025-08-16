@@ -2,6 +2,7 @@ package com.moya.service.interview;
 
 import com.moya.interfaces.api.interview.request.UploadInterviewVideoRequest;
 import com.moya.service.interview.command.InterviewVideoCommand;
+import com.moya.support.file.FfmpegUtils;
 import com.moya.support.file.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,6 +85,14 @@ public class InterviewService {
         MultipartFile thumbnail = request.getThumbnail();
         String sessionId = request.getInterviewSessionId().toString();
 
+        // 저장하기 전 webm -> mp4 변환하는 코드 추가
+        try {
+            file = FfmpegUtils.convertWebmToMp4IfNeeded(file);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("FFmpeg 변환 중 인터럽트 ", e);
+        }
+
         // 1) 파일 저장 (보통 상대경로 반환: /files-dev/video/xxx.webm)
         String videoPath = fileStorageService.saveOther(file, "video/"+sessionId);
         String thumbnailPath = (thumbnail != null) ? fileStorageService.saveOther(thumbnail, "thumbnail/"+sessionId) : null;
@@ -115,7 +124,8 @@ public class InterviewService {
                         device,
                         stride,
                         returnPoints,
-                        calibDataJson
+                        calibDataJson,
+                        thumbnailUrl
                 );
             } else {
                 System.err.println("[analyze] skip: order/subOrder parse 실패 (order="
@@ -139,7 +149,8 @@ public class InterviewService {
             String device,
             int stride,
             boolean returnPoints,
-            String calibDataJson
+            String calibDataJson,
+            String thumbnailUrl
     ) {
         try {
             String resolved = toAbsoluteUrl(videoUrl); // 안전차원으로 한 번 더 보정
@@ -156,6 +167,10 @@ public class InterviewService {
             body.add("device",        new HttpEntity<>(device, text));
             body.add("stride",        new HttpEntity<>(String.valueOf(stride), text));
             body.add("return_points", new HttpEntity<>(String.valueOf(returnPoints), text));
+            if (thumbnailUrl != null && !thumbnailUrl.isBlank()) {
+                body.add("thumbnail_url", new HttpEntity<>(thumbnailUrl, text));
+            }
+
             if (calibDataJson != null && !calibDataJson.isBlank()) {
                 HttpHeaders jsonHeaders = new HttpHeaders();
                 jsonHeaders.setContentType(MediaType.APPLICATION_JSON);

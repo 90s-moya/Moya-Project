@@ -41,6 +41,7 @@ deploy-be-dev:
       -e PYTHON_PATH="$PYTHON_PATH"
       -e VIDEO_PATH="$VITE_FILE_URL"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+    - docker image prune -f
   tags:
     - ec2
   only:
@@ -66,6 +67,7 @@ deploy-be-prod:
       -e PYTHON_PATH="$PYTHON_PATH"
       -e VIDEO_PATH="$VITE_FILE_URL"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+    - docker image prune -f
   tags:
     - ec2
   only:
