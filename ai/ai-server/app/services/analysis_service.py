@@ -81,7 +81,7 @@ def analyze_all(
     """하나의 업로드 영상으로 Posture + Emotion + Gaze 동시 실행"""
 
     # webm → mp4 변환 포함 전처리
-    processed_bytes = preprocess_video(video_bytes, target_fps=30, max_frames=1800, resize_to=(320, 240))
+    processed_bytes = preprocess_video_cuda(video_bytes, target_fps=30, max_frames=1800, resize_to=(320, 240))
 
     # 1) Posture 분석
     posture = analyze_video_bytes(processed_bytes)
