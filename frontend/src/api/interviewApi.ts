@@ -93,9 +93,9 @@ export async function sendFollowupAudio(params: {
   })
   console.log("맞아 아니야 딱 말해 ",res)
    const { order, sub_order, question } = res.data;
-    localStorage.setItem("currentOrder", order) ?? "0", 10;
-    localStorage.setItem("currentSubOrder", sub_order) ?? "0", 10;
-    localStorage.setItem("questions", question)
+    localStorage.setItem("currentOrder", String(order));
+    localStorage.setItem("currentSubOrder", String(sub_order));
+    localStorage.setItem("questions", question);
 
 }
 

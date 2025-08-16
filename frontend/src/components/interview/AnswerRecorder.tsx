@@ -16,19 +16,11 @@ type Props = {
 };
 
 export default function AnswerRecorder({ keyInfo, ttsFinished, start, stop, isRecording, error, videoStream }: Props) {
+  
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const saved = useInterviewAnswerStore((s) => s.getByKey(keyInfo));
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  // TTS 종료 후 3초 뒤 자동 녹음 시작
-  useEffect(() => {
-    if (!ttsFinished) return;
-    const timer = setTimeout(() => {
-      // 이미 녹음 중이면 중복 호출 방지
-      if (!isRecording) start();
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [ttsFinished, isRecording, start]);
+  // 자동 녹음 시작 로직 제거 - 사용자가 명시적으로 버튼을 눌러야만 시작
 
   // 카메라 스트림 바인딩
   useEffect(() => {

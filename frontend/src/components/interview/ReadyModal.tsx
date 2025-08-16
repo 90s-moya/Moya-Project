@@ -74,7 +74,7 @@ export default function ReadyModal({ open, onClose, onStart }: ReadyModalProps) 
       </li>
       <li className="flex items-start gap-3">
         <svg className="h-5 w-5 mt-0.5 text-green-600" viewBox="0 0 20 20" fill="currentColor"><path d="M16.707 5.293a1 1 0 0 1 0 1.414l-7.25 7.25a1 1 0 0 1-1.414 0L3.293 9.957a1 1 0 1 1 1.414-1.414l3.04 3.04 6.543-6.543a1 1 0 0 1 1.417 0z"/></svg>
-        <span>질문 음성 종료 후 <span className="font-semibold">3초 뒤</span> 답변이 시작되며, <span className="font-semibold">최대 1분</span> 동안 답변할 수 있어요.</span>
+        <span>질문을 읽고 <span className="font-semibold">답변 시작 버튼을 눌러</span> 답변을 시작해주세요. <span className="font-semibold">최대 1분</span> 동안 답변할 수 있어요.</span>
       </li>
     </ul>
   </section>
