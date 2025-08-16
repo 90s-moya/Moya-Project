@@ -2,12 +2,14 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { SignalingClient } from "@/lib/webrtc/SignallingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/PeerConnectionManager";
-import { getDocsInRoom, getRoomDetail, uploadVideo } from "@/api/studyApi";
+import {
+  createFeedback,
+  getDocsInRoom,
+  getRoomDetail,
+  uploadVideo,
+} from "@/api/studyApi";
 import { useMediaStore } from "@/store/useMediaStore";
-// 날짜 처리
-import dayjs from "dayjs";
 import type { StudyRoomDetail } from "@/types/study";
-import { AsteriskIcon } from "lucide-react";
 
 type Participant = {
   id: string;
@@ -53,6 +55,15 @@ export function useStudyRoom() {
   const roomIdRef = useRef<string>("");
 
   const stopFixedRef = useRef<() => void>(() => {});
+
+  // 피드백 팝업 관련
+  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackType, setFeedbackType] = useState<
+    "POSITIVE" | "NEGATIVE" | null
+  >(null);
+  const [feedbackTargetUserId, setFeedbackTargetUserId] = useState<string>("");
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
 
   // 방 정보 가져오기
   useEffect(() => {
@@ -172,7 +183,7 @@ export function useStudyRoom() {
 
   // 참가자별 서류 매핑 함수
   const getParticipantDocs = (participantId: string) => {
-    console.log("getParticipantDocs 호출됨 - participantId:", participantId);
+    // console.log("getParticipantDocs 호출됨 - participantId:", participantId);
     console.log("allDocs:", allDocs);
 
     const filteredDocs = allDocs.filter((doc) => doc.userId === participantId);
@@ -549,6 +560,59 @@ export function useStudyRoom() {
     })();
   }, []); // 의존성 배열을 비워서 한 번만 실행
 
+  // 피드백 관련 함수들
+
+  // 피드백 팝업 열기기
+  const handleOpenFeedback = useCallback(
+    (userId: string, type: "POSITIVE" | "NEGATIVE") => {
+      setFeedbackTargetUserId(userId);
+      setFeedbackType(type);
+      setShowFeedbackPopup(true);
+    },
+    []
+  );
+
+  // 피드백 팝업 닫기
+  const handleCloseFeedback = useCallback(() => {
+    setShowFeedbackPopup(false);
+    setFeedbackMessage("");
+    setFeedbackType(null);
+    setFeedbackTargetUserId("");
+  }, []);
+
+  // 피드백 제출
+  const handleSubmitFeedback = useCallback(async () => {
+    if (
+      !feedbackType ||
+      feedbackMessage.trim() === "" ||
+      !feedbackTargetUserId ||
+      !roomId
+    )
+      return;
+
+    setIsSendingFeedback(true);
+
+    try {
+      await createFeedback({
+        roomId: roomId,
+        receiverId: feedbackTargetUserId,
+        feedbackType: feedbackType,
+        message: feedbackMessage,
+      });
+      handleCloseFeedback();
+    } catch (error) {
+      console.log("피드백 전송 실패:", error);
+    } finally {
+      setIsSendingFeedback(false);
+    }
+  }, [
+    feedbackType,
+    feedbackMessage,
+    feedbackTargetUserId,
+    roomId,
+    handleCloseFeedback,
+  ]);
+
   return {
     participants,
     localStream,
@@ -564,5 +628,14 @@ export function useStudyRoom() {
     setFocusedUserId,
     setShowCarousel,
     roomInfo,
+    // 피드백 관련
+    showFeedbackPopup,
+    feedbackMessage,
+    feedbackType,
+    isSendingFeedback,
+    handleOpenFeedback,
+    handleCloseFeedback,
+    handleSubmitFeedback,
+    setFeedbackMessage,
   };
 }

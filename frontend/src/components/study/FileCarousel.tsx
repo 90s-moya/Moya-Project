@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 
 interface CarouselProps {
   items: {
@@ -96,17 +96,17 @@ export default function FileCarousel({ items, onClose }: CarouselProps) {
   return (
     <div className="h-full flex flex-col">
       {/* 상단 탭바 + 닫기 (sticky) */}
-      <div className="sticky top-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur px-2 py-2 border-b">
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-white/95 backdrop-blur px-0 py-2 border-b">
         <div className="overflow-x-auto max-w-full">
           <div className="flex gap-2 pr-2">
             {items.map((item, index) => (
               <button
                 key={item.id}
                 onClick={() => setCurrentIndex(index)}
-                className={`px-3 py-1 rounded-full text-sm whitespace-nowrap border transition-colors ${
+                className={`px-3 py-2 rounded-full text-sm whitespace-nowrap border transition-colors ${
                   index === currentIndex
                     ? "bg-blue-500 text-white border-blue-500"
-                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-[#2b7fff]"
                 }`}
               >
                 {item.title}
@@ -119,7 +119,7 @@ export default function FileCarousel({ items, onClose }: CarouselProps) {
           className="text-gray-500 hover:text-gray-700 text-xl"
           aria-label="닫기"
         >
-          ✕
+          <X className="w-6 h-6" />
         </button>
       </div>
 
@@ -133,9 +133,9 @@ export default function FileCarousel({ items, onClose }: CarouselProps) {
                 prev > 0 ? prev - 1 : items.length - 1
               )
             }
-            className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50"
+            className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-1.5 shadow-lg hover:bg-gray-50"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-5 h-5 text-[#2b7fff]" />
           </button>
         )}
 
@@ -150,9 +150,9 @@ export default function FileCarousel({ items, onClose }: CarouselProps) {
                 prev < items.length - 1 ? prev + 1 : 0
               )
             }
-            className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50"
+            className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 bg-white rounded-full p-1.5 shadow-lg hover:bg-gray-50"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5 text-[#2b7fff]" />
           </button>
         )}
       </div>

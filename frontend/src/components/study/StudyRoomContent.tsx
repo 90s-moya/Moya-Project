@@ -1,5 +1,7 @@
 import VideoTile from "./VideoTile";
 import Carousel from "./FileCarousel";
+import { Card } from "@/components/ui/card";
+import { FileText, Users, X } from "lucide-react";
 
 type Participant = {
   id: string;
@@ -31,6 +33,8 @@ interface StudyRoomContentProps {
   getCarouselItems: () => DocItem[];
   getGridColumns: (count: number) => number;
   roomId: string;
+  // 피드백 관련
+  onOpenFeedback: (userId: string, type: "POSITIVE" | "NEGATIVE") => void;
 }
 
 export default function StudyRoomContent({
@@ -43,6 +47,7 @@ export default function StudyRoomContent({
   getCarouselItems,
   getGridColumns,
   roomId,
+  onOpenFeedback,
 }: StudyRoomContentProps) {
   // 참가자 수에 따른 그리드 행 개수 계산
   const getGridRows = (count: number) => {
@@ -63,6 +68,7 @@ export default function StudyRoomContent({
           roomId={roomId}
           userDocs={userDocs}
           onDocsClick={handleDocsClick}
+          onOpenFeedback={onOpenFeedback}
         />
       </div>
     );
@@ -70,17 +76,17 @@ export default function StudyRoomContent({
 
   return (
     <div
-      className="px-4"
+      className="px-4 pt-2"
       style={{
         height: focusedUserId
           ? "calc(100vh - 210px)" // 포커스 모드: header(~140px) + footer(~60px) + 여유(~10px) 제외
-          : "calc(100vh - 60px)", // 일반 모드: footer(~60px)만 제외
-        paddingBottom: focusedUserId ? "4px" : "4px",
+          : "calc(100vh - 80px)", // 일반 모드: footer(~60px)만 제외
+        paddingBottom: "4px",
       }}
     >
       {/* 포커스 모드일 때: 왼쪽 포커스된 비디오 + 오른쪽 서류 */}
       {focusedUserId ? (
-        <div className="flex gap-3 h-full animate-in fade-in duration-200">
+        <div className="flex gap-6 h-full animate-in fade-in duration-200">
           {/* 왼쪽: 포커스된 비디오 (화면의 절반) */}
           <div className="w-1/2 h-full">
             {participants
@@ -99,12 +105,25 @@ export default function StudyRoomContent({
               ))}
           </div>
 
-          {/* 오른쪽: 서류 캐러셀 (화면의 절반) */}
-          <div className="w-1/2 h-full bg-gray-50 rounded-md overflow-hidden">
-            <Carousel
-              items={getCarouselItems()}
-              onClose={handleCloseCarousel}
-            />
+          {/* 오른쪽: 서류 캐러셀 (화면의 절반) - StudyListPage 스타일 적용 */}
+          <div className="w-1/2 h-full">
+            <Card className="h-full p-6">
+              {/* 서류 섹션 헤더 */}
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold text-[#1b1c1f] flex items-center gap-2">
+                  <FileText className="w-6 h-6 text-[#2b7fff]" />
+                  참여자 서류
+                </h2>
+              </div>
+
+              {/* 서류 캐러셀 */}
+              <div className="flex-1 bg-gray-50 rounded-lg overflow-hidden">
+                <Carousel
+                  items={getCarouselItems()}
+                  onClose={handleCloseCarousel}
+                />
+              </div>
+            </Card>
           </div>
         </div>
       ) : (
