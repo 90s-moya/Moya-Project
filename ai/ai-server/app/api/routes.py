@@ -24,12 +24,7 @@ from app.services.analysis_db_service import get_or_create_qa_pair, save_results
 from app.services.face_service import infer_face_video as infer_face
 from app.services.gaze_service import (
     infer_gaze, 
-    start_calibration, 
-    add_calibration_point, 
-    run_calibration, 
-    save_calibration, 
-    list_calibrations,
-    load_calibration_for_tracking
+
 )
 from app.utils.gpt import (
     ask_gpt_if_ends_async,
@@ -661,76 +656,6 @@ async def posture_report(file: UploadFile = File(...)):
     report = analyze_video_bytes(data)
     return JSONResponse(content=report)
 
-
-# === 캘리브레이션 관련 엔드포인트들 ===
-class CalibrationStartRequest(BaseModel):
-    screen_width: int = 1920
-    screen_height: int = 1080
-    window_width: int = 1344
-    window_height: int = 756
-
-class CalibrationPointRequest(BaseModel):
-    gaze_vector: List[float]
-    target_point: Tuple[float, float]
-
-@router.post("/v1/calibration/start")
-async def calibration_start(request: CalibrationStartRequest):
-    """캘리브레이션 시작"""
-    try:
-        result = start_calibration(
-            request.screen_width, 
-            request.screen_height, 
-            request.window_width, 
-            request.window_height
-        )
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"캘리브레이션 시작 실패: {e}")
-
-@router.post("/v1/calibration/add-point")
-async def calibration_add_point(request: CalibrationPointRequest):
-    """캘리브레이션 포인트 추가"""
-    try:
-        result = add_calibration_point(request.gaze_vector, request.target_point)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"캘리브레이션 포인트 추가 실패: {e}")
-
-@router.post("/v1/calibration/run")
-async def calibration_run(mode: str = Form("quick")):
-    """캘리브레이션 실행"""
-    try:
-        result = run_calibration(mode)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"캘리브레이션 실행 실패: {e}")
-
-@router.post("/v1/calibration/save")
-async def calibration_save(filename: str = Form(None)):
-    """캘리브레이션 저장"""
-    try:
-        result = save_calibration(filename)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"캘리브레이션 저장 실패: {e}")
-
-@router.get("/v1/calibration/list")
-async def calibration_list():
-    """저장된 캘리브레이션 목록"""
-    try:
-        result = list_calibrations()
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"캘리브레이션 목록 조회 실패: {e}")
-
-@router.post("/v1/tracking/load-calibration")
-async def tracking_load_calibration(calib_path: str = Form(...)):
-    """시선 추적용 캘리브레이션 로드"""
-    try:
-        result = load_calibration_for_tracking(calib_path)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"캘리브레이션 로드 실패: {e}")
 
 
 # --------------------------
