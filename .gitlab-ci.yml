@@ -232,6 +232,21 @@ deploy-ai-prod-gpu:
     - docker rm ai-main || true
     - >
       docker run -d --name ai-main -p 8000:8000 --gpus all
+      -e NVIDIA_VISIBLE_DEVICES=all
+      -e NVIDIA_DRIVER_CAPABILITIES=video,compute,utility
+      -e FFMPEG_PREFER_ORDER=h264_nvenc,libx264
+      -e FFMPEG_THREADS=2
+      -e FFMPEG_FILTER_THREADS=1
+      -e X264_PRESET=ultrafast
+      -e X264_CRF=26
+      -e OMP_NUM_THREADS=1
+      -e OPENBLAS_NUM_THREADS=1
+      -e MKL_NUM_THREADS=1
+      -e NUMEXPR_NUM_THREADS=1
+      -e TFLITE_NUM_THREADS=1
+      -e TOKENIZERS_PARALLELISM=false
+      -e TF_CPP_MIN_LOG_LEVEL=2
+      -e GLOG_minloglevel=3
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
       -e DB_HOST="$DB_HOST"
