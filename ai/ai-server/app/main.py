@@ -1,28 +1,22 @@
 
 # app/main.py
+# >>> 이 블록을 파일 맨 위, 어떤 import 보다 먼저 둡니다 <<<
 import os
+# 사전에 누가 세팅했어도 강제로 해제
+for k in ("TF_FORCE_GPU_ONLY", "MEDIAPIPE_FORCE_GPU_DELEGATE", "MEDIAPIPE_DISABLE_CPU_DELEGATE"):
+    if os.environ.get(k):
+        print(f"[CLEANUP] Unset {k}")
+        os.environ.pop(k, None)
 
-# Tesla T4 GPU 전용 설정 - CPU 델리게이트 완전 차단
-# TensorFlow CPU 백엔드 완전 비활성화
-os.environ['TF_DISABLE_XNNPACK'] = '1'
-os.environ['TF_DISABLE_ONEDNN'] = '1' 
-os.environ['TF_DISABLE_MKL'] = '1'
-os.environ['TF_LITE_DISABLE_CPU_DELEGATE'] = '1'
-os.environ['TF_FORCE_GPU_ONLY'] = '1'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# 스레드 캡으로 CPU 스파이크 완화
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("TFLITE_NUM_THREADS", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 
-# MediaPipe GPU 강제 설정
-os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
-os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
-os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
-os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
-
-# PyTorch/CUDA 설정
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-os.environ['TORCH_CUDNN_V8_API_ENABLED'] = '1'
-
-# PyTorch 호환성을 위한 환경변수 설정 (PTGaze 라이브러리 호환)
-os.environ['TORCH_WEIGHTS_ONLY'] = 'FALSE'
 
 print("[STARTUP] GPU-only mode initialized - All CPU delegates DISABLED")
 
