@@ -79,15 +79,12 @@ export default function Component() {
                 <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 opacity-75 blur-sm group-hover:opacity-100 transition-opacity duration-300" />
               </Button>
-<<<<<<< frontend/src/pages/interview/InterviewStartPage.tsx
               
-=======
 
               <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
                 <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
                 <span>시작을 누르면 서류 선택 화면으로 이동합니다</span>
               </div>
->>>>>>> frontend/src/pages/interview/InterviewStartPage.tsx
             </div>
           </div>
 
