@@ -70,26 +70,29 @@ RUN set -eux; \
     ffmpeg -v error -encoders | grep -q h264_nvenc || true; \
     ffmpeg -v error -filters  | grep -E 'scale_(cuda|npp)' || true
 
-# 성능/로그/FFmpeg 제어 ENV
-ENV OMP_NUM_THREADS=1 \
-    OPENBLAS_NUM_THREADS=1 \
-    MKL_NUM_THREADS=1 \
-    NUMEXPR_NUM_THREADS=1 \
-    TFLITE_NUM_THREADS=1 \
+# Tesla T4 (4 vCPU, 15GB RAM) 최적화 ENV
+ENV OMP_NUM_THREADS=2 \
+    OPENBLAS_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2 \
+    NUMEXPR_NUM_THREADS=2 \
+    TFLITE_NUM_THREADS=2 \
     TOKENIZERS_PARALLELISM=false \
     TF_CPP_MIN_LOG_LEVEL=2 \
     GLOG_minloglevel=3 \
     UVICORN_WORKERS=1 \
     FFMPEG_PREFER_ORDER=h264_nvenc,libx264 \
-    FFMPEG_THREADS=2 \
-    FFMPEG_FILTER_THREADS=1 \
-    X264_PRESET=ultrafast \
-    X264_CRF=26 \
+    FFMPEG_THREADS=3 \
+    FFMPEG_FILTER_THREADS=2 \
+    X264_PRESET=veryfast \
+    X264_CRF=28 \
     LD_LIBRARY_PATH=/usr/local/lib:/opt/ffmpeg/lib:$LD_LIBRARY_PATH \
     NVENC_PRESET=p1 \
-    NVENC_TUNE=ll \
+    NVENC_TUNE=ull \
     NVENC_RC=cbr \
-    NVENC_BITRATE=2M
+    NVENC_BITRATE=1.5M \
+    NVENC_MAXRATE=1.5M \
+    NVENC_BUFSIZE=3M \
+    CUDA_VISIBLE_DEVICES=0
 
 # 빌더에서 산출물 복사
 COPY --from=builder /usr/local /usr/local

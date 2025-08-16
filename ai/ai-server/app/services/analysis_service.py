@@ -125,9 +125,9 @@ def _can_remux_to_mp4_without_reencode(info: dict,
 
 def preprocess_video_to_mp4_bytes(
     video_bytes: bytes,
-    target_fps: int = 30,
-    max_frames: Optional[int] = 1800,
-    resize_to: Optional[Tuple[int, int]] = (320, 240),
+    target_fps: int = 25,  # Tesla T4 메모리 절약을 위해 25fps로 감소
+    max_frames: Optional[int] = 1500,  # 최대 프레임 수 감소 (60초 * 25fps)
+    resize_to: Optional[Tuple[int, int]] = (288, 216),  # 16:12 비율로 메모리 절약
     keep_aspect: bool = False,  # 현재는 고정 리사이즈 사용(필요시 확장)
     drop_audio: bool = True,
 ) -> tuple[bytes, Dict[str, Any]]:
@@ -138,18 +138,19 @@ def preprocess_video_to_mp4_bytes(
     - NVENC 없으면 libx264(ultrafast)로 폴백
     """
     ffmpeg = _which_ffmpeg()
-    threads = os.getenv("FFMPEG_THREADS", "2")
-    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
-    x264_preset = os.getenv("X264_PRESET", "ultrafast")
-    x264_crf = int(os.getenv("X264_CRF", "26"))
+    # Tesla T4 (4 vCPU) 최적화 설정
+    threads = os.getenv("FFMPEG_THREADS", "3")      # 4 vCPU 중 3개 사용 (1개는 시스템용)
+    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "2")  # 필터 스레드 증가
+    x264_preset = os.getenv("X264_PRESET", "veryfast")  # ultrafast보다 약간 느리지만 품질 개선
+    x264_crf = int(os.getenv("X264_CRF", "28"))     # 품질 약간 낮춰서 속도 향상
     
-    # NVENC 최적화 옵션들
-    nvenc_preset = os.getenv("NVENC_PRESET", "p1")  # p1(빠름) ~ p7(느림)
-    nvenc_tune = os.getenv("NVENC_TUNE", "ll")      # ll(저지연), hq(고품질), ull(초저지연)
-    nvenc_rc = os.getenv("NVENC_RC", "cbr")         # cbr, vbr, cqp
-    nvenc_bitrate = os.getenv("NVENC_BITRATE", "2M")
-    nvenc_maxrate = os.getenv("NVENC_MAXRATE", "2M")
-    nvenc_bufsize = os.getenv("NVENC_BUFSIZE", "4M")
+    # Tesla T4 NVENC 7세대 최적화 옵션들
+    nvenc_preset = os.getenv("NVENC_PRESET", "p1")  # 최고 속도
+    nvenc_tune = os.getenv("NVENC_TUNE", "ull")     # 초저지연 (Tesla T4에서 지원)
+    nvenc_rc = os.getenv("NVENC_RC", "cbr")         # 일정 비트레이트
+    nvenc_bitrate = os.getenv("NVENC_BITRATE", "1.5M")  # 메모리 절약을 위해 낮춤
+    nvenc_maxrate = os.getenv("NVENC_MAXRATE", "1.5M")
+    nvenc_bufsize = os.getenv("NVENC_BUFSIZE", "3M")     # 버퍼 크기 줄임
 
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
         tmp_in.write(video_bytes)
@@ -183,11 +184,9 @@ def preprocess_video_to_mp4_bytes(
         return cmd
 
     def build_nvenc_cmd() -> list[str]:
-        # CPU 디코드 → (가능하면) hwupload_cuda, scale_cuda → NVENC
+        # CPU 디코드 → CPU 스케일 → NVENC (GPU 스케일 제거)
         vf_parts = []
-        if resize_to and has_scale_cuda:
-            vf_parts.append(f"hwupload_cuda,scale_cuda={w}:{h}")
-        elif vf_scale_cpu:
+        if vf_scale_cpu:
             vf_parts.append(vf_scale_cpu)
         cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin",
                "-y", "-i", in_path, "-threads", threads, "-filter_threads", filter_threads]
@@ -209,6 +208,11 @@ def preprocess_video_to_mp4_bytes(
             "-b:v", nvenc_bitrate,
             "-maxrate", nvenc_maxrate,
             "-bufsize", nvenc_bufsize,
+            "-gpu", "0",              # Tesla T4 GPU 명시적 지정
+            "-delay", "0",            # 지연 제거
+            "-zerolatency", "1",      # 제로 레이턴시 모드
+            "-forced-idr", "1",       # 강제 IDR 프레임
+            "-aq-strength", "1",      # 적응형 양자화 최소화 (속도 우선)
             out_path
         ]
         return cmd
@@ -262,16 +266,28 @@ def preprocess_video_to_mp4_bytes(
             _run_ffmpeg(build_copy_cmd())
             debug.update({"pipeline": "copy", "encoder": "copy", "scale": "n/a"})
         else:
+            # NVENC 먼저 시도, 실패시 libx264로 폴백
+            nvenc_success = False
             if has_nvenc:
-                _run_ffmpeg(build_nvenc_cmd())
-                debug.update({
-                    "pipeline": "gpu-scale+enc" if has_scale_cuda else "gpu-enc",
-                    "encoder": "h264_nvenc",
-                    "scale": "scale_cuda" if has_scale_cuda else ("scale(cpu)" if resize_to else None),
-                })
-            else:
+                try:
+                    _run_ffmpeg(build_nvenc_cmd())
+                    nvenc_success = True
+                    debug.update({
+                        "pipeline": "cpu-scale+gpu-enc",
+                        "encoder": "h264_nvenc",
+                        "scale": "scale(cpu)" if resize_to else None,
+                    })
+                except RuntimeError as e:
+                    # NVENC 실패시 로그 남기고 libx264로 폴백
+                    debug["nvenc_error"] = str(e)
+            
+            if not nvenc_success:
                 _run_ffmpeg(build_x264_cmd())
-                debug.update({"pipeline": "cpu", "encoder": "libx264", "scale": "scale(cpu)" if resize_to else None})
+                debug.update({
+                    "pipeline": "cpu" + ("-fallback" if has_nvenc else ""),
+                    "encoder": "libx264",
+                    "scale": "scale(cpu)" if resize_to else None
+                })
 
         with open(out_path, "rb") as f:
             processed = f.read()
@@ -294,10 +310,10 @@ def analyze_all(
     stride: int = 5,
     return_points: bool = False,
     calib_data: Optional[dict] = None,
-    # 변환 파라미터
-    target_fps: int = 30,
-    resize_to: Tuple[int, int] = (320, 240),
-    max_frames: int = 1800,
+    # Tesla T4 최적화 변환 파라미터
+    target_fps: int = 25,
+    resize_to: Tuple[int, int] = (288, 216),
+    max_frames: int = 1500,
     return_debug: bool = False,
 ):
     """
