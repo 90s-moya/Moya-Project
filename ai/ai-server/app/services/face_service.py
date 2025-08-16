@@ -1,36 +1,29 @@
 # app/services/face_service.py
 from __future__ import annotations
-import sys
+import sys, io, tempfile
 from pathlib import Path
 from functools import lru_cache
-import io
-import tempfile
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterable
 
 import torch
 import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
-
-# 동영상 처리용
 import cv2
 import numpy as np
 
-# === Face_Resnet 경로 추가 ===
+from app.utils.accelerator import init_runtime
+init_runtime()
+
 ROOT = Path(__file__).resolve().parents[2]
 FACE_DIR = ROOT / "Face_Resnet"
 sys.path.insert(0, str(FACE_DIR))
 
 try:
     from Face_Resnet.model import load_model
-    from Face_Resnet.video_optimized import analyze_video_bytes
 except ImportError as e:
-    print(f"Warning: Face_Resnet import failed: {e}")
-    # 기본 함수들 정의
     def load_model(*args, **kwargs):
         raise RuntimeError("Face_Resnet model not available")
-    def analyze_video_bytes(*args, **kwargs):
-        raise RuntimeError("Face_Resnet video analysis not available")
 
 CKPT_PATH = str(FACE_DIR / "best_model.pt")
 CLASS_NAMES = ["angry","disgust","fear","happy","sad","surprise","neutral"]
@@ -42,195 +35,129 @@ _preprocess = transforms.Compose([
     transforms.Normalize(mean=(0.485,0.456,0.406), std=(0.229,0.224,0.225)),
 ])
 
-# Tesla T4 GPU 메모리 최적화를 위한 유틸리티 함수
 def cleanup_gpu_memory():
-    """GPU 메모리 정리"""
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-        import gc
-        gc.collect()
+        import gc; gc.collect()
 
 @lru_cache(maxsize=1)
 def get_face_model(device: str = "cuda"):
-    """Tesla T4 최적화 Face 모델 로드"""
-    dev = "cuda" if device == "cuda" and torch.cuda.is_available() else "cpu"
-    
-    # Tesla T4 GPU 최적화 설정
-    if dev == "cuda":
-        # cuDNN 최적화 설정
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.deterministic = False
-        
-        print(f"Face Model - Using GPU: {torch.cuda.get_device_name(0)}")
-        print(f"Face Model - CUDA Version: {torch.version.cuda}")
-    
+    dev = "cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu"
     model = load_model(CKPT_PATH, device=dev, num_classes=len(CLASS_NAMES))
-    
-    # Tesla T4 최적화: Half precision 모델 변환
     if dev == "cuda":
-        model = model.half()  # FP16 변환
-        # GPU 메모리 정보 출력
-        memory_allocated = torch.cuda.memory_allocated(0) / 1024**3  # GB
-        print(f"Face Model - GPU Memory Allocated: {memory_allocated:.2f}GB")
-    
+        model = model.half()
+        torch.backends.cudnn.benchmark = True
     model.eval()
     return model, dev
 
-def infer_face(image_bytes: bytes, device: str = "cuda") -> dict:
-    """이미지 바이트 -> 감정 분류 (Tesla T4 GPU 최적화)"""
+def _detect_face_roi(bgr: np.ndarray, margin: float = 0.25) -> np.ndarray:
+    # 가장 단순하고 가벼운 Haar 사용(없으면 중앙크롭 폴백)
+    try:
+        cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        face_cascade = cv2.CascadeClassifier(cascade_path)
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.2, 3, minSize=(60,60))
+        if len(faces) == 0:
+            h, w = bgr.shape[:2]
+            size = min(h, w)
+            y0 = max(0, (h - size)//2); x0 = max(0, (w - size)//2)
+            return bgr[y0:y0+size, x0:x0+size]
+        x,y,w,h = max(faces, key=lambda r: r[2]*r[3])
+        mx = int(w*margin); my = int(h*margin)
+        x0 = max(0, x-mx); y0 = max(0, y-my)
+        x1 = min(bgr.shape[1], x+w+mx); y1 = min(bgr.shape[0], y+h+my)
+        return bgr[y0:y1, x0:x1]
+    except Exception:
+        h, w = bgr.shape[:2]
+        size = min(h, w)
+        y0 = max(0, (h - size)//2); x0 = max(0, (w - size)//2)
+        return bgr[y0:y0+size, x0:x0+size]
+
+def infer_face_frames(
+    frames: Iterable[np.ndarray],
+    device: str = "cuda",
+    stride: int = 5,
+    return_points: bool = False,
+    batch: int = 16
+) -> Dict[str, Any]:
     model, dev = get_face_model(device)
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    x = _preprocess(img).unsqueeze(0).to(dev)
-    
-    # Tesla T4 GPU 최적화 추론
-    with torch.no_grad():
-        # FP16 사용 (GPU인 경우)
-        if dev == "cuda":
-            with torch.cuda.amp.autocast():
-                logits = model(x.half())  # Half precision 입력
-        else:
-            logits = model(x)
-            
-        # GPU에서 직접 연산 수행 (CPU 이동 최소화)
-        probs = F.softmax(logits, dim=1)
-        top_idx = torch.argmax(probs, dim=1).item()
-        top_score = probs[0, top_idx].item()
-        
-        # 모든 확률을 한 번에 CPU로 이동
-        all_probs = probs.cpu().numpy().squeeze()
-    
-    # 추론 완료 후 GPU 메모리 정리 (Tesla T4 최적화)
+    xs: List[torch.Tensor] = []
+    frame_ids: List[int] = []
+    probs_sum = torch.zeros(len(CLASS_NAMES), dtype=torch.float32, device=("cuda" if dev=="cuda" else "cpu"))
+
+    def _flush():
+        nonlocal xs, frame_ids, probs_sum
+        if not xs: return []
+        x = torch.stack(xs, dim=0).to(dev, non_blocking=True)
+        if dev == "cuda": x = x.half()
+        with torch.no_grad():
+            if dev == "cuda":
+                with torch.cuda.amp.autocast():
+                    logits = model(x)
+            else:
+                logits = model(x)
+            p = F.softmax(logits, dim=1)  # (N,C)
+        probs_sum += p.sum(dim=0)
+        outs = p.detach().cpu().numpy()
+        xs.clear(); ids = frame_ids[:]; frame_ids.clear()
+        return [{"frame_idx": ids[i], "probs": outs[i]} for i in range(len(ids))]
+
+    timeline: List[Dict[str, Any]] = []
+    for i, bgr in enumerate(frames):
+        if i % max(1, stride) != 0: continue
+        roi = _detect_face_roi(bgr, margin=0.25)
+        img = Image.fromarray(cv2.cvtColor(roi, cv2.COLOR_BGR2RGB))
+        xs.append(_preprocess(img))
+        frame_ids.append(i)
+        if len(xs) >= batch:
+            frame_outs = _flush()
+            if return_points:
+                for fo in frame_outs:
+                    top = int(np.argmax(fo["probs"]))
+                    timeline.append({"frame": fo["frame_idx"], "label": CLASS_NAMES[top]})
+    # 잔여 플러시
+    frame_outs = _flush()
+    if return_points:
+        for fo in frame_outs:
+            top = int(np.argmax(fo["probs"]))
+            timeline.append({"frame": fo["frame_idx"], "label": CLASS_NAMES[top]})
+
+    # 집계
+    probs_mean = (probs_sum / max(1, len(timeline) if return_points else (len(frame_outs) or 1))).cpu().numpy()
+    top_idx = int(np.argmax(probs_mean))
+    result = {
+        "label": CLASS_NAMES[top_idx],
+        "score": float(probs_mean[top_idx]),
+        "probs": {CLASS_NAMES[i]: float(probs_mean[i]) for i in range(len(CLASS_NAMES))},
+        "samples": int(len(timeline) if return_points else max(1, frame_ids[-1] if frame_ids else 0) + 1),
+    }
+    if return_points:
+        result["timeline"] = timeline
     if dev == "cuda":
         cleanup_gpu_memory()
-    
-    return {
-        "label": CLASS_NAMES[top_idx],
-        "score": float(top_score),
-        "probs": {CLASS_NAMES[i]: float(all_probs[i]) for i in range(len(CLASS_NAMES))}
-    }
+    return result
 
-def _bytes_to_temp_video(b: bytes, suffix: str = ".mp4") -> str:
-    f = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    f.write(b)
-    f.flush(); f.close()
-    return f.name
-
+# ===== 바이트 기반(호환) : 임시파일→프레임→frames API 호출 =====
 def infer_face_video(
     video_bytes: bytes,
     device: str = "cuda",
     stride: int = 5,
     max_frames: Optional[int] = None,
     return_points: bool = False,
-    optimization_level: str = "balanced",  # "fast", "balanced", "quality"
+    optimization_level: str = "balanced",
 ) -> Dict[str, Any]:
-    """
-    동영상 바이트 -> 고급 감정 분석 (video_optimized.py 사용)
-    - MediaPipe 얼굴 검출 + 크롭
-    - EMA 스무딩 + 히스테리시스
-    - 블러/품질 필터링
-    - 면접 최적화 프리셋 적용
-    """
-    # 최적화 레벨에 따른 설정 조정
-    if optimization_level == "fast":
-        # 빠른 처리를 위한 설정
-        config = {
-            "ema_alpha": 0.85,
-            "enter_thr": 0.55,
-            "exit_thr": 0.45,
-            "margin_thr": 0.15,
-            "min_stable": 3,
-            "face_margin": 0.15,
-            "min_face_px": 80,
-            "blur_thr": 70.0,
-            "use_clahe": False,
-            "logit_bias_str": "happy=-0.3,neutral=0.1",
-            "use_happy_guard": False
-        }
-    elif optimization_level == "quality":
-        # 고품질 분석을 위한 설정
-        config = {
-            "ema_alpha": 0.95,
-            "enter_thr": 0.65,
-            "exit_thr": 0.55,
-            "margin_thr": 0.25,
-            "min_stable": 8,
-            "face_margin": 0.30,
-            "min_face_px": 128,
-            "blur_thr": 100.0,
-            "use_clahe": True,
-            "logit_bias_str": "happy=-0.5,neutral=0.3,fear=0.2",
-            "use_happy_guard": True
-        }
-    else:  # balanced
-        # 균형 잡힌 설정 (기본값)
-        config = {
-            "ema_alpha": 0.92,
-            "enter_thr": 0.60,
-            "exit_thr": 0.50,
-            "margin_thr": 0.20,
-            "min_stable": 6,
-            "face_margin": 0.25,
-            "min_face_px": 112,
-            "blur_thr": 90.0,
-            "use_clahe": False,
-            "logit_bias_str": "happy=-0.4,neutral=0.2,fear=0.1",
-            "use_happy_guard": True
-        }
-    
-    # video_optimized.py의 고급 분석 사용
-    report = analyze_video_bytes(
-        video_bytes=video_bytes,
-        model_name="Celal11/resnet-50-finetuned-FER2013-0.001",
-        output_path=None,
-        show_video=False,
-        **config
-    )
-    
-    if not report:
-        raise RuntimeError("비디오 분석에 실패했습니다.")
-    
-    # report 구조를 face_service 형식으로 변환
-    frame_dist = report.get("frame_distribution", {})
-    summary = report.get("summary", {})
-    
-    # 지배 감정 결정
-    dominant_emotion = summary.get("dominant_emotion", "neutral")
-    if dominant_emotion == "불확실":
-        dominant_emotion = "neutral"
-    
-    # 확률 분포 계산 (퍼센트를 확률로 변환)
-    probs = {}
-    total_frames = report.get("video_info", {}).get("total_frames", 1)
-    
-    for emotion in CLASS_NAMES:
-        if emotion in frame_dist:
-            probs[emotion] = frame_dist[emotion]["percentage"] / 100.0
-        else:
-            probs[emotion] = 0.0
-    
-    # 지배 감정의 점수
-    dominant_score = probs.get(dominant_emotion, 0.0)
-    
-    result = {
-        "label": dominant_emotion,
-        "score": float(dominant_score),
-        "probs": probs,
-        "samples": total_frames,
-        "fps": float(report.get("video_info", {}).get("fps", 30.0)),
-        "emotion_changes": summary.get("emotion_changes", 0),
-        "average_emotion_duration": summary.get("average_emotion_duration", 0.0)
-    }
-    
-    # 타임라인 정보 추가 (요청 시)
-    if return_points and "detailed_logs" in report:
-        timeline = []
-        for log in report["detailed_logs"]:
-            timeline.append({
-                "t": float(log["start_frame"] / result["fps"]),
-                "frame": int(log["start_frame"]),
-                "label": log["label"],
-                "duration": float(log["duration_seconds"])
-            })
-        result["timeline"] = timeline
-    
-    return result
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+        tmp.write(video_bytes); tmp_path = tmp.name
+    cap = cv2.VideoCapture(tmp_path)
+    frames: List[np.ndarray] = []
+    while True:
+        ok, frame = cap.read()
+        if not ok: break
+        frames.append(frame)
+        if max_frames and len(frames) >= max_frames: break
+    cap.release()
+    try: os.remove(tmp_path)
+    except Exception: pass
+    if not frames:
+        raise RuntimeError("no frames")
+    return infer_face_frames(frames, device=device, stride=stride, return_points=return_points)
