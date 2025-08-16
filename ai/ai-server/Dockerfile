@@ -92,7 +92,10 @@ ENV OMP_NUM_THREADS=2 \
     NVENC_BITRATE=1.5M \
     NVENC_MAXRATE=1.5M \
     NVENC_BUFSIZE=3M \
-    CUDA_VISIBLE_DEVICES=0
+    CUDA_VISIBLE_DEVICES=0 \
+    TORCH_CUDNN_V8_API_ENABLED=1 \
+    PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512 \
+    CUDA_LAUNCH_BLOCKING=0
 
 # 빌더에서 산출물 복사
 COPY --from=builder /usr/local /usr/local

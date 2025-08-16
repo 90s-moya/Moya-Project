@@ -34,26 +34,71 @@ _preprocess = transforms.Compose([
     transforms.Normalize(mean=(0.485,0.456,0.406), std=(0.229,0.224,0.225)),
 ])
 
+# Tesla T4 GPU 메모리 최적화를 위한 유틸리티 함수
+def cleanup_gpu_memory():
+    """GPU 메모리 정리"""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        import gc
+        gc.collect()
+
 @lru_cache(maxsize=1)
 def get_face_model(device: str = "cuda"):
+    """Tesla T4 최적화 Face 모델 로드"""
     dev = "cuda" if device == "cuda" and torch.cuda.is_available() else "cpu"
+    
+    # Tesla T4 GPU 최적화 설정
+    if dev == "cuda":
+        # cuDNN 최적화 설정
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+        
+        print(f"Face Model - Using GPU: {torch.cuda.get_device_name(0)}")
+        print(f"Face Model - CUDA Version: {torch.version.cuda}")
+    
     model = load_model(CKPT_PATH, device=dev, num_classes=len(CLASS_NAMES))
+    
+    # Tesla T4 최적화: Half precision 모델 변환
+    if dev == "cuda":
+        model = model.half()  # FP16 변환
+        # GPU 메모리 정보 출력
+        memory_allocated = torch.cuda.memory_allocated(0) / 1024**3  # GB
+        print(f"Face Model - GPU Memory Allocated: {memory_allocated:.2f}GB")
+    
     model.eval()
     return model, dev
 
 def infer_face(image_bytes: bytes, device: str = "cuda") -> dict:
-    """이미지 바이트 -> 감정 분류"""
+    """이미지 바이트 -> 감정 분류 (Tesla T4 GPU 최적화)"""
     model, dev = get_face_model(device)
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     x = _preprocess(img).unsqueeze(0).to(dev)
+    
+    # Tesla T4 GPU 최적화 추론
     with torch.no_grad():
-        logits = model(x)
-        probs = F.softmax(logits, dim=1).cpu().numpy().squeeze()
-    top_idx = int(probs.argmax())
+        # FP16 사용 (GPU인 경우)
+        if dev == "cuda":
+            with torch.cuda.amp.autocast():
+                logits = model(x.half())  # Half precision 입력
+        else:
+            logits = model(x)
+            
+        # GPU에서 직접 연산 수행 (CPU 이동 최소화)
+        probs = F.softmax(logits, dim=1)
+        top_idx = torch.argmax(probs, dim=1).item()
+        top_score = probs[0, top_idx].item()
+        
+        # 모든 확률을 한 번에 CPU로 이동
+        all_probs = probs.cpu().numpy().squeeze()
+    
+    # 추론 완료 후 GPU 메모리 정리 (Tesla T4 최적화)
+    if dev == "cuda":
+        cleanup_gpu_memory()
+    
     return {
         "label": CLASS_NAMES[top_idx],
-        "score": float(probs[top_idx]),
-        "probs": {CLASS_NAMES[i]: float(probs[i]) for i in range(len(CLASS_NAMES))}
+        "score": float(top_score),
+        "probs": {CLASS_NAMES[i]: float(all_probs[i]) for i in range(len(CLASS_NAMES))}
     }
 
 def _bytes_to_temp_video(b: bytes, suffix: str = ".mp4") -> str:
