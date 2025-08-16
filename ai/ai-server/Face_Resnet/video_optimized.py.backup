@@ -1,4 +1,4 @@
-# Face video_optimized.py
+# Face
 # video_optimized.py (완전 교체본: 기본 실행 시 '면접 최적 프리셋' 자동 적용)
 # - 얼굴 검출+크롭(MediaPipe)
 # - 블러/크기 품질 필터
