@@ -41,12 +41,15 @@ function CountdownOverlay({
   }, [left, onDone])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div
-        aria-live="assertive"
-        className="text-white text-[100px] md:text-[120px] font-bold leading-none select-none"
-      >
-        {left}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-full blur-3xl animate-pulse" />
+        <div
+          aria-live="assertive"
+          className="relative text-white text-[120px] md:text-[140px] font-bold leading-none select-none bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent"
+        >
+          {left}
+        </div>
       </div>
     </div>
   )
@@ -165,152 +168,214 @@ export default function InterviewSetupPage() {
     : "bg-blue-50 text-blue-700"
 
    return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 font-['Pretendard']">
       <Header scrollBg={false} />
 
-      {/* 히어로 + 단계 진행 바 */}
+      {/* Enhanced hero + progress bar */}
       <div className="mx-auto max-w-6xl px-6 pt-24">
         <div className="flex items-start justify-between">
-          <div>
-            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border shadow-sm ${statusBadge} border-slate-200`}>
-              {testStatus === TestStatus.NotStarted && "STEP 3/4"}
-              {testStatus === TestStatus.Testing && "STEP 3/4 · 장치 확인 중"}
-              {testStatus === TestStatus.Completed && "STEP 3/4 · 시선 추적 설정 필요"}
-              {testStatus === TestStatus.EyeTracking && "STEP 3/4 · 시작 준비 완료"}
-            </span>
-            <h1 className="mt-3 text-2xl md:text-3xl font-semibold text-slate-900 tracking-tight">
-              AI 면접 환경 설정
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              카메라/마이크를 점검하고 시선 추적을 설정한 뒤 면접을 시작하세요.
-            </p>
-          </div>
-          <div className="hidden md:block w-64">
-            <div className="h-2 w-full rounded-full bg-slate-200">
-              <div className={`h-2 rounded-full ${isReadyToStart ? "bg-emerald-500 w-[75%]" : "bg-blue-500 w-[65%]"}`} />
+          <div className="space-y-4">
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+              <span className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold border shadow-lg ${statusBadge} border-slate-200`}>
+                {testStatus === TestStatus.NotStarted && "STEP 3/4"}
+                {testStatus === TestStatus.Testing && "STEP 3/4 · 장치 확인 중"}
+                {testStatus === TestStatus.Completed && "STEP 3/4 · 시선 추적 설정 필요"}
+                {testStatus === TestStatus.EyeTracking && "STEP 3/4 · 시작 준비 완료"}
+              </span>
             </div>
-            <p className="mt-2 text-xs text-right text-slate-500">3/4</p>
-          </div>
-        </div>
-      </div>
-
-      {/* 본문 카드 (하단 고정바와 겹치지 않게 pb-28) */}
-      <div className="mx-auto max-w-6xl px-6 py-8 pb-28">
-        <div className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm p-6 md:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_300px] gap-8">
-            {/* 웹캠 + 마이크 게이지 */}
-            <div>
-              <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0,rgba(59,130,246,0.06),transparent_45%),radial-gradient(circle_at_85%_100%,rgba(15,23,42,0.05),transparent_45%)] pointer-events-none" />
-                <div className="aspect-video w-full">
-                  <Webcam ref={webcamRef} audio={false} className="h-full w-full object-cover" mirrored />
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between text-xs text-slate-600">
-                <span>마이크 감지</span>
-                <span className={micReady ? "text-emerald-600 font-medium" : "text-slate-500"}>
-                  {micReady ? "충분" : "말씀해 보세요"}
-                </span>
-              </div>
-              <div className="mt-1 h-2 w-full rounded-full bg-slate-200 overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-200 ${micReady ? "bg-gradient-to-r from-emerald-400 to-emerald-600" : "bg-gradient-to-r from-blue-400 to-blue-600"}`}
-                  style={{ width: `${testStatus !== TestStatus.NotStarted ? Math.min(micLevel * 2, 100) : 0}%` }}
-                />
-              </div>
-
-              <p className="mt-3 text-xs text-slate-500">
-                평소 말하듯이 아래 문장을 읽어주세요. 충분히 감지되면 다음 단계가 활성화됩니다.
+            
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+              <h1 className="text-2xl md:text-4xl font-bold text-slate-900 tracking-tight bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent">
+                AI 면접 환경 설정
+              </h1>
+            </div>
+            
+            <div className="animate-fade-in-up" style={{ animationDelay: '0.6s' }}>
+              <p className="text-lg text-slate-700 max-w-2xl">
+                카메라/마이크를 점검하고 시선 추적을 설정한 뒤 <span className="font-semibold text-blue-600">면접을 시작</span>하세요
               </p>
             </div>
+          </div>
+          
+          {/* <div className="hidden md:block w-64 animate-fade-in-up" style={{ animationDelay: '0.8s' }}>
+            <div className="h-3 w-full rounded-full bg-slate-200 shadow-inner">
+              <div className={`h-3 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-500 transition-all duration-1000 ease-out ${isReadyToStart ? "w-[75%]" : "w-[65%]"}`} />
+            </div>
+            <p className="mt-2 text-sm text-right text-slate-500 font-medium">3/4</p>
+          </div> */}
+        </div>
+      </div>
 
-            {/* 상태 패널 */}
-            <div className="space-y-4">
-              <div className={`rounded-xl p-4 border ${cameraReady ? "border-emerald-500 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                <div className="text-sm font-semibold text-slate-900">카메라</div>
-                <div className="mt-1 text-xs text-slate-600">
-                  {testStatus === TestStatus.Completed || testStatus === TestStatus.EyeTracking
-                    ? "확인 성공! 카메라가 정상적으로 작동합니다."
-                    : (cameraLabel || "카메라 장치를 찾는 중...")}
+      {/* Enhanced main content card */}
+      <div className="mx-auto max-w-6xl px-6 py-5 pb-23">
+        <div className="rounded-3xl border border-slate-200/60 bg-white/90 backdrop-blur-sm shadow-2xl shadow-slate-200/50 p-8 md:p-10 animate-fade-in-up" style={{ animationDelay: '1s' }}>
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_350px] gap-10">
+            {/* Enhanced webcam + mic gauge */}
+            <div className="space-y-1">
+              <div className="relative overflow-hidden rounded-2xl border-2 border-slate-200/60 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/30 shadow-xl shadow-slate-200/30">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0,rgba(59,130,246,0.08),transparent_45%),radial-gradient(circle_at_85%_100%,rgba(15,23,42,0.06),transparent_45%)] pointer-events-none" />
+                <div className="aspect-video w-full relative">
+                  <Webcam ref={webcamRef} audio={false} className="h-full w-full object-cover" mirrored />
+                  {/* Webcam overlay */}
+                  <div className="absolute inset-0 border-2 border-blue-200/40 rounded-2xl pointer-events-none" />
                 </div>
               </div>
 
-              <div className={`rounded-xl p-4 border ${micReady ? "border-emerald-500 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                <div className="text-sm font-semibold text-slate-900">마이크</div>
-                <div className="mt-1 text-xs text-slate-600">
-                  {micReady ? "확인 성공! 마이크가 정상적으로 작동합니다." : (micLabel || "마이크 장치를 찾는 중...")}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm font-semibold text-slate-700">
+                  <span>마이크 감지</span>
+                  <span className={micReady ? "text-emerald-600" : "text-slate-500"}>
+                    {micReady ? "감지됨" : "말씀해 보세요"}
+                  </span>
+                </div>
+                <div className="h-3 w-full rounded-full bg-slate-200 overflow-hidden shadow-inner">
+                  <div
+                    className={`h-full transition-all duration-500 ease-out rounded-full ${
+                      micReady 
+                        ? "bg-gradient-to-r from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25" 
+                        : "bg-gradient-to-r from-blue-400 to-indigo-600 shadow-lg shadow-blue-500/25"
+                    }`}
+                    style={{ width: `${testStatus !== TestStatus.NotStarted ? Math.min(micLevel * 2, 100) : 0}%` }}
+                  />
                 </div>
               </div>
+            </div>
 
-              <div className={`rounded-xl p-4 border ${eyeTrackingReady ? "border-emerald-500 bg-emerald-50" : "border-slate-200 bg-white"}`}>
-                <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  시선 추적
-                  {eyeTrackingReady && (
-                    <button 
-                      onClick={resetEyeTracking}
-                      className="text-xs bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded text-yellow-700"
-                      title="재캘리브레이션"
-                    >
-                      재설정
-                    </button>
-                  )}
+            {/* Enhanced status panel */}
+            <div className="space-y-5">
+              {[
+                {
+                  title: "카메라",
+                  status: cameraReady,
+                  description: testStatus === TestStatus.Completed || testStatus === TestStatus.EyeTracking
+                    ? "확인 성공! 카메라가 정상적으로 작동합니다"
+                    : (cameraLabel || "카메라 장치를 찾는 중..."),
+                  color: cameraReady ? "from-emerald-500 to-emerald-600" : "from-slate-400 to-slate-500"
+                },
+                {
+                  title: "마이크",
+                  status: micReady,
+                  description: micReady ? "확인 성공! 마이크가 정상적으로 작동합니다" : (micLabel || "마이크 장치를 찾는 중..."),
+                  color: micReady ? "from-emerald-500 to-emerald-600" : "from-slate-400 to-slate-500"
+                },
+                {
+                  title: "시선 추적",
+                  status: eyeTrackingReady,
+                  description: eyeTrackingReady ? "캘리브레이션 완료! 시선 추적이 준비되었습니다" : "시선 추적 캘리브레이션이 필요합니다.",
+                  color: eyeTrackingReady ? "from-emerald-500 to-emerald-600" : "from-slate-400 to-slate-500"
+                }
+              ].map((item, index) => (
+                <div
+                  key={index}
+                  className={`group relative rounded-2xl p-5 border-2 transition-all duration-300 transform hover:scale-105 ${
+                    item.status 
+                      ? "border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-emerald-100/40 shadow-lg shadow-emerald-200/50" 
+                      : "border-slate-200/60 bg-white/80 backdrop-blur-sm hover:border-blue-200/60 hover:shadow-lg hover:shadow-blue-100/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-base font-bold text-slate-900">{item.title}</div>
+                    {item.status && item.title === "시선 추적" && (
+                      <button 
+                        onClick={resetEyeTracking}
+                        className="text-xs bg-yellow-100 hover:bg-yellow-200 px-3 py-1.5 rounded-full text-yellow-700 font-medium transition-colors duration-200 hover:shadow-md"
+                        title="재캘리브레이션"
+                      >
+                        🔄 재설정
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-sm text-slate-700 leading-relaxed">
+                    {item.description}
+                  </div>
+                  
+                  {/* Status indicator */}
+                  <div className={`absolute top-3 right-3 h-4 w-4 rounded-full bg-gradient-to-r ${item.color} shadow-lg ${item.status ? 'animate-pulse' : ''}`} />
                 </div>
-                <div className="mt-1 text-xs text-slate-600">
-                  {eyeTrackingReady ? "캘리브레이션 완료! 시선 추적이 준비되었습니다." : "시선 추적 캘리브레이션이 필요합니다."}
-                </div>
-              </div>
+              ))}
 
-              <div className="rounded-xl border border-slate-200 bg-white p-3">
-                <div className="text-xs text-slate-700 mb-2">읽기 문장</div>
-                <textarea
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                  readOnly
-                  defaultValue="안녕하세요 저는 이번에 모의 AI 면접에 참여하게 된 지원자입니다."
-                />
-              </div>
+              
             </div>
           </div>
         </div>
       </div>
 
-      {/* 하단 고정 CTA 바 (항상 노출) */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-slate-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-        <div className="mx-auto max-w-6xl px-6 py-3 flex flex-wrap items-center justify-center gap-3">
+      {/* Enhanced bottom CTA bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-blue-200/60 bg-white/90 backdrop-blur-sm supports-[backdrop-filter]:bg-white/80">
+        <div className="mx-auto max-w-6xl px-6 py-4 flex flex-wrap items-center justify-center gap-4">
           {testStatus === TestStatus.NotStarted && (
-            <Button onClick={startTest} className="h-11 rounded-full px-7 text-base bg-blue-600 hover:bg-blue-700 focus-visible:ring-4 focus-visible:ring-blue-200">
-              테스트하기
+            <Button 
+              onClick={startTest} 
+              className="group relative h-12 px-8 rounded-2xl text-base font-semibold bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:via-indigo-700 hover:to-cyan-700 focus-visible:ring-4 focus-visible:ring-blue-200/50 transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/25 active:scale-95"
+            >
+              <span className="relative z-10">테스트하기</span>
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </Button>
           )}
 
           {testStatus === TestStatus.Completed && (
             <>
-              <Button onClick={resetState} variant="outline" className="h-11 rounded-full px-7 text-base border-slate-300 hover:bg-slate-50">
+              <Button 
+                onClick={resetState} 
+                variant="outline" 
+                className="h-12 px-8 rounded-2xl text-base font-semibold border-2 border-slate-300 hover:bg-slate-50 hover:border-blue-300 transition-all duration-200"
+              >
                 테스트 다시하기
               </Button>
-              <Button onClick={startEyeTracking} className="h-11 rounded-full px-7 text-base bg-emerald-600 hover:bg-emerald-700 focus-visible:ring-4 focus-visible:ring-emerald-200">
-                시선 추적 설정
+              <Button 
+                onClick={startEyeTracking} 
+                className="group relative h-12 px-8 rounded-2xl text-base font-semibold bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 focus-visible:ring-4 focus-visible:ring-emerald-200/50 transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-emerald-500/25"
+              >
+                <span className="relative z-10">시선 추적 설정</span>
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </Button>
             </>
           )}
 
           {testStatus === TestStatus.EyeTracking && (
             <>
-              <Button onClick={resetState} variant="outline" className="h-11 rounded-full px-7 text-base border-slate-300 hover:bg-slate-50">
-                테스트 다시하기
+              <Button 
+                onClick={resetState} 
+                variant="outline" 
+                className="h-12 px-8 rounded-2xl text-base font-semibold border-2 border-slate-300 hover:bg-slate-50 hover:border-blue-300 transition-all duration-200"
+              >
+                🔄 테스트 다시하기
               </Button>
-              <Button onClick={openReady} className="h-11 rounded-full px-7 text-base bg-blue-600 hover:bg-blue-700 focus-visible:ring-4 focus-visible:ring-blue-200">
-                면접 시작하기
+              <Button 
+                onClick={openReady} 
+                className="group relative h-12 px-8 rounded-2xl text-base font-semibold bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-700 hover:via-indigo-700 hover:to-cyan-700 focus-visible:ring-4 focus-visible:ring-blue-200/50 transform transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-blue-500/25"
+              >
+                <span className="relative z-10">면접 시작하기</span>
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {/* 모달/오버레이/캘리브레이션 (로직 그대로) */}
+      {/* Modals/overlays/calibration (logic unchanged) */}
       <ReadyModal open={readyOpen} onClose={() => setReadyOpen(false)} onStart={handleReadyStart} />
       {countdownOn && <CountdownOverlay seconds={3} onDone={handleCountdownDone} />}
       <WebCalibration key={calibrationKey} isOpen={calibrationOpen} onComplete={handleCalibrationComplete} onCancel={handleCalibrationCancel} />
+
+      {/* Custom CSS for animations */}
+      <style>{`
+        @keyframes fade-in-up {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        .animate-fade-in-up {
+          animation: fade-in-up 0.8s ease-out forwards;
+          opacity: 0;
+        }
+      `}</style>
     </div>
   )
 }
