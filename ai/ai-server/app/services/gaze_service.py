@@ -9,6 +9,19 @@ import cv2
 from pathlib import Path
 from typing import Optional, Any, Dict
 
+# Tesla T4 GPU 가속 초기화 (Gaze 서비스용)
+def init_gaze_gpu():
+    """시선 추적 GPU 가속 초기화"""
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+    os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
+    os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
+    os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
+    print("[GPU] Gaze service GPU acceleration initialized")
+
+# GPU 가속 초기화 실행
+init_gaze_gpu()
+
 # === Gaze_TR_pro 경로 등록 ===
 AI_SERVER_ROOT = Path(__file__).resolve().parents[2]  # ai-server 디렉토리
 GAZE_DIR = AI_SERVER_ROOT / "Gaze_TR_pro"
