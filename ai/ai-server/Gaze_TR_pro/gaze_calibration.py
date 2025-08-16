@@ -88,7 +88,7 @@ class GazeCalibrator:
         
         config = OmegaConf.create({
             "mode": "ETH-XGaze",
-            "device": "cpu",
+            "device": "cuda",
             "model": {"name": "resnet18"},
             "face_detector": {
                 "mode": "mediapipe",

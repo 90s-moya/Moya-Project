@@ -17,7 +17,7 @@ class ResNet18_Emotion(nn.Module):
     def forward(self, x):
         return self.backbone(x)
 
-def load_model(ckpt_path: str | None, device="cpu", num_classes=7):
+def load_model(ckpt_path: str | None, device="cuda", num_classes=7):
         model = ResNet18_Emotion(num_classes=num_classes, pretrained=True).to(device)
         if ckpt_path:
             state = torch.load(ckpt_path, map_location=device, weights_only=False)

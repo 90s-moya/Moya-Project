@@ -102,7 +102,7 @@ def load_model_and_processor(model_name):
     return model, processor, id2label
 
 class EmaSmoother:
-    def __init__(self, num_labels, alpha=0.8, device="cpu"):
+    def __init__(self, num_labels, alpha=0.8, device="cuda"):
         self.alpha = alpha
         self.device = device
         self.state = None

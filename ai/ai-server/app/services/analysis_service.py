@@ -1,27 +1,22 @@
 # app/services/video_pipeline.py
 # 목적:
-# - 프론트에서 온 WebM(주로 VP8/VP9)을 일시적으로 MP4(H.264, yuv420p)로 변환하여
-#   모델(infer_face_video / infer_gaze / analyze_video_bytes)에 전달.
-# - 변환 파일은 디스크에 "영구 저장"하지 않음(임시 파일 사용 후 즉시 삭제).
-# - CPU 100% 문제 완화를 위해: 가능한 경우 GPU 디코드/스케일 + 하드웨어 인코딩(NVENC/QSV/VideoToolbox),
-#   불가시 libx264(ultrafast) 폴백 + 스레드 제한. 입력이 이미 조건을 만족하면 remux(copy) 경로.
+# - 프론트(WebM 등) → 임시 MP4(H.264, yuv420p) 변환 (보관 X)
+# - 변환본을 "한 번만" 디코딩해 프레임 리스트로 만들고, 세 모델이 공유
+# - 가능하면 GPU(NVENC + scale_cuda/qsv) 사용, 불가 시 CPU 폴백(스레드 제한)
 #
 # 환경변수(옵션):
 #   FFMPEG_BIN             : ffmpeg 바이너리 경로(기본 "ffmpeg")
 #   FFPROBE_BIN            : ffprobe 바이너리 경로(기본 "ffprobe")
-#   FFMPEG_THREADS         : 인코딩/디코드 스레드(기본 "2")
+#   FFMPEG_THREADS         : 인코딩 스레드(기본 "2")
 #   FFMPEG_FILTER_THREADS  : 필터 스레드(기본 "1")
 #   X264_PRESET            : libx264 preset(기본 "ultrafast")
 #   X264_CRF               : libx264 CRF(기본 "26")
-#   FFMPEG_FORCE_HW        : "1"이면 하드웨어 인코더 실패 시 CPU 폴백 금지(바로 예외)
-#   FFMPEG_PREFER_ORDER    : 선호 인코더 우선순위(쉼표구분). 예: "h264_nvenc,h264_qsv,libx264"
+#   FFMPEG_FORCE_HW        : "1" → 하드웨어 실패 시 CPU 폴백 금지 (바로 예외)
+#   FFMPEG_PREFER_ORDER    : "h264_nvenc,h264_qsv,libx264"
 #
-# 팁:
-# - 컨테이너에서 다음이 보여야 전처리 대부분을 GPU로 보냄:
-#     ffmpeg -encoders | grep h264_nvenc
-#     ffmpeg -filters  | grep -E 'scale_(cuda|npp|qsv)'
-#   (없으면 스케일은 CPU로 돌아가 CPU가 튈 수 있음)
-# - 실행은 반드시 GPU 권한: docker run --gpus all ...
+# 필요 빌드 체크(컨테이너 내부):
+#   ffmpeg -hide_banner -encoders | grep h264_nvenc
+#   ffmpeg -hide_banner -filters  | grep -E 'scale_(cuda|npp|qsv)'
 
 import os
 import json
@@ -29,11 +24,30 @@ import shutil
 import subprocess
 import tempfile
 from datetime import datetime
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 
+import numpy as np
+
+# ----- 모델 임포트 -----
 from app.utils.posture import analyze_video_bytes
 from app.services.gaze_service import infer_gaze
 from app.services.face_service import infer_face_video
+
+# 프레임 입력 API가 있다면 사용(없으면 None)
+try:
+    from app.utils.posture import analyze_video_frames  # type: ignore
+except Exception:
+    analyze_video_frames = None  # type: ignore
+
+try:
+    from app.services.face_service import infer_face_frames  # type: ignore
+except Exception:
+    infer_face_frames = None  # type: ignore
+
+try:
+    from app.services.gaze_service import infer_gaze_frames  # type: ignore
+except Exception:
+    infer_gaze_frames = None  # type: ignore
 
 
 # ---------- 공통 유틸 ----------
@@ -51,7 +65,6 @@ def _which_ffprobe() -> str:
     return path
 
 def _run_ffmpeg(cmd: list[str]) -> None:
-    """FFmpeg 실행. 실패 시 STDERR를 예외 메시지로 올립니다."""
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
         raise RuntimeError(
@@ -64,7 +77,6 @@ def _out(cmd: list[str]) -> str:
     return subprocess.check_output(cmd, text=True, errors="ignore")
 
 def _has(ffmpeg: str, kind: str, name: str) -> bool:
-    """ffmpeg 기능 보유 여부 확인(kind: encoder/decoder/filter)."""
     try:
         if kind == "encoder":
             return name in _out([ffmpeg, "-hide_banner", "-v", "error", "-encoders"])
@@ -97,7 +109,6 @@ def _parse_fps(r_frame_rate: Optional[str]) -> float:
         return 0.0
 
 def _pick_encoder(ffmpeg_path: str) -> str:
-    """가능한 하드웨어 인코더를 우선 선택. 환경변수로 우선순위 커스터마이즈 지원."""
     prefer_env = os.getenv("FFMPEG_PREFER_ORDER", "h264_nvenc,h264_qsv,libx264")
     prefer = [x.strip() for x in prefer_env.split(",") if x.strip()]
     try:
@@ -119,7 +130,6 @@ def _pick_encoder(ffmpeg_path: str) -> str:
 def _can_remux_to_mp4_without_reencode(info: dict,
                                        want_size: Optional[Tuple[int, int]],
                                        want_fps: Optional[int]) -> bool:
-    """입력이 이미 MP4/H.264/yuv420p && 목표 해상도/프레임이면 -c copy로 remux만."""
     fmt = (info.get("format") or {}).get("format_name", "")
     v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
     if not v:
@@ -140,7 +150,7 @@ def _can_remux_to_mp4_without_reencode(info: dict,
     return True
 
 
-# ---------- 변환(임시 파일 사용, 즉시 삭제) ----------
+# ---------- 1) WebM → MP4(H.264) 변환 (임시, 보관 X) ----------
 
 def preprocess_video_to_mp4_bytes(
     video_bytes: bytes,
@@ -152,12 +162,6 @@ def preprocess_video_to_mp4_bytes(
     drop_audio: bool = True,
     return_debug: bool = False,
 ) -> bytes | tuple[bytes, Dict[str, Any]]:
-    """
-    입력 바이트(WebM/MP4 등)를 임시 파일로 저장 → MP4(H.264, yuv420p)로 변환 → 결과 바이트 리턴.
-    - 가능하면 GPU 디코드/스케일 + NVENC/QSV 인코드 경로를 우선 시도.
-    - 실패 시 libx264(ultrafast)로 폴백하며 스레드/필터 스레드를 강하게 제한.
-    - 입력이 이미 조건을 만족하면 remux(-c copy)로 재인코딩 생략.
-    """
     ffmpeg = _which_ffmpeg()
     preferred_encoder = _pick_encoder(ffmpeg)
 
@@ -172,24 +176,20 @@ def preprocess_video_to_mp4_bytes(
 
     info = _ffprobe(in_path)
 
-    # 가용 기능 체크
-    has_nvenc     = _has(ffmpeg, "encoder", "h264_nvenc")
-    has_qsv       = _has(ffmpeg, "encoder", "h264_qsv")
-    has_scale_cuda= _has(ffmpeg, "filter", "scale_cuda") or _has(ffmpeg, "filter", "scale_npp")
-    has_scale_qsv = _has(ffmpeg, "filter", "scale_qsv")
+    has_nvenc      = _has(ffmpeg, "encoder", "h264_nvenc")
+    has_qsv        = _has(ffmpeg, "encoder", "h264_qsv")
+    has_scale_cuda = _has(ffmpeg, "filter", "scale_cuda") or _has(ffmpeg, "filter", "scale_npp")
+    has_scale_qsv  = _has(ffmpeg, "filter", "scale_qsv")
 
-    # 입력 코덱 → cuvid/qsv 디코더 맵
     v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
     codec_name = (v.get("codec_name") or "").lower()
     cuvid_map = {"h264": "h264_cuvid", "hevc": "hevc_cuvid", "vp9": "vp9_cuvid", "av1": "av1_cuvid"}
     qsv_dec_map = {"h264": "h264_qsv", "hevc": "hevc_qsv", "vp9": "vp9_qsv"}
-    cuvid = cuvid_map.get(codec_name, "")
+    cuvid  = cuvid_map.get(codec_name, "")
     qsvdec = qsv_dec_map.get(codec_name, "")
 
-    # 필터 구성 (CPU 필터 표현식; GPU 스케일을 쓰면 대체됨)
     cpu_vf_filters = []
     if target_fps and target_fps > 0:
-        # fps는 CPU 필터보다 출력 -r이 더 가벼움 → CPU 경로에서만 필터 사용
         cpu_vf_filters.append(f"fps={int(target_fps)}")
     if resize_to:
         w, h = int(resize_to[0]), int(resize_to[1])
@@ -202,6 +202,7 @@ def preprocess_video_to_mp4_bytes(
     cpu_vf = ",".join(cpu_vf_filters) if cpu_vf_filters else None
 
     used: Dict[str, Any] = {
+        "stage": "preprocess",
         "pipeline": None, "decoder": None, "scale": None, "encoder": None,
         "input_codec": codec_name, "preferred_encoder": preferred_encoder
     }
@@ -229,25 +230,23 @@ def preprocess_video_to_mp4_bytes(
         cmd += ["-pix_fmt", "yuv420p", "-movflags", "+faststart",
                 "-c:v", "libx264", "-preset", preset, "-tune", "fastdecode",
                 "-crf", str(crf_val),
-                "-threads", "1",  # 인코더 스레드도 최소화
+                "-threads", "1",
                 out_path]
         return cmd
 
     def build_nvenc_cmd(use_gpu_scale: bool) -> list[str]:
-        # GPU 경로: 가능하면 디코더/스케일/인코더 모두 GPU 사용.
-        # fps 제한은 -vf fps 대신 출력 -r 사용(부담 ↓)
         vf_parts = []
         if resize_to:
             if use_gpu_scale:
-                vf_parts += ["hwupload_cuda", f"scale_cuda={w}:{h}"]
+                vf_parts += ["scale_cuda=%d:%d" % (w, h)]
                 used["scale"] = "scale_cuda"
             else:
                 vf_parts += [f"scale={w}:{h}:flags=fast_bilinear"]
                 used["scale"] = "scale(cpu)"
-        vf = ",".join(vf_parts) if vf_parts else "null"
+        vf = ",".join(vf_parts) if vf_parts else None
 
-        # 입력 디코더 지정: 가능한 경우 cuvid, 아니면 hwaccel
-        cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y"]
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+               "-init_hw_device", "cuda=cuda:0", "-filter_hw_device", "cuda"]
         if cuvid and _has(ffmpeg, "decoder", cuvid):
             cmd += ["-c:v", cuvid]
             used["decoder"] = cuvid
@@ -271,11 +270,10 @@ def preprocess_video_to_mp4_bytes(
         return cmd
 
     def build_qsv_cmd(use_gpu_scale: bool) -> list[str]:
-        # QSV 경로(있다면). scale_qsv가 없으면 CPU 스케일.
         vf_parts = []
         if resize_to:
             if use_gpu_scale and has_scale_qsv:
-                vf_parts += [f"scale_qsv={w}:{h}"]
+                vf_parts += ["scale_qsv=%d:%d" % (w, h)]
                 used["scale"] = "scale_qsv"
             else:
                 vf_parts += [f"scale={w}:{h}:flags=fast_bilinear"]
@@ -306,17 +304,15 @@ def preprocess_video_to_mp4_bytes(
         return cmd
 
     try:
-        # 0) remux만으로 충분하면 재인코딩 없이 처리
+        # copy 경로
         if _can_remux_to_mp4_without_reencode(
-            info,
-            want_size=resize_to if (resize_to and not keep_aspect) else resize_to,
+            info, want_size=resize_to if (resize_to and not keep_aspect) else resize_to,
             want_fps=target_fps
         ) and not cpu_vf:
             _run_ffmpeg(build_copy_cmd())
-            used.update({"pipeline": "copy", "encoder": "copy", "scale": None, "decoder": "copy"})
-
+            used.update({"pipeline": "copy", "encoder": "copy", "decoder": "copy", "scale": None})
         else:
-            # 1) 하드웨어 경로 우선 (NVENC → QSV)
+            # 하드웨어 우선
             tried_hw = False
             if preferred_encoder == "h264_nvenc" and has_nvenc:
                 tried_hw = True
@@ -324,19 +320,18 @@ def preprocess_video_to_mp4_bytes(
                     _run_ffmpeg(build_nvenc_cmd(use_gpu_scale=bool(has_scale_cuda)))
                     used.update({"pipeline": "gpu", "encoder": "h264_nvenc"})
                 except Exception as e:
-                    if force_hw:
+                    if os.getenv("FFMPEG_FORCE_HW", "0") == "1":
                         raise RuntimeError("NVENC 필수 모드인데 사용 불가") from e
 
-            if used["pipeline"] is None and (preferred_encoder == "h264_qsv" and has_qsv):
+            if used["pipeline"] is None and preferred_encoder == "h264_qsv" and has_qsv:
                 tried_hw = True
                 try:
                     _run_ffmpeg(build_qsv_cmd(use_gpu_scale=bool(has_scale_qsv)))
                     used.update({"pipeline": "gpu", "encoder": "h264_qsv"})
                 except Exception as e:
-                    if force_hw:
+                    if os.getenv("FFMPEG_FORCE_HW", "0") == "1":
                         raise RuntimeError("QSV 필수 모드인데 사용 불가") from e
 
-            # 2) 하드웨어 우선 엔코더가 없고 NVENC/QSV 중 하나라도 존재하면 NVENC→QSV 순으로 보조 시도
             if used["pipeline"] is None and not tried_hw:
                 if has_nvenc:
                     try:
@@ -351,7 +346,7 @@ def preprocess_video_to_mp4_bytes(
                     except Exception:
                         pass
 
-            # 3) CPU 폴백
+            # CPU 폴백
             if used["pipeline"] is None:
                 _run_ffmpeg(build_cpu_cmd())
                 used.update({"pipeline": "cpu", "encoder": "libx264", "decoder": "cpu", "scale": used.get("scale") or "scale(cpu)"})
@@ -369,7 +364,83 @@ def preprocess_video_to_mp4_bytes(
                 pass
 
 
-# ---------- 분석 파이프라인(모델 호출) ----------
+# ---------- 2) MP4 바이트 → 프레임 리스트 (단 한 번 디코딩) ----------
+
+def decode_to_frames(
+    mp4_bytes: bytes,
+    size: Tuple[int, int] = (320, 240),
+    fps: int = 30,
+    max_frames: int = 1800,
+    use_gpu_when_possible: bool = True,
+) -> tuple[List[np.ndarray], Dict[str, Any]]:
+    """
+    MP4 바이트를 raw RGB24 프레임 리스트로 변환. 가능하면 CUDA 디코드/스케일 사용.
+    반환:
+      frames: [H,W,3] uint8
+      debug : {'stage': 'decode', 'decoder': ..., 'scale': ..., 'fps': ..., 'frames_out': ...}
+    """
+    ffmpeg = _which_ffmpeg()
+    has_scale_cuda = _has(ffmpeg, "filter", "scale_cuda") or _has(ffmpeg, "filter", "scale_npp")
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        tmp.write(mp4_bytes)
+        in_path = tmp.name
+
+    w, h = int(size[0]), int(size[1])
+    frame_bytes = w * h * 3
+
+    debug = {"stage": "decode", "decoder": None, "scale": None, "fps": fps, "frames_out": 0}
+    try:
+        if use_gpu_when_possible and has_scale_cuda:
+            cmd = [
+                ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+                "-init_hw_device", "cuda=cuda:0", "-filter_hw_device", "cuda",
+                "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
+                "-i", in_path,
+                "-vf", f"scale_cuda={w}:{h}",
+                "-r", str(int(fps)),
+                "-f", "rawvideo", "-pix_fmt", "rgb24", "-"
+            ]
+            debug.update({"decoder": "hwaccel cuda", "scale": "scale_cuda"})
+        else:
+            cmd = [
+                ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+                "-i", in_path,
+                "-vf", f"scale={w}:{h}:flags=fast_bilinear",
+                "-r", str(int(fps)),
+                "-f", "rawvideo", "-pix_fmt", "rgb24", "-"
+            ]
+            debug.update({"decoder": "cpu", "scale": "scale(cpu)"})
+
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        frames: List[np.ndarray] = []
+        i = 0
+        try:
+            while True:
+                if i >= max_frames:
+                    break
+                buf = p.stdout.read(frame_bytes)  # type: ignore
+                if not buf or len(buf) < frame_bytes:
+                    break
+                frame = np.frombuffer(buf, dtype=np.uint8).reshape(h, w, 3)
+                frames.append(frame)
+                i += 1
+        finally:
+            if p.stdout:
+                p.stdout.close()
+            p.wait()
+
+        debug["frames_out"] = len(frames)
+        return frames, debug
+
+    finally:
+        try:
+            os.remove(in_path)
+        except Exception:
+            pass
+
+
+# ---------- 3) 전체 분석 파이프라인 ----------
 
 def analyze_all(
     video_bytes: bytes,
@@ -377,18 +448,17 @@ def analyze_all(
     stride: int = 5,
     return_points: bool = False,
     calib_data: Optional[dict] = None,
-    # 변환 파라미터(모델이 안정적으로 먹는 해상도/프레임으로 맞추기)
     target_fps: int = 30,
     resize_to: Tuple[int, int] = (320, 240),
     max_frames: int = 1800,
-    return_debug: bool = True,  # 디폴트로 디버그도 반환해서 실제 경로 확인
+    return_debug: bool = True,
 ):
     """
-    - 입력(WebM/MP4)을 임시로 MP4(H.264, yuv420p, target_fps, resize_to)로 맞춘 뒤
-      자세/표정/시선 모델에 전달하고, 결과를 dict로 반환.
-    - 중간 MP4 파일은 디스크에 남기지 않음(임시 후 즉시 삭제).
+    1) 입력(WebM/MP4)을 임시로 MP4(H.264, yuv420p, target_fps, resize_to)로 변환
+    2) 변환본을 "한 번만" 디코딩해 프레임 리스트를 만들고(가능하면 GPU),
+    3) 세 모델이 그 프레임을 공유해서 사용 (프레임 API 없으면 바이트 경로 폴백)
     """
-    # device 자동 선택(CUDA 가능하면 cuda, 아니면 cpu)
+    # device 자동 선택
     if device is None:
         try:
             import torch
@@ -396,25 +466,55 @@ def analyze_all(
         except Exception:
             device = "cpu"
 
-    processed = preprocess_video_to_mp4_bytes(
+    # (1) 변환
+    processed_data = preprocess_video_to_mp4_bytes(
         video_bytes=video_bytes,
         target_fps=target_fps,
         max_frames=max_frames,
         resize_to=resize_to,
-        keep_aspect=False,   # 모델 입력 고정 크기 권장
+        keep_aspect=False,
         crf=23,
         drop_audio=True,
         return_debug=True,
     )
-    if isinstance(processed, tuple):
-        processed_bytes, dbg = processed
+    if isinstance(processed_data, tuple):
+        mp4_bytes, dbg_pre = processed_data
     else:
-        processed_bytes, dbg = processed, None
+        mp4_bytes, dbg_pre = processed_data, None
 
-    # 아래 모델 함수들은 기존과 동일한 시그니처로 바이트 입력을 받는다고 가정
-    posture = analyze_video_bytes(processed_bytes)
-    face = infer_face_video(processed_bytes, device, stride, None, return_points)
-    gaze = infer_gaze(processed_bytes, calib_data=calib_data)
+    # (2) 단일 디코딩 → 프레임 리스트
+    frames, dbg_dec = decode_to_frames(
+        mp4_bytes=mp4_bytes,
+        size=resize_to,
+        fps=target_fps // max(1, stride),   # stride만큼 샘플링 효과
+        max_frames=max_frames // max(1, stride),
+        use_gpu_when_possible=True,
+    )
+
+    # (3) 모델 호출
+    # 3-1 자세
+    if analyze_video_frames is not None:
+        posture = analyze_video_frames(frames)  # type: ignore
+        posture_path = "frames"
+    else:
+        posture = analyze_video_bytes(mp4_bytes)
+        posture_path = "bytes"
+
+    # 3-2 얼굴/감정
+    if infer_face_frames is not None:
+        face = infer_face_frames(frames, device=device, stride=1, return_points=return_points)  # type: ignore
+        face_path = "frames"
+    else:
+        face = infer_face_video(mp4_bytes, device, stride, None, return_points)
+        face_path = "bytes"
+
+    # 3-3 시선
+    if infer_gaze_frames is not None:
+        gaze = infer_gaze_frames(frames, calib_data=calib_data)  # type: ignore
+        gaze_path = "frames"
+    else:
+        gaze = infer_gaze(mp4_bytes, calib_data=calib_data)
+        gaze_path = "bytes"
 
     result = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -424,6 +524,20 @@ def analyze_all(
         "emotion": face,
         "gaze": gaze,
     }
+
     if return_debug:
-        result["debug"] = dbg
+        result["debug"] = {
+            "preprocess": dbg_pre,
+            "decode": dbg_dec,
+            "model_paths": {
+                "posture": posture_path,
+                "face": face_path,
+                "gaze": gaze_path,
+            },
+            "frames_info": {
+                "count": len(frames),
+                "shape": list(frames[0].shape) if frames else None,
+                "dtype": str(frames[0].dtype) if frames else None,
+            },
+        }
     return result
