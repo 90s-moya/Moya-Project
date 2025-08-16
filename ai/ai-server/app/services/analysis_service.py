@@ -125,7 +125,7 @@ def _can_remux_to_mp4_without_reencode(info: dict,
 
 def preprocess_video_to_mp4_bytes(
     video_bytes: bytes,
-    target_fps: int = 25,  # Tesla T4 메모리 절약을 위해 25fps로 감소
+    target_fps: int = 15,  # Tesla T4 메모리 절약을 위해 25fps로 감소
     max_frames: Optional[int] = 1500,  # 최대 프레임 수 감소 (60초 * 25fps)
     resize_to: Optional[Tuple[int, int]] = (288, 216),  # 16:12 비율로 메모리 절약
     keep_aspect: bool = False,  # 현재는 고정 리사이즈 사용(필요시 확장)
@@ -342,7 +342,7 @@ def analyze_all(
     return_points: bool = False,
     calib_data: Optional[dict] = None,
     # Tesla T4 최적화 변환 파라미터
-    target_fps: int = 25,
+    target_fps: int = 15,
     resize_to: Tuple[int, int] = (288, 216),
     max_frames: int = 1500,
     return_debug: bool = False,

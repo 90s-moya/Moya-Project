@@ -20,7 +20,7 @@ def init_posture_gpu():
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     os.environ['TORCH_CUDNN_V8_API_ENABLED'] = '1'
     
-    # MediaPipe GPU 우선 설정
+    # MediaPipe GPU 우선 설정 (Python 솔루션에는 영향 제한적)
     os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
     os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
     
@@ -158,18 +158,32 @@ def _compress_runs(sampled_frames, labels, step):
     })
     return segments
 
-def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every: int = 1):
+def analyze_video_bytes(
+    file_bytes: bytes,
+    mode: str = "segments",
+    sample_every: int = 1,
+    analyzed_fps: float | None = None,   # 실제 분석 fps (예: 15)
+    reported_fps: int | None = None      # 프론트 표시용 fps (예: 30)
+):
     """
     업로드된 동영상 바이트 -> 샘플링/분석 -> JSON 리포트 반환
 
     반환 포맷
     {
-      "timestamp": ISO8601,
-      "total_frames": int,                # 원본에서 읽은 총 프레임 수(스킵 포함)
+      "timestamp": ISO8601(Z),
+      "total_frames": int,                # 분석 fps 기준 읽은 총 프레임 수(스킵 포함)
       "frame_distribution": {label:int},  # 라벨별 카운트
-      "detailed_logs": [                  # 연속 구간
+      "detailed_logs": [                  # 연속 구간(분석 fps 프레임 기준)
         {"label": str, "start_frame": int, "end_frame": int}, ...
-      ]
+      ],
+      "detailed_logs_seconds": [          # 초 기준 구간
+        {"label": str, "start_s": float, "end_s": float}, ...
+      ],
+      "detailed_logs_frames_reported": [  # reported_fps(예:30) 프레임 기준 구간
+        {"label": str, "start_frame": int, "end_frame": int}, ...
+      ],
+      "meta": {"analyzed_fps": float, "reported_fps": int, "sample_every": int, "duration_s": float},
+      "total_frames_reported": int        # duration_s * reported_fps
     }
     """
     assert mode in ("segments", "samples"), "mode must be 'segments' or 'samples'"
@@ -180,17 +194,21 @@ def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every:
         tmp.write(file_bytes)
         tmp_path = tmp.name
 
-    # Tesla T4 GPU 가속 MediaPipe Pose (GPU 전용)
+    # MediaPipe Pose (Python 솔루션: CPU 기반)
     pose_ctx = mp_pose.Pose(
         static_image_mode=False,
         min_detection_confidence=0.5,
-        model_complexity=0,
-        # GPU 전용 설정 (CPU 완전 차단)
-        enable_segmentation=False,  # 세그멘테이션 비활성화로 성능 향상
-        smooth_landmarks=True,      # GPU 기반 랜드마크 추적
+        model_complexity=0,       # 경량
+        enable_segmentation=False,
+        smooth_landmarks=True,
         min_tracking_confidence=0.5
     )
     cap = cv2.VideoCapture(tmp_path)
+
+    # 분석 fps 확정 (넘어오지 않으면 비디오에서 추정, 실패 시 15 가정)
+    if analyzed_fps is None:
+        probed = cap.get(cv2.CAP_PROP_FPS) or 0.0
+        analyzed_fps = probed if probed > 0 else 15.0
 
     try:
         total_frames_read = 0
@@ -232,23 +250,61 @@ def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every:
             pass
 
     # 라벨 카운트만 남김
-    if per_frame_labels:
-        counts = Counter(per_frame_labels)
-        frame_distribution = {k: int(v) for k, v in counts.items()}
-    else:
-        frame_distribution = {}
+    frame_distribution = {k: int(v) for k, v in Counter(per_frame_labels).items()} if per_frame_labels else {}
 
-    # detailed_logs 생성
+    # detailed_logs 생성(분석 fps 프레임 기준)
     if mode == "samples":
         detailed_logs = [{"frame": int(f), "label": lb} for f, lb in zip(sampled_frames, per_frame_labels)]
     else:
         detailed_logs = _compress_runs(sampled_frames, per_frame_labels, step=sample_every)
 
-    # 최종 리포트
+    # 초/보고용 프레임(예: 30fps) 변환
+    def _f2s(fr): return fr / float(analyzed_fps)
+    def _f_report(fr):
+        if not reported_fps:
+            return int(fr)
+        return int(round(_f2s(fr) * reported_fps))
+
+    # seconds 버전
+    if mode == "samples":
+        detailed_logs_seconds = [{"time_s": _f2s(f), "label": lb} for f, lb in zip(sampled_frames, per_frame_labels)]
+    else:
+        detailed_logs_seconds = [{
+            "label": seg["label"],
+            "start_s": _f2s(seg["start_frame"]),
+            "end_s": _f2s(seg["end_frame"]),
+        } for seg in detailed_logs]
+
+    # 보고용 프레임(30fps) 버전
+    detailed_logs_frames_reported = None
+    if reported_fps:
+        if mode == "samples":
+            detailed_logs_frames_reported = [{"frame": _f_report(f), "label": lb} for f, lb in zip(sampled_frames, per_frame_labels)]
+        else:
+            detailed_logs_frames_reported = [{
+                "label": seg["label"],
+                "start_frame": _f_report(seg["start_frame"]),
+                "end_frame": _f_report(seg["end_frame"]),
+            } for seg in detailed_logs]
+
+    total_seconds = (total_frames_read / float(analyzed_fps)) if analyzed_fps else None
+    total_frames_reported = int(round(total_seconds * reported_fps)) if (total_seconds and reported_fps) else None
+
+    # 최종 리포트 (UTC 표준화)
     report = {
-        "timestamp": datetime.datetime.now().isoformat(),
-        "total_frames": int(total_frames_read),
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "total_frames": int(total_frames_read),          # 분석 fps 기준
         "frame_distribution": frame_distribution,
-        "detailed_logs": detailed_logs,
+        "detailed_logs": detailed_logs,                  # 분석 fps 프레임 기준
+        "detailed_logs_seconds": detailed_logs_seconds,  # 초 기준
+        "meta": {
+            "analyzed_fps": float(analyzed_fps),
+            "reported_fps": int(reported_fps or analyzed_fps),
+            "sample_every": int(sample_every),
+            "duration_s": float(total_seconds) if total_seconds is not None else None,
+        }
     }
+    if detailed_logs_frames_reported is not None:
+        report["detailed_logs_frames_reported"] = detailed_logs_frames_reported
+        report["total_frames_reported"] = total_frames_reported
     return report
