@@ -11,13 +11,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
-try:
-    import mediapipe as mp
-    MP_AVAILABLE = True
-    mp_fd = mp.solutions.face_detection
-except Exception:
-    MP_AVAILABLE = False
-    mp_fd = None
+
 # 동영상 처리용
 import cv2
 import numpy as np
@@ -70,7 +64,7 @@ def _bytes_to_temp_video(b: bytes, suffix: str = ".mp4") -> str:
 
 def infer_face_video(
     video_bytes: bytes,
-    device: str = "cpu",
+    device: str = "cuda",
     stride: int = 5,
     max_frames: Optional[int] = None,
     return_points: bool = False,
@@ -186,127 +180,4 @@ def infer_face_video(
             })
         result["timeline"] = timeline
     
-    return result
-
-def _center_crop_square_bgr(img_bgr, out_size=224):
-    h, w = img_bgr.shape[:2]
-    side = min(h, w)
-    y0 = (h - side) // 2
-    x0 = (w - side) // 2
-    crop = img_bgr[y0:y0+side, x0:x0+side]
-    if crop.shape[0] != out_size or crop.shape[1] != out_size:
-        crop = cv2.resize(crop, (out_size, out_size))
-    return crop
-
-
-def _detect_and_crop_face_bgr(frame_bgr, detector, margin=0.25, min_size=80):
-    """
-    MediaPipe 얼굴 검출로 가장 큰 얼굴 영역을 크롭. 실패 시 None.
-    """
-    if detector is None:
-        return None
-
-    h, w = frame_bgr.shape[:2]
-    rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-    res = detector.process(rgb)
-    if not res or not res.detections:
-        return None
-
-    best = None
-    best_area = -1
-    for det in res.detections:
-        bbox = det.location_data.relative_bounding_box
-        x, y, bw, bh = bbox.xmin, bbox.ymin, bbox.width, bbox.height
-        X = max(0, int(x * w)); Y = max(0, int(y * h))
-        W = int(bw * w); H = int(bh * h)
-        mx = int(W * margin); my = int(H * margin)
-        X0 = max(0, X - mx); Y0 = max(0, Y - my)
-        X1 = min(w, X + W + mx); Y1 = min(h, Y + H + my)
-        area = (X1 - X0) * (Y1 - Y0)
-        if area > best_area:
-            best_area = area
-            best = (X0, Y0, X1, Y1)
-
-    if best is None:
-        return None
-    X0, Y0, X1, Y1 = best
-    face = frame_bgr[Y0:Y1, X0:X1]
-    if face.size == 0:
-        return None
-    if min(face.shape[0], face.shape[1]) < min_size:
-        return None
-    # 정사각 리사이즈
-    face = cv2.resize(face, (224, 224))
-    return face
-
-
-def infer_face_frames(
-    frames: List[np.ndarray],
-    device: str = "cuda",
-    sample_stride: int = 1,
-    return_points: bool = False,
-    use_face_detector: bool = True,
-) -> Dict[str, Any]:
-    """
-    프레임 리스트 기반 감정 추론.
-    - MediaPipe 얼굴검출 + 크롭(옵션). 실패하면 센터크롭으로 대체.
-    - sample_stride로 샘플링(예: 3이면 3프레임마다 1개만 추론)
-    """
-    model, dev = get_face_model(device)
-    detector = mp_fd.FaceDetection(model_selection=1, min_detection_confidence=0.5) if (MP_AVAILABLE and use_face_detector) else None
-
-    counts = {k: 0 for k in CLASS_NAMES}
-    timeline = []
-    used = 0
-
-    with torch.no_grad():
-        for i, bgr in enumerate(frames):
-            if sample_stride > 1 and (i % sample_stride) != 0:
-                continue
-
-            face_bgr = None
-            if detector is not None:
-                face_bgr = _detect_and_crop_face_bgr(bgr, detector)
-            if face_bgr is None:
-                face_bgr = _center_crop_square_bgr(bgr, 224)
-
-            rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(rgb)
-            x = _preprocess(img).unsqueeze(0).to(dev)
-
-            logits = model(x)
-            probs = F.softmax(logits, dim=1).cpu().numpy().squeeze()
-            top_idx = int(probs.argmax())
-            label = CLASS_NAMES[top_idx]
-
-            counts[label] += 1
-            used += 1
-
-            if return_points:
-                timeline.append({
-                    "frame": i,
-                    "label": label,
-                    "score": float(probs[top_idx]),
-                    "probs": {CLASS_NAMES[j]: float(probs[j]) for j in range(len(CLASS_NAMES))}
-                })
-
-    if used == 0:
-        return {
-            "label": "neutral",
-            "score": 0.0,
-            "probs": {k: 0.0 for k in CLASS_NAMES},
-            "samples": 0,
-            "timeline": timeline if return_points else None
-        }
-
-    dominant = max(counts, key=counts.get)
-    probs_dist = {k: counts[k] / float(used) for k in CLASS_NAMES}
-    result = {
-        "label": dominant,
-        "score": float(probs_dist[dominant]),
-        "probs": probs_dist,
-        "samples": used
-    }
-    if return_points:
-        result["timeline"] = timeline
     return result
