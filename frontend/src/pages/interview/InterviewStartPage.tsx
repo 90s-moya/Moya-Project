@@ -68,8 +68,6 @@ export default function Component() {
               <p className="text-sm text-slate-500">시작을 누르면 서류 선택 화면으로 이동합니다</p>
             </div>
 
-
-
             <div className="animate-fade-in-up space-y-4" style={{ animationDelay: '0.8s' }}>
               <Button
                 onClick={handleStartInterview}
@@ -82,6 +80,11 @@ export default function Component() {
                 <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 opacity-75 blur-sm group-hover:opacity-100 transition-opacity duration-300" />
               </Button>
               
+
+              <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                <span>시작을 누르면 서류 선택 화면으로 이동합니다</span>
+              </div>
             </div>
           </div>
 
