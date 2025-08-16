@@ -142,6 +142,14 @@ def preprocess_video_to_mp4_bytes(
     filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
     x264_preset = os.getenv("X264_PRESET", "ultrafast")
     x264_crf = int(os.getenv("X264_CRF", "26"))
+    
+    # NVENC 최적화 옵션들
+    nvenc_preset = os.getenv("NVENC_PRESET", "p1")  # p1(빠름) ~ p7(느림)
+    nvenc_tune = os.getenv("NVENC_TUNE", "ll")      # ll(저지연), hq(고품질), ull(초저지연)
+    nvenc_rc = os.getenv("NVENC_RC", "cbr")         # cbr, vbr, cqp
+    nvenc_bitrate = os.getenv("NVENC_BITRATE", "2M")
+    nvenc_maxrate = os.getenv("NVENC_MAXRATE", "2M")
+    nvenc_bufsize = os.getenv("NVENC_BUFSIZE", "4M")
 
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
         tmp_in.write(video_bytes)
@@ -195,7 +203,12 @@ def preprocess_video_to_mp4_bytes(
             "-pix_fmt", "yuv420p",
             "-movflags", "+faststart",
             "-c:v", "h264_nvenc",
-            "-preset", "fast",
+            "-preset", nvenc_preset,
+            "-tune", nvenc_tune,
+            "-rc", nvenc_rc,
+            "-b:v", nvenc_bitrate,
+            "-maxrate", nvenc_maxrate,
+            "-bufsize", nvenc_bufsize,
             out_path
         ]
         return cmd
