@@ -7,13 +7,27 @@ import datetime
 import tempfile
 import os
 
-# Tesla T4 GPU 가속 초기화 (Posture 분석용)
+# Tesla T4 GPU 가속 초기화 (Posture 분석용 - CPU 완전 차단)
 def init_posture_gpu():
-    """자세 분석 GPU 가속 초기화"""
+    """자세 분석 GPU 가속 초기화 - CPU 완전 차단"""
+    # TensorFlow CPU 백엔드 완전 차단
+    os.environ['TF_DISABLE_XNNPACK'] = '1'
+    os.environ['TF_DISABLE_ONEDNN'] = '1'
+    os.environ['TF_DISABLE_MKL'] = '1'
+    os.environ['TF_LITE_DISABLE_CPU_DELEGATE'] = '1'
+    os.environ['TF_FORCE_GPU_ONLY'] = '1'
+    
+    # CUDA/PyTorch GPU 설정
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['TORCH_CUDNN_V8_API_ENABLED'] = '1'
+    
+    # MediaPipe GPU 강제 설정
     os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
     os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
-    print("[GPU] Posture analysis GPU acceleration initialized")
+    os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
+    os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
+    
+    print("[GPU] Posture analysis GPU-only mode initialized - CPU delegates DISABLED")
 
 # GPU 가속 초기화 실행
 init_posture_gpu()
@@ -154,14 +168,14 @@ def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every:
         tmp.write(file_bytes)
         tmp_path = tmp.name
 
-    # Tesla T4 GPU 가속 MediaPipe Pose
+    # Tesla T4 GPU 가속 MediaPipe Pose (GPU 전용)
     pose_ctx = mp_pose.Pose(
         static_image_mode=False,
         min_detection_confidence=0.5,
         model_complexity=1,
-        # GPU 가속 설정
+        # GPU 전용 설정 (CPU 완전 차단)
         enable_segmentation=False,  # 세그멘테이션 비활성화로 성능 향상
-        smooth_landmarks=True,      # 부드러운 랜드마크 추적
+        smooth_landmarks=True,      # GPU 기반 랜드마크 추적
         min_tracking_confidence=0.5
     )
     cap = cv2.VideoCapture(tmp_path)
