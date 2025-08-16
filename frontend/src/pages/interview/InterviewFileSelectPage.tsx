@@ -147,7 +147,7 @@ export default function InterviewFileSelectPage() {
       <Header scrollBg={false} />
 
       {/* 상단 여백 고정 */}
-      <div className="pt-20 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/60">
+      <div className="pt-20 bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/60 mt-10">
         <div className="mx-auto max-w-5xl px-6 pb-8">
           <div className="flex items-center justify-between">
             <div>
@@ -156,7 +156,7 @@ export default function InterviewFileSelectPage() {
               </span>
               <h1 className="mt-3 text-2xl font-semibold text-slate-900">서류 선택</h1>
               <p className="mt-2 text-sm text-slate-600">
-                탭에서 유형을 선택해 1개 이상 고르세요. 다음 단계에서 AI가 분석해 인터뷰를 준비합니다
+                탭에서 유형을 선택해 1개 이상 고르세요. AI가 서류를 분석해 인터뷰를 준비합니다
               </p>
             </div>
 
@@ -166,30 +166,12 @@ export default function InterviewFileSelectPage() {
                 {summary}
               </div>
             </div>
-          </div>
-
-          {/* 가이드 카드 */}
-          <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 md:p-5 shadow-sm">
-            <ul className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                카드 클릭으로 선택, 우측 링크로 미리보기
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                파일명은 두 줄까지만 표시되고 전체 이름은 툴팁으로 확인
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                선택 후 하단의 다음 버튼으로 진행
-              </li>
-            </ul>
-          </div>
+          </div>          
         </div>
       </div>
 
       {/* 표 형태 탭 바 */}
-      <div className="mx-auto max-w-5xl px-6">
+      <div className="mx-auto max-w-5xl px-6 mt-3">
         <div
           role="tablist"
           aria-label="문서 유형"
@@ -228,7 +210,6 @@ export default function InterviewFileSelectPage() {
               {STATUS_LABEL[tab]}
             </h2>
           </div>
-          <span className="text-xs text-slate-500">현재 선택: {currentPickedName}</span>
         </header>
 
         {grouped[tab].length === 0 ? (

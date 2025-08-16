@@ -358,8 +358,8 @@ export function useAnswerRecorder({
           }
 
           // 동영상 전송 후 url return
-          const urls = await sendVideoUpload(formData);
-          console.log("==========비디오 레츠고 ======", urls);
+          // const urls = await sendVideoUpload(formData);
+          // console.log("==========비디오 레츠고 ======", urls);
 
 
           // 카메라를 항상 유지: 트랙/스트림은 유지하고 레코더만 정리
@@ -380,7 +380,7 @@ export function useAnswerRecorder({
     timerRef.current = window.setInterval(() => {
       setSeconds((s) => { const n = s + 1; if (n >= maxDurationSec) stop(); return n; });
     }, 1000);
-  }, [key, maxDurationSec, setLocalPending, markSynced, markFailed, stop]);
+  }, [maxDurationSec, setLocalPending, markSynced, markFailed, stop]);
 
   useEffect(() => {
     if (onUploadComplete && audioUploaded && videoUploaded) {
