@@ -1,4 +1,4 @@
-# app/services/video_pipeline.py
+# app/services/analysis_service.py
 # 목적:
 # - WebM/MP4 입력을 임시로 MP4(H.264, yuv420p)로 변환해 모델에 전달
 # - NVDEC(디코더) 강제 금지: libnvcuvid.so.1 미노출 환경에서도 안전 동작

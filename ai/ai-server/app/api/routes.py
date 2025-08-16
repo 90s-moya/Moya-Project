@@ -21,7 +21,7 @@ from app.schemas import EvaluationSessionRead
 from app.services.analysis_service import analyze_all
 from app.services.analysis_db_service import get_or_create_qa_pair, save_results_to_qa
 
-from app.services.face_service import infer_face
+from app.services.face_service import infer_face_video as infer_face
 from app.services.gaze_service import (
     infer_gaze, 
     start_calibration, 
