@@ -1,6 +1,6 @@
-# ============================
+# ============================ #
 # Builder
-# ============================
+# ============================ #
 FROM python:3.10-slim AS builder
 
 WORKDIR /app
@@ -32,57 +32,31 @@ RUN mkdir -p /root/.ptgaze/models && \
 # 소스 복사
 COPY . .
 
-# ============================
+# ============================ #
 # Runner
-# ============================
-FROM python:3.10-slim AS runner
+# ============================ #
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 AS runner
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-# 런타임 의존성 + 추가 라이브러리
+# 런타임 의존성 + FFmpeg 설치 (CUDA 호환 버전)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 libsm6 libxext6 \
     libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
     libavcodec-dev libavformat-dev libavutil-dev \
     libswscale-dev libswresample-dev \
     xz-utils curl ca-certificates jq \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- CUDA 지원 ffmpeg 설치 (안정성 개선) ----
-RUN set -eux; \
-    # 백업 플랜: apt ffmpeg도 설치
-    apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*; \
-    # BtbN 빌드 시도
-    api='https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest'; \
-    url="$(curl -fsSL "$api" 2>/dev/null | jq -r ".assets[] | select(.name | test(\"linux64-gpl.*\\\\.tar\\\\.xz$\")) | .browser_download_url" 2>/dev/null | head -n1)" || true; \
-    if [ -n "$url" ] && [ "$url" != "null" ]; then \
-        echo "Downloading BtbN FFmpeg: $url"; \
-        if curl -fL --retry 2 --retry-all-errors -o /tmp/ffmpeg.tar.xz "$url" 2>/dev/null; then \
-            if tar -tJf /tmp/ffmpeg.tar.xz >/dev/null 2>&1; then \
-                mkdir -p /opt/ffmpeg; \
-                tar -xJf /tmp/ffmpeg.tar.xz -C /opt/ffmpeg --strip-components=1; \
-                ln -sf /opt/ffmpeg/bin/ffmpeg /usr/local/bin/ffmpeg; \
-                ln -sf /opt/ffmpeg/bin/ffprobe /usr/local/bin/ffprobe; \
-                # 라이브러리 복사 (실패해도 계속)
-                cp -r /opt/ffmpeg/lib/* /usr/local/lib/ 2>/dev/null || true; \
-                echo "BtbN FFmpeg installed successfully"; \
-            fi; \
-            rm -f /tmp/ffmpeg.tar.xz; \
-        fi; \
-    else \
-        echo "Using system FFmpeg as fallback"; \
-    fi; \
-    # 라이브러리 캐시 업데이트
-    ldconfig 2>/dev/null || true; \
-    # FFmpeg 테스트 (실패해도 계속)
-    ffmpeg -version >/dev/null 2>&1 || echo "FFmpeg test failed"; \
-    ffmpeg -v error -encoders 2>/dev/null | grep -q h264_nvenc || echo "NVENC not available"; \
-    ffmpeg -v error -filters 2>/dev/null | grep -E 'scale_(cuda|npp)' || echo "CUDA filters not available"
+# ============================ #
+# 변경 없음: 최적화 ENV
+# ============================ #
 
-# Tesla T4 (4 vCPU, 15GB RAM) 최적화 ENV
+# Tesla T4 (4 vCPU, 15GB RAM) 최적화
 ENV OMP_NUM_THREADS=2 \
     OPENBLAS_NUM_THREADS=2 \
     MKL_NUM_THREADS=2 \
@@ -100,7 +74,7 @@ ENV FFMPEG_PREFER_ORDER=h264_nvenc,libx264 \
     X264_PRESET=veryfast \
     X264_CRF=28
 
-# 라이브러리 경로 (안전하게 설정)
+# 라이브러리 경로 (기존 설정)
 ENV LD_LIBRARY_PATH=/usr/local/lib:/opt/ffmpeg/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
 
 # NVENC 설정
@@ -169,7 +143,6 @@ RUN set -e; \
     mkdir -p /tmp/python-cache && chmod 777 /tmp/python-cache || true
 
 # 헬스체크 제거 (엔드포인트 없음)
-
 EXPOSE 8000
 
 # Python 경로 설정
