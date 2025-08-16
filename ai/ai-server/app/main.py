@@ -86,7 +86,7 @@ try:
         print(f"[STARTUP] PyTorch GPU initialized: {torch.cuda.get_device_name(0)}")
         print(f"[STARTUP] CUDA Version: {torch.version.cuda}")
     else:
-        print("[ERROR] CUDA not available - GPU required!")
+        print("[STARTUP] CUDA not available - using CPU fallback mode")
 except ImportError:
     print("[WARNING] PyTorch not available")
     pass
