@@ -1,10 +1,8 @@
-# model.py
-# -*- coding: utf-8 -*-
-import os, shutil
-import torch
-import torch.nn as nn
+# model.py (교체/패치)
+import os, torch, torch.nn as nn
 from torchvision.models import resnet18
 from contextlib import suppress
+import shutil
 
 class ResNet18_Emotion(nn.Module):
     def __init__(self, num_classes=7, pretrained=True):
@@ -19,51 +17,46 @@ class ResNet18_Emotion(nn.Module):
     def forward(self, x):
         return self.backbone(x)
 
-def _can_torch_compile() -> bool:
-    """Triton JIT에 필요한 조건이 될 때만 compile 사용."""
-    if os.getenv("DISABLE_TORCH_COMPILE", "0") == "1":
+def _can_compile_when_opted_in() -> bool:
+    if os.getenv("USE_TORCH_COMPILE", "0") != "1":
         return False
     if not torch.cuda.is_available():
         return False
-    # triton import 가능?
+    # triton + C compiler + ptxas 체크
     with suppress(Exception):
-        import triton  # noqa: F401
+        import triton  # noqa
     try:
-        import triton  # type: ignore # noqa: F401
+        import triton  # noqa
     except Exception:
         return False
-    # 호스트 C 컴파일러와 ptxas 필요
     cc = os.getenv("CC")
     has_cc = (shutil.which(cc) if cc else None) or shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
     has_ptxas = shutil.which("ptxas") is not None
     return bool(has_cc and has_ptxas)
 
 def load_model(ckpt_path: str | None, device="cuda", num_classes=7):
-    """Tesla T4 최적화 모델 로드 (컴파일러 없으면 eager로 자동 폴백)"""
     use_cuda = (device == "cuda" and torch.cuda.is_available())
-
     if use_cuda:
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = False
 
-    model = ResNet18_Emotion(num_classes=num_classes, pretrained=True)
-    model = model.to(device if use_cuda else "cpu")
+    model = ResNet18_Emotion(num_classes=num_classes, pretrained=True).to(device if use_cuda else "cpu")
 
     if ckpt_path:
         state = torch.load(ckpt_path, map_location=(device if use_cuda else "cpu"), weights_only=False)
         sd = state.get("state_dict", state)
-        new_sd = { (k[7:] if k.startswith("module.") else k): v for k, v in sd.items() }
-        model.load_state_dict(new_sd, strict=False)
+        sd = { (k[7:] if k.startswith("module.") else k): v for k, v in sd.items() }
+        model.load_state_dict(sd, strict=False)
         print(f"[INFO] Loaded checkpoint: {ckpt_path}")
 
-    if use_cuda and _can_torch_compile():
+    if use_cuda and _can_compile_when_opted_in():
         try:
-            model = torch.compile(model, mode="reduce-overhead")
-            print("[INFO] torch.compile enabled (Inductor/Triton)")
+            model = torch.compile(model, mode="reduce-overhead")  # 옵트인일 때만
+            print("[INFO] torch.compile enabled")
         except Exception as e:
-            print(f"[WARN] torch.compile disabled: {e}")
+            print(f"[WARN] torch.compile failed → using eager: {e}")
     else:
-        print("[INFO] torch.compile skipped (no compiler/PTXAS or disabled)")
+        print("[INFO] using eager (no torch.compile)")
 
     model.eval()
     return model

@@ -36,9 +36,9 @@ _preprocess = transforms.Compose([
 def _autocast_ctx(dev: str):
     if dev == "cuda":
         try:
-            return torch.amp.autocast("cuda")  # 신 API
+            return torch.amp.autocast("cuda")      # 신 API
         except Exception:
-            return torch.cuda.amp.autocast()   # 구 API 폴백
+            return torch.cuda.amp.autocast()       # 구버전 폴백
     return nullcontext()
 
 def cleanup_gpu_memory():
@@ -105,13 +105,16 @@ def _resolve_ckpt() -> Optional[str]:
 @lru_cache(maxsize=1)
 def get_face_model(device: str = "cuda"):
     dev = "cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu"
-    ckpt = _resolve_ckpt()
-    if ckpt:
-        print(f"[FACE] Using checkpoint: {ckpt}")
-    else:
-        print("[FACE] No checkpoint selected/found. Using ImageNet pretrained ResNet18.")
-    # load_model은 ckpt가 None이면 사전학습만 로드
-    model = load_model(ckpt, device=dev, num_classes=len(CLASS_NAMES))
+    model = load_model(_resolve_ckpt(), device=dev, num_classes=len(CLASS_NAMES))
+
+    # ★★ 여기 추가: Dynamo eager로 강제 (Triton/컴파일러 불필요)
+    try:
+        import torch._dynamo as dynamo
+        model = dynamo.optimize("eager")(model)
+        print("[INFO] TorchDynamo backend = eager (no codegen)")
+    except Exception as e:
+        print(f"[INFO] Dynamo eager not used: {e}")
+
     if dev == "cuda":
         model = model.half()
         torch.backends.cudnn.benchmark = True
@@ -162,7 +165,7 @@ def infer_face_frames(
         with torch.no_grad():
             with _autocast_ctx(dev):
                 logits = model(x)
-            p = F.softmax(logits, dim=1)    
+        p = F.softmax(logits, dim=1)  
         probs_sum += p.sum(dim=0)
         outs = p.detach().cpu().numpy()
         xs.clear(); ids = frame_ids[:]; frame_ids.clear()
