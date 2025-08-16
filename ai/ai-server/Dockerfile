@@ -22,7 +22,6 @@ COPY requirements.txt /app/requirements.txt
 
 # OpenCV 중복 제거: opencv-* 사전 제거 후 requirements만 설치
 RUN pip install --upgrade pip && \
-    pip uninstall -y opencv-python opencv-python-headless opencv-contrib-python || true && \
     pip install --no-cache-dir -r requirements.txt
 
 # PTGaze 모델 다운로드
