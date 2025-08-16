@@ -464,11 +464,11 @@ export function useStudyRoom() {
             const exists = prev.some((p) => p.id === data.senderId);
 
             if (exists) {
-              console.log("이미 존재하는 참가자입니다.", data.senderId);
+              // console.log("이미 존재하는 참가자입니다.", data.senderId);
               return prev;
             }
 
-            console.log("새 참가자 추가합니다.", data.senderId);
+            // console.log("새 참가자 추가합니다.", data.senderId);
             return [
               ...prev,
               { id: data.senderId, stream: null, isLocal: false },
@@ -480,17 +480,28 @@ export function useStudyRoom() {
         }
 
         if (data.type === "leave") {
-          setParticipants((prev) =>
-            prev.filter((p) => {
-              if (p.id === data.senderId && p.stream) {
-                p.stream.getTracks().forEach((track) => track.stop());
-              }
-              return p.id !== data.senderId;
-            })
-          );
+          // 스트림 정리 및 참가자 제거
+          setParticipants((prev) => {
+            const leavingParticipant = prev.find((p) => p.id === data.senderId);
 
+            if (leavingParticipant && leavingParticipant.stream) {
+              // 나간 참가자의 모든 트랙 정지
+              leavingParticipant.stream.getTracks().forEach((track) => {
+                track.stop();
+              });
+            }
+
+            // 참가자 목록에서 제거
+            const updatedParticipants = prev.filter(
+              (p) => p.id !== data.senderId
+            );
+
+            return updatedParticipants;
+          });
+
+          // PeerConnection 정리
           peerManager.removeConnection(data.senderId);
-          console.log("퇴장함~", data.senderId);
+
           return;
         }
         await peerManager.handleSignal(data);
