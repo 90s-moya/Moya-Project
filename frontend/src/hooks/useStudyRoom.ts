@@ -79,7 +79,7 @@ export function useStudyRoom() {
     };
 
     fetchRoomInfo();
-  }, [roomId]);
+  }, [roomId, participants.length]);
 
   // roomId를 ref로 관리
   useEffect(() => {
@@ -426,7 +426,7 @@ export function useStudyRoom() {
     }
   }, [participants.length, roomId]); // participants.length를 의존성에 추가
 
-  // WebRTC 연결 설정 (수정)
+  // WebRTC 연결 설정
   useEffect(() => {
     if (signalingRef.current) return;
 
@@ -446,10 +446,10 @@ export function useStudyRoom() {
         const peerManager = peerManagerRef.current;
         if (!peerManager) return;
 
-        console.log("받은 메세지", data);
+        // console.log("받은 메세지", data);
 
         if (data.type === "join") {
-          console.log("새 참가자 join입니다.", data.senderId);
+          // console.log("새 참가자 join입니다.", data.senderId);
 
           // 연결 생성과 participants 추가를 더 신중하게 처리
           await peerManager.createConnectionWith(data.senderId);
@@ -459,7 +459,7 @@ export function useStudyRoom() {
             peerManagerRef.current?.setLocalStream(localStream);
           }
 
-          // 참가자 추가 시 중복 체크 강화화
+          // 참가자 추가 시 중복 체크 강화
           setParticipants((prev) => {
             const exists = prev.some((p) => p.id === data.senderId);
 
@@ -475,9 +475,10 @@ export function useStudyRoom() {
             ];
           });
 
-          console.log("새 참여자 연결!");
+          // console.log("새 참여자 연결!");
           return;
         }
+
         if (data.type === "leave") {
           setParticipants((prev) =>
             prev.filter((p) => {
