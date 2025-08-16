@@ -62,6 +62,9 @@ RUN set -eux; \
     tar -xJf /tmp/ffmpeg.tar.xz -C /opt/ffmpeg --strip-components=1; \
     ln -sf /opt/ffmpeg/bin/ffmpeg /usr/local/bin/ffmpeg; \
     ln -sf /opt/ffmpeg/bin/ffprobe /usr/local/bin/ffprobe; \
+    # 라이브러리 경로 설정 (라이브러리 파일들을 시스템 경로에 복사)
+    cp -r /opt/ffmpeg/lib/* /usr/local/lib/ || true; \
+    ldconfig; \
     rm -f /tmp/ffmpeg.tar.xz; \
     # 스모크 체크(실패해도 빌드는 계속)
     ffmpeg -v error -encoders | grep -q h264_nvenc || true; \
@@ -81,7 +84,12 @@ ENV OMP_NUM_THREADS=1 \
     FFMPEG_THREADS=2 \
     FFMPEG_FILTER_THREADS=1 \
     X264_PRESET=ultrafast \
-    X264_CRF=26
+    X264_CRF=26 \
+    LD_LIBRARY_PATH=/usr/local/lib:/opt/ffmpeg/lib:$LD_LIBRARY_PATH \
+    NVENC_PRESET=p1 \
+    NVENC_TUNE=ll \
+    NVENC_RC=cbr \
+    NVENC_BITRATE=2M
 
 # 빌더에서 산출물 복사
 COPY --from=builder /usr/local /usr/local
