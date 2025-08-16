@@ -380,7 +380,7 @@ export function useAnswerRecorder({
     timerRef.current = window.setInterval(() => {
       setSeconds((s) => { const n = s + 1; if (n >= maxDurationSec) stop(); return n; });
     }, 1000);
-  }, [key, maxDurationSec, setLocalPending, markSynced, markFailed, stop]);
+  }, [maxDurationSec, setLocalPending, markSynced, markFailed, stop]);
 
   useEffect(() => {
     if (onUploadComplete && audioUploaded && videoUploaded) {

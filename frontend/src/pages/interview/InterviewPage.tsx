@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Mic, MicOff, Settings, Loader2 } from "lucide-react"
-import aiCharacter from "@/assets/images/ai-character.png"
+import aiCharacter from "@/assets/images/interviewer_version_1.jpg"
 import { useAnswerRecorder } from "@/lib/recording/useAnswerRecorder"
 import AnswerRecorder from "@/components/interview/AnswerRecorder"
 import { type QuestionKey } from "@/types/interview"
@@ -113,15 +113,11 @@ export default function InterviewScreen() {
     setIsAnswerPhase(true)
   }, [])
 
-  // 질문 표시 후 8초 뒤 답변 단계로 전환
+  // 질문 표시 후 즉시 답변 단계로 전환 (8초 타이머 제거)
   useEffect(() => {
     if (!questionText) return
-    setIsAIspeaking(true)
-    const timer = setTimeout(() => {
-      setIsAIspeaking(false)
-      startAnswerPhase()
-    }, 8000)
-    return () => clearTimeout(timer)
+    setIsAIspeaking(false)  // AI 말하기 상태는 false로 유지
+    startAnswerPhase()       // 즉시 답변 단계로 전환
   }, [questionText, startAnswerPhase])
 
   // 표시용 시간/진행률
@@ -159,11 +155,11 @@ export default function InterviewScreen() {
 
       {/* 중앙 캔버스 */}
       <div className="px-6 pb-[112px] h-[calc(100vh-120px)]">
-        <div className="relative h-full rounded-[28px] bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-600 shadow-inner overflow-hidden">
+        
           <div className="absolute inset-0 p-10 flex flex-col">
             <div className="flex-1 grid place-items-center">
-              <div className="w-[68%] lg:w-[64%] max-w-[720px] aspect-[4/3] rounded-[24px] border border-white/18 bg-gradient-to-b from-slate-800 to-slate-700 shadow-2xl grid place-items-center">
-                <img src={aiCharacter} alt="AI 면접관" className="object-contain p-5" />
+              <div className="w-[68%] lg:w-[64%] max-w-[720px] aspect-[16/9]">
+                <img src={aiCharacter} alt="AI 면접관" className="w-full h-full object-contain rounded-lg" />
               </div>
             </div>
 
@@ -186,13 +182,7 @@ export default function InterviewScreen() {
           </div>
 
           {/* 우하단 내 화면 카드 */}
-          <div className="absolute bottom-6 right-6 z-10 w-[300px]">
-            {isAIspeaking && (
-              <div className="mb-2 text-xs text-white/90 bg-white/10 px-2 py-1 rounded-full inline-flex items-center gap-2">
-                <span className="inline-block w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                <span>AI가 말하는 중…</span>
-              </div>
-            )}
+          <div className="absolute bottom-32 right-6 z-10 w-[300px]">
             <AnswerRecorder
               keyInfo={keyInfo}
               ttsFinished={isAnswerPhase}
@@ -203,7 +193,7 @@ export default function InterviewScreen() {
               videoStream={videoStream}
             />
           </div>
-        </div>
+        
       </div>
 
       {/* 하단 고정 컨트롤 바 */}
@@ -230,22 +220,27 @@ export default function InterviewScreen() {
           </div>
 
           <div className="flex items-center gap-4">
-            
-
-            {/* 전송 중 버튼 비활성화 + 스피너 */}
+            {/* 통합 녹음 시작/종료 버튼 */}
             <Button
-              className={`h-12 px-6 rounded-2xl text-white ${isSubmitting ? "bg-gray-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
-              onClick={handleStopClick}
-              disabled={isSubmitting}
-              aria-busy={isSubmitting}
+              className={`h-12 px-6 rounded-2xl text-white ${
+                isSubmitting 
+                  ? "bg-gray-300 cursor-not-allowed" 
+                  : recIsRecording 
+                    ? "bg-red-600 hover:bg-red-700" 
+                    : "bg-green-600 hover:bg-green-700"
+              }`}
+              onClick={recIsRecording ? handleStopClick : start}
+              disabled={isSubmitting || !isAnswerPhase}
             >
               {isSubmitting ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   업로드 중
                 </span>
+              ) : recIsRecording ? (
+                "답변 종료"
               ) : (
-                "녹음 종료"
+                "답변 시작"
               )}
             </Button>
           </div>
@@ -257,7 +252,7 @@ export default function InterviewScreen() {
         <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm grid place-items-center">
           <div className="rounded-2xl bg-white shadow-2xl px-6 py-5 flex items-center gap-3">
             <Loader2 className="w-5 h-5 animate-spin" />
-            <div className="text-sm font-medium text-gray-900">응답 저장 중입니다… 잠시만 기다려주세요</div>
+            <div className="text-sm font-medium text-gray-900">다음 질문을 생성 중입니다… 잠시만 기다려주세요</div>
           </div>
         </div>
       )}
