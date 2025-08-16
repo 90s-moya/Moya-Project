@@ -150,7 +150,11 @@ export default function InterviewScreen() {
         <div className="mx-6 flex-1 text-center text-gray-900 text-lg md:text-xl font-medium truncate">
           {questionText}
         </div>
-        <div className="text-gray-800 font-extrabold tracking-tight">AI 면접</div>
+        {/* AI 면접 안내 + 캐릭터 이미지 */}
+        <div className="flex items-center gap-2">
+          <img src={aiCharacter} alt="AI 면접관" className="w-8 h-8 rounded-full object-cover border-2 border-blue-200 shadow-sm" style={{ minWidth: 32, minHeight: 32 }} />
+          <span className="text-blue-700 font-extrabold tracking-tight text-base md:text-lg whitespace-nowrap">AI 면접</span>
+        </div>
       </div>
 
       {/* 중앙 캔버스 */}
