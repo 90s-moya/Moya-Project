@@ -184,7 +184,7 @@ def analyze_video_bytes(file_bytes: bytes, mode: str = "segments", sample_every:
     pose_ctx = mp_pose.Pose(
         static_image_mode=False,
         min_detection_confidence=0.5,
-        model_complexity=1,
+        model_complexity=0,
         # GPU 전용 설정 (CPU 완전 차단)
         enable_segmentation=False,  # 세그멘테이션 비활성화로 성능 향상
         smooth_landmarks=True,      # GPU 기반 랜드마크 추적
