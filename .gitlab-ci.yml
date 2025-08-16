@@ -145,7 +145,6 @@ build-ai-gpu:
     - ai-main
     - master
 
-
 # ----------------------------------------------------
 # AI 개발 환경 배포 (EC2, GCP에서 각각 실행)
 # ----------------------------------------------------
@@ -167,6 +166,7 @@ deploy-ai-dev-ec2:
       -e GMS_API_KEY="$GMS_API_KEY"
       -e GMS_BASE_URL="$GMS_BASE_URL"
       gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker image prune -f
   tags:
     - ec2
   only:
@@ -189,6 +189,7 @@ deploy-ai-dev-gpu:
       -e GMS_API_KEY="$GMS_API_KEY"
       -e GMS_BASE_URL="$GMS_BASE_URL"
       gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker image prune -f
   tags:
     - gcp
   only:
@@ -215,6 +216,7 @@ deploy-ai-prod-ec2:
       -e GMS_API_KEY="$GMS_API_KEY"
       -e GMS_BASE_URL="$GMS_BASE_URL"
       gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker image prune -f
   tags:
     - ec2
   only:
@@ -238,6 +240,7 @@ deploy-ai-prod-gpu:
       -e GMS_API_KEY="$GMS_API_KEY"
       -e GMS_BASE_URL="$GMS_BASE_URL"
       gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker image prune -f
   tags:
     - gcp
   only:
