@@ -31,14 +31,24 @@ export default function VideoTile({
 
   // 비디오 스트림 연결 최적화
   useEffect(() => {
-    if (videoRef.current && stream) {
+    const videoElement = videoRef.current;
+
+    if (videoElement && stream) {
       // 기존 srcObject가 같은 스트림이면 재설정하지 않음
-      if (videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
+      if (videoElement.srcObject !== stream) {
+        videoElement.srcObject = stream;
       }
-    } else if (videoRef.current && !stream) {
-      videoRef.current.srcObject = null;
+    } else if (videoElement && !stream) {
+      videoElement.srcObject = null;
+      videoElement.pause();
     }
+
+    return () => {
+      if (videoElement) {
+        videoElement.srcObject = null;
+        videoElement.pause();
+      }
+    };
   }, [stream]);
 
   // 서류 아이콘 클릭 시 실행되는 함수

@@ -14,7 +14,6 @@ export default function StudyRoomPage() {
     focusedUserId,
     showCarousel,
     roomId,
-    roomInfo,
     getParticipantDocs,
     handleDocsClick,
     handleCloseCarousel,
@@ -23,6 +22,8 @@ export default function StudyRoomPage() {
     handleLeaveRoom,
     setFocusedUserId,
     setShowCarousel,
+    // 방 정보 조회 관련
+    roomInfo,
     // 피드백 관련
     showFeedbackPopup,
     feedbackMessage,
