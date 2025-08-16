@@ -18,12 +18,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 패키지 설치
+# Python 패키지 wheel 빌드
 COPY requirements.txt /app/requirements.txt
 RUN python3.10 -m pip install --upgrade pip && \
-    python3.10 -m pip install --no-cache-dir -r requirements.txt
+    python3.10 -m pip wheel --wheel-dir=/wheels -r requirements.txt
 
-# PTGaze 모델 다운로드 (원본 그대로 유지)
+# PTGaze 모델 다운로드
 RUN mkdir -p /root/.ptgaze/models && \
     wget -O /root/.ptgaze/models/eth-xgaze_resnet18.pth \
       "https://github.com/hysts/pytorch_mpiigaze/releases/download/v0.1.0/eth-xgaze_resnet18.pth" || \
@@ -51,7 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ============================ #
-# 최적화 ENV (원본 유지)
+# 최적화 ENV
 # ============================ #
 ENV OMP_NUM_THREADS=2 \
     OPENBLAS_NUM_THREADS=2 \
@@ -86,7 +86,10 @@ ENV CUDA_VISIBLE_DEVICES=0 \
 # ============================ #
 # 빌더 산출물 복사
 # ============================ #
-COPY --from=builder /usr/local /usr/local
+# wheel 기반 설치 → Runner에서 패키지만 설치
+COPY --from=builder /wheels /wheels
+RUN python3.10 -m pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*
+
 COPY --from=builder /root/.ptgaze /root/.ptgaze
 COPY --from=builder /app /app
 
@@ -104,6 +107,6 @@ RUN set -e; \
 # 실행 설정
 # ============================ #
 EXPOSE 8000
-ENV PYTHONPATH=/app:$PYTHONPATH
+ENV PYTHONPATH=/app:${PYTHONPATH:-}
 
 CMD ["sh", "-c", "cd /app && python3.10 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1 --log-level info"]
