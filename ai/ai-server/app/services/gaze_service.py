@@ -9,28 +9,40 @@ import cv2
 from pathlib import Path
 from typing import Optional, Any, Dict
 
-# Tesla T4 GPU 가속 초기화 (Gaze 서비스용 - CPU 완전 차단)
+# Tesla T4 GPU 가속 초기화 (Gaze 서비스용 - 폴백 모드 지원)
 def init_gaze_gpu():
-    """시선 추적 GPU 가속 초기화 - CPU 완전 차단"""
-    # TensorFlow CPU 백엔드 완전 차단
+    """시선 추적 GPU 가속 초기화 - 폴백 모드 지원"""
+    # TensorFlow CPU 백엔드 비활성화 (기본)
     os.environ['TF_DISABLE_XNNPACK'] = '1'
     os.environ['TF_DISABLE_ONEDNN'] = '1'
     os.environ['TF_DISABLE_MKL'] = '1'
     os.environ['TF_LITE_DISABLE_CPU_DELEGATE'] = '1'
-    os.environ['TF_FORCE_GPU_ONLY'] = '1'
     
     # CUDA/GPU 설정
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
     os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
     
-    # MediaPipe GPU 강제 설정
+    # MediaPipe GPU 우선 설정
     os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
     os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
-    os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
-    os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
     
-    print("[GPU] Gaze service GPU-only mode initialized - CPU delegates DISABLED")
+    # GPU 사용 가능 여부 확인
+    gpu_available = False
+    try:
+        import torch
+        gpu_available = torch.cuda.is_available()
+        if gpu_available:
+            os.environ['TF_FORCE_GPU_ONLY'] = '1'
+            os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
+            os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
+            print("[GPU] Gaze service GPU-only mode initialized")
+        else:
+            print("[CPU] Gaze service CPU fallback mode")
+    except ImportError:
+        print("[CPU] Gaze service CPU mode (PyTorch not available)")
+    
+    return gpu_available
 
 # GPU 가속 초기화 실행
 init_gaze_gpu()

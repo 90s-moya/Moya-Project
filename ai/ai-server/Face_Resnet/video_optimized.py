@@ -22,42 +22,63 @@ from datetime import datetime
 from collections import Counter
 from transformers import ResNetForImageClassification, ResNetConfig, AutoImageProcessor
 
-# Tesla T4 GPU 전용 초기화 (CPU 완전 차단)
+# Tesla T4 GPU 가속 초기화 (폴백 모드 포함)
 def init_gpu_acceleration():
-    """Tesla T4 GPU 전용 초기화"""
+    """Tesla T4 GPU 가속 초기화 - 폴백 모드 지원"""
     import os
     
-    # TensorFlow CPU 백엔드 완전 차단
+    # TensorFlow CPU 백엔드 완전 차단 (GPU 없어도 적용)
     os.environ['TF_DISABLE_XNNPACK'] = '1'
     os.environ['TF_DISABLE_ONEDNN'] = '1'  
     os.environ['TF_DISABLE_MKL'] = '1'
     os.environ['TF_LITE_DISABLE_CPU_DELEGATE'] = '1'
-    os.environ['TF_FORCE_GPU_ONLY'] = '1'
     
-    # MediaPipe GPU 강제 설정
-    os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
-    os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
+    # MediaPipe 설정 (GPU 우선, CPU 폴백 허용)
+    os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
+    os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
+    
+    gpu_available = False
     
     try:
-        # OpenCV GPU 백엔드 설정
-        if cv2.cuda.getCudaEnabledDeviceCount() > 0:
-            print(f"[GPU] OpenCV CUDA devices: {cv2.cuda.getCudaEnabledDeviceCount()}")
-            cv2.setUseOptimized(True)  # OpenCV 최적화 활성화
+        # OpenCV GPU 백엔드 설정 시도
+        cuda_devices = cv2.cuda.getCudaEnabledDeviceCount()
+        if cuda_devices > 0:
+            print(f"[GPU] OpenCV CUDA devices: {cuda_devices}")
+            cv2.setUseOptimized(True)
             
             # DNN 백엔드를 CUDA로 설정
             cv2.dnn.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
             cv2.dnn.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
             print("[GPU] OpenCV DNN backend set to CUDA")
-            print("[GPU] CPU delegates DISABLED - GPU ONLY MODE")
+            
+            # GPU 전용 모드 설정
+            os.environ['TF_FORCE_GPU_ONLY'] = '1'
+            os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
+            os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
+            
+            gpu_available = True
+            print("[GPU] GPU-ONLY MODE ACTIVE - CPU delegates DISABLED")
         else:
-            print("[ERROR] No CUDA devices found - GPU acceleration required!")
-            raise RuntimeError("GPU required but not available")
+            print("[WARNING] No CUDA devices found - using CPU fallback mode")
+            gpu_available = False
     except Exception as e:
-        print(f"[ERROR] GPU acceleration init failed: {e}")
-        raise
+        print(f"[WARNING] GPU initialization failed: {e} - using CPU fallback")
+        gpu_available = False
+    
+    if not gpu_available:
+        print("[FALLBACK] Running in CPU mode - GPU acceleration disabled")
+        # CPU 모드에서는 TF_FORCE_GPU_ONLY 해제
+        if 'TF_FORCE_GPU_ONLY' in os.environ:
+            del os.environ['TF_FORCE_GPU_ONLY']
+        if 'MEDIAPIPE_FORCE_GPU_DELEGATE' in os.environ:
+            del os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE']
+        if 'MEDIAPIPE_DISABLE_CPU_DELEGATE' in os.environ:
+            del os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE']
+    
+    return gpu_available
 
-# GPU 전용 초기화 실행
-init_gpu_acceleration()
+# GPU 가속 초기화 실행 (폴백 모드 지원)
+GPU_AVAILABLE = init_gpu_acceleration()
 
 UNCERTAIN_LABEL = "불확실"
 
@@ -73,30 +94,56 @@ except Exception:
     mp_fd = None
     mp_fm = None
 
-def init_face_detector(min_conf=0.5, model_selection=1):
+def init_face_detector(min_conf=0.5, model_selection=1, gpu_available=True):
     if not MP_AVAILABLE or mp_fd is None:
         return None
-    # Tesla T4 GPU 가속 설정
-    return mp_fd.FaceDetection(
-        model_selection=model_selection,
-        min_detection_confidence=min_conf,
-        # GPU 가속 활성화 (Tesla T4)
-        enable_gpu=True,
-        gpu_id=0
-    )
+    
+    # GPU 사용 가능 여부에 따른 설정
+    detector_kwargs = {
+        'model_selection': model_selection,
+        'min_detection_confidence': min_conf
+    }
+    
+    if gpu_available:
+        # Tesla T4 GPU 가속 설정 (GPU 사용 가능시)
+        try:
+            detector_kwargs.update({
+                'enable_gpu': True,
+                'gpu_id': 0
+            })
+            print("[GPU] MediaPipe FaceDetection GPU mode enabled")
+        except Exception:
+            print("[WARNING] MediaPipe GPU parameters not supported - using default")
+    else:
+        print("[CPU] MediaPipe FaceDetection CPU mode")
+    
+    return mp_fd.FaceDetection(**detector_kwargs)
 
-def init_face_mesh():
+def init_face_mesh(gpu_available=True):
     if not MP_AVAILABLE or mp_fm is None:
         return None
-    # Tesla T4 GPU 가속 설정
-    return mp_fm.FaceMesh(
-        static_image_mode=False, 
-        max_num_faces=1, 
-        refine_landmarks=True,
-        # GPU 가속 활성화 (Tesla T4)
-        enable_gpu=True,
-        gpu_id=0
-    )
+    
+    # GPU 사용 가능 여부에 따른 설정
+    mesh_kwargs = {
+        'static_image_mode': False,
+        'max_num_faces': 1,
+        'refine_landmarks': True
+    }
+    
+    if gpu_available:
+        # Tesla T4 GPU 가속 설정 (GPU 사용 가능시)
+        try:
+            mesh_kwargs.update({
+                'enable_gpu': True,
+                'gpu_id': 0
+            })
+            print("[GPU] MediaPipe FaceMesh GPU mode enabled")
+        except Exception:
+            print("[WARNING] MediaPipe GPU parameters not supported - using default")
+    else:
+        print("[CPU] MediaPipe FaceMesh CPU mode")
+    
+    return mp_fm.FaceMesh(**mesh_kwargs)
 
 def detect_and_crop_face(frame_bgr, detector, margin=0.2, min_face=80):
     h, w = frame_bgr.shape[:2]
@@ -326,7 +373,7 @@ def analyze_video(
     if device.type == 'cuda':
         bias_vec = bias_vec.half()
         
-    face_mesh = init_face_mesh() if use_happy_guard else None
+    face_mesh = init_face_mesh(gpu_available=device.type == 'cuda') if use_happy_guard else None
 
     # 다양한 코덱 지원을 위한 백엔드 시도
     cap = None
@@ -383,7 +430,7 @@ def analyze_video(
             print("[Face VideoWriter] 모든 코덱 실패, 출력 비디오 저장 없이 진행")
             output_path = None
 
-    detector = init_face_detector(min_conf=face_min_conf, model_selection=face_model_selection)
+    detector = init_face_detector(min_conf=face_min_conf, model_selection=face_model_selection, gpu_available=device.type == 'cuda')
 
     all_frames_emotions = []
     detailed_logs = []

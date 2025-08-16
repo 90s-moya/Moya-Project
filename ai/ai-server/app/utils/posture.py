@@ -7,27 +7,39 @@ import datetime
 import tempfile
 import os
 
-# Tesla T4 GPU 가속 초기화 (Posture 분석용 - CPU 완전 차단)
+# Tesla T4 GPU 가속 초기화 (Posture 분석용 - 폴백 모드 지원)
 def init_posture_gpu():
-    """자세 분석 GPU 가속 초기화 - CPU 완전 차단"""
-    # TensorFlow CPU 백엔드 완전 차단
+    """자세 분석 GPU 가속 초기화 - 폴백 모드 지원"""
+    # TensorFlow CPU 백엔드 비활성화 (기본)
     os.environ['TF_DISABLE_XNNPACK'] = '1'
     os.environ['TF_DISABLE_ONEDNN'] = '1'
     os.environ['TF_DISABLE_MKL'] = '1'
     os.environ['TF_LITE_DISABLE_CPU_DELEGATE'] = '1'
-    os.environ['TF_FORCE_GPU_ONLY'] = '1'
     
     # CUDA/PyTorch GPU 설정
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     os.environ['TORCH_CUDNN_V8_API_ENABLED'] = '1'
     
-    # MediaPipe GPU 강제 설정
+    # MediaPipe GPU 우선 설정
     os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
     os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
-    os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
-    os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
     
-    print("[GPU] Posture analysis GPU-only mode initialized - CPU delegates DISABLED")
+    # GPU 사용 가능 여부 확인
+    gpu_available = False
+    try:
+        import torch
+        gpu_available = torch.cuda.is_available()
+        if gpu_available:
+            os.environ['TF_FORCE_GPU_ONLY'] = '1'
+            os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
+            os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
+            print("[GPU] Posture analysis GPU-only mode initialized")
+        else:
+            print("[CPU] Posture analysis CPU fallback mode")
+    except ImportError:
+        print("[CPU] Posture analysis CPU mode (PyTorch not available)")
+    
+    return gpu_available
 
 # GPU 가속 초기화 실행
 init_posture_gpu()
