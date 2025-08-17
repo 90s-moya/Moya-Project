@@ -2,6 +2,7 @@ import { Mail, Lock, AlertCircleIcon } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
+import CloudFriends from "@/assets/images/cloud-friends.png";
 
 // 모달 컴포넌트 import
 import {
@@ -85,7 +86,7 @@ const Login: React.FC = () => {
           </h2>
         </div>
         <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2">
-          <img src="/src/assets/images/cloud-friends.png" alt="로고" />
+          <img src={CloudFriends} alt="로고" />
         </div>
       </div>
 
