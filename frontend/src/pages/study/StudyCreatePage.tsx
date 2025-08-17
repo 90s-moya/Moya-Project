@@ -70,6 +70,18 @@ export default function StudyCreatePage() {
 
   // 종료 시간 선택 핸들러
   const handleEndDateChange = (date: Date | null) => {
+    if(selectedStartDate == null){
+      alert("시작 일시 먼저 선택해주세요.");
+      return;
+    }
+    if(!date){
+      alert("날짜를 선택해주세요.");
+      return;
+    }
+    if(selectedStartDate> date){
+      alert("종료시간은 시작 시간보다 늦어야 합니다.");
+      return;
+    }
     setSelectedEndDate(date);
     if (date) {
       // dayjs를 사용하여 9시간을 더하고 ISO 문자열로 변환
