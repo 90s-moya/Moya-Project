@@ -1,7 +1,7 @@
 # app/services/analysis_service.py
-# - 전처리 파이프라인은 기존 유지
+# - 전처리에서 ffmpeg **NVDEC + scale_cuda + NVENC** 경로 사용
+# - 디버그 dict에 실행 커맨드/경로/사용 기능 기록
 # - 가능한 경우 single-decode(frames) 사용(auto)
-# - X264 기본값을 CPU 덜 먹는 ultrafast/CRF 30로 상향 가능(환경변수로 제어)
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import tempfile
 from datetime import datetime
-from typing import Optional, Tuple, Dict, Any, Iterable
+from typing import Optional, Tuple, Dict, Any
 
 # 기존 bytes 기반 API (호환)
 from app.utils.posture import analyze_video_bytes
@@ -25,12 +25,12 @@ except Exception:
     analyze_video_frames = None  # type: ignore
 
 try:
-    from app.services.gaze_service import infer_gaze_frames  # (frames: Iterable[np.ndarray], calib_data: dict|None) -> Any
+    from app.services.gaze_service import infer_gaze_frames  # (frames, calib_data) -> Any
 except Exception:
     infer_gaze_frames = None  # type: ignore
 
 try:
-    from app.services.face_service import infer_face_frames  # (frames: Iterable[np.ndarray], device: str, stride: int, return_points: bool) -> Any
+    from app.services.face_service import infer_face_frames  # (frames, device, stride, return_points) -> Any
 except Exception:
     infer_face_frames = None  # type: ignore
 
@@ -136,7 +136,7 @@ def preprocess_video_to_mp4_file(
     ffmpeg = _which_ffmpeg()
     threads = os.getenv("FFMPEG_THREADS", "1")
     filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
-    x264_preset = os.getenv("X264_PRESET", "ultrafast")  # CPU 덜 먹는 기본값
+    x264_preset = os.getenv("X264_PRESET", "ultrafast")
     x264_crf = int(os.getenv("X264_CRF", "30"))
     ff_loglvl = os.getenv("FFMPEG_LOGLEVEL", "error")
 
@@ -174,16 +174,17 @@ def preprocess_video_to_mp4_file(
         return cmd
 
     def build_nvenc_cmd() -> list[str]:
+        # 핵심: NVDEC(cuda)로 디코드 → scale_cuda/scale_npp → NVENC
         cmd = [ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
+               "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",  # GPU 디코드
                "-y", "-i", in_path, "-threads", threads, "-filter_threads", filter_threads]
+
         vf_parts = []
-        if resize_to and has_scale_cuda:
-            vf_parts.append("hwupload_cuda")
+        if resize_to:
             w, h = int(resize_to[0]), int(resize_to[1])
             scaler = "scale_cuda" if _has(ffmpeg, "filter", "scale_cuda") else "scale_npp"
             vf_parts.append(f"{scaler}={w}:{h}")
-        elif resize_to:
-            vf_parts.append(vf_scale_cpu)
+
         if vf_parts:
             cmd += ["-vf", ",".join(vf_parts)]
         if target_fps and target_fps > 0:
@@ -192,6 +193,7 @@ def preprocess_video_to_mp4_file(
             cmd += ["-frames:v", str(int(max_frames))]
         if drop_audio:
             cmd += ["-an"]
+
         cmd += [
             "-movflags", "+faststart",
             "-c:v", "h264_nvenc",
@@ -202,11 +204,8 @@ def preprocess_video_to_mp4_file(
             "-maxrate", nvenc_maxrate,
             "-bufsize", nvenc_bufsize,
             "-gpu", "0",
-            "-delay", "0",
             "-zerolatency", "1",
             "-forced-idr", "1",
-            "-aq-strength", "1",
-            "-extra_hw_frames", "8",
             out_path
         ]
         return cmd
@@ -245,8 +244,9 @@ def preprocess_video_to_mp4_file(
         "max_frames": max_frames,
         "pipeline": None,
         "encoder": None,
-        "decoder": "cpu",
+        "decoder": None,
         "scale": None,
+        "cmd": None
     }
 
     try:
@@ -255,39 +255,36 @@ def preprocess_video_to_mp4_file(
             can_copy = _can_remux_to_mp4_without_reencode(info, None, None)
 
         if can_copy:
-            _run_ffmpeg(build_copy_cmd())
-            debug.update({"pipeline": "copy", "encoder": "copy", "scale": "n/a"})
+            cmd = build_copy_cmd()
+            debug.update({"pipeline": "copy", "encoder": "copy", "decoder": "copy", "scale": "n/a", "cmd": " ".join(cmd)})
+            _run_ffmpeg(cmd)
         else:
             nvenc_success = False
             if has_nvenc:
+                cmd = build_nvenc_cmd()
+                debug.update({
+                    "pipeline": "nvdec+scale_cuda+nvenc" if has_scale_cuda and resize_to else "nvdec+nvenc",
+                    "encoder": "h264_nvenc",
+                    "decoder": "nvdec",
+                    "scale": ("scale_cuda/npp" if resize_to else None),
+                    "cmd": " ".join(cmd)
+                })
                 try:
-                    _run_ffmpeg(build_nvenc_cmd())
+                    _run_ffmpeg(cmd)
                     nvenc_success = True
-                    if resize_to and has_scale_cuda:
-                        scaler = "scale_cuda" if _has(ffmpeg, "filter", "scale_cuda") else "scale_npp"
-                        debug.update({
-                            "pipeline": "cpu-dec+gpu-scale+gpu-enc",
-                            "encoder": "h264_nvenc",
-                            "scale": scaler,
-                            "memory_path": "cpu->gpu->gpu"
-                        })
-                    else:
-                        debug.update({
-                            "pipeline": "cpu-dec+cpu-scale+gpu-enc",
-                            "encoder": "h264_nvenc",
-                            "scale": "scale(cpu)" if resize_to else None,
-                            "memory_path": "cpu->cpu->gpu"
-                        })
                 except RuntimeError as e:
                     debug["nvenc_error"] = str(e)
 
             if not nvenc_success:
-                _run_ffmpeg(build_x264_cmd())
+                cmd = build_x264_cmd()
                 debug.update({
-                    "pipeline": "cpu" + ("-fallback" if has_nvenc else ""),
+                    "pipeline": "cpu-fallback",
                     "encoder": "libx264",
-                    "scale": "scale(cpu)" if resize_to else None
+                    "decoder": "cpu",
+                    "scale": "scale(cpu)" if resize_to else None,
+                    "cmd": " ".join(cmd)
                 })
+                _run_ffmpeg(cmd)
 
         return out_path, debug
 
@@ -297,6 +294,8 @@ def preprocess_video_to_mp4_file(
                 os.remove(in_path)
         except Exception:
             pass
+
+# --- 이하 analyze_all 등은 기존과 동일 (필요 시 디버깅 필드만 추가) ---
 
 class VideoFrameIterator:
     def __init__(self, mp4_path: str, stride: int = 5):
