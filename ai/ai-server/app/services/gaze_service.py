@@ -13,14 +13,31 @@ from typing import Iterable, Optional, Dict, Any
 import cv2
 
 # ----- optional native modules -----
+import sys
+from pathlib import Path
+
+# 모듈 경로 설정
+try:
+    current_file = Path(__file__)
+    project_root = current_file.resolve().parents[2]  # app/services/gaze_service.py -> project root
+    gaze_dir = project_root / "Gaze_TR_pro"
+    
+    if str(gaze_dir) not in sys.path:
+        sys.path.insert(0, str(gaze_dir))
+        print(f"[gaze] Added to sys.path: {gaze_dir}")
+except Exception as e:
+    print(f"[gaze] Failed to add gaze directory to path: {e}")
+
 try:
     from gaze_calibration import GazeCalibrator as NativeCalibrator  # type: ignore
+    print(f"[gaze] Successfully imported GazeCalibrator")
 except Exception as e:
     print(f"[gaze] import warning (calibrator): {e}")
     NativeCalibrator = None  # type: ignore
 
 try:
     from gaze_tracking import GazeTracker as NativeTracker  # type: ignore
+    print(f"[gaze] Successfully imported GazeTracker")
 except Exception as e:
     print(f"[gaze] import warning (tracker): {e}")
     NativeTracker = None  # type: ignore
@@ -173,7 +190,7 @@ def infer_gaze_frames(frames: Iterable[Any], calib_data: Dict[str, Any] | None =
     tracker = get_tracker()
 
     # 네이티브/라이트 공통으로 처리될 수 있게 메소드 탐색
-    for name in ("infer_frames", "track_frames", "infer", "run"):
+    for name in ("process_frames", "infer_frames", "track_frames", "infer", "run"):
         if hasattr(tracker, name):
             fn = getattr(tracker, name)
             try:
