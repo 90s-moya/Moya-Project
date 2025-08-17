@@ -38,8 +38,9 @@ deploy-be-dev:
       -e JWT_SECRET="$JWT_SECRET"
       -e MAIL_USERNAME="$MAIL_USERNAME"
       -e MAIL_PASSWORD="$MAIL_PASSWORD"
-      -e PYTHON_PATH="$PYTHON_PATH"
+      -e PYTHON_PATH="$PYTHON_PATH/dev"
       -e VIDEO_PATH="$VITE_FILE_URL"
+      -e STT_PATH="$STT_PATH/ai-dev"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
     - docker image prune -f
   tags:
@@ -64,8 +65,9 @@ deploy-be-prod:
       -e JWT_SECRET="$JWT_SECRET"
       -e MAIL_USERNAME="$MAIL_USERNAME"
       -e MAIL_PASSWORD="$MAIL_PASSWORD"
-      -e PYTHON_PATH="$PYTHON_PATH"
+      -e PYTHON_PATH="$PYTHON_PATH/prod"
       -e VIDEO_PATH="$VITE_FILE_URL"
+      -e STT_PATH="$STT_PATH/ai"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
     - docker image prune -f
   tags:
