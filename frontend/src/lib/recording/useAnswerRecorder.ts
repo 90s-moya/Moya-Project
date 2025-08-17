@@ -353,13 +353,12 @@ export function useAnswerRecorder({
             `${order}_${subOrder}.webm`,
             { type: usedMime }
           )
-          const calibData = localStorage.getItem("gaze_calibration_data");
           const formData = new FormData();
           formData.append("file", file);
           formData.append("interviewSessionId", localStorage.getItem("interviewSessionId") ?? "");
           formData.append("order", order ?? "0" );
           formData.append("subOrder", subOrder ?? "0");
-          formData.append("calibDataJson", JSON.stringify(calibData));
+          // 캘리브레이션 데이터 제거됨
 
 
           const thumb = thumbBlobRef.current;
