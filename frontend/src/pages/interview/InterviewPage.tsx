@@ -29,25 +29,9 @@ export default function InterviewScreen() {
   const raw = localStorage.getItem("questions")
   const questionText = raw ?? ""
   
-  // 면접 완료 상태 체크
-  const isInterviewFinished = localStorage.getItem("interviewFinished") === "true"
-
   useEffect(() => {
     if (questionText) localStorage.setItem("lastQuestion", questionText)
   }, [questionText])
-
-  // 면접 완료 상태 체크 및 콘솔 로그
-  useEffect(() => {
-    if (isInterviewFinished) {
-      console.log("🎊 UI에서 면접 완료 상태를 감지했습니다!")
-      console.log("완료 시간:", localStorage.getItem("interviewFinishedAt"))
-      console.log("현재 order:", currentOrder, "subOrder:", currentSubOrder)
-      console.log("마지막 질문:", localStorage.getItem("lastQuestion"))
-      
-      // 여기서 완료 모달을 보여주거나 다른 처리를 할 수 있음
-      // setShowCompleteModal(true) 같은 로직 추가 가능
-    }
-  }, [isInterviewFinished, currentOrder, currentSubOrder])
 
   const [nonce, setNonce] = useState(0)
   useEffect(() => { setNonce(n => n + 1) }, [questionText])
