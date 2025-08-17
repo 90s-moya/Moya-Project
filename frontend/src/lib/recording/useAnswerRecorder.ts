@@ -322,9 +322,9 @@ export function useAnswerRecorder({
       // let videoMR = new MediaRecorder(stream);
     let webmOptions: MediaRecorderOptions | undefined;
     const tryMime = (mt: string) => (window as any).MediaRecorder?.isTypeSupported?.(mt);
-    if (tryMime?.('video/webm;codecs=vp9,opus')) webmOptions = { mimeType: 'video/webm;codecs=vp9,opus', videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
-    else if (tryMime?.('video/webm;codecs=vp8,opus')) webmOptions = { mimeType: 'video/webm;codecs=vp8,opus', videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
-    else webmOptions = { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
+    if (tryMime?.('video/webm;codecs=vp8')) webmOptions = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 128_000 };
+    else if (tryMime?.('video/webm')) webmOptions = { mimeType: 'video/webm', videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 128_000 };
+    else webmOptions = { videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 128_000 };
 
       let videoMR = new MediaRecorder(processed, webmOptions);
 
@@ -386,7 +386,7 @@ export function useAnswerRecorder({
     
     mr.start(100);
     //비디오
-    videoMR.start();
+    videoMR.start(100);
     mediaRecorderRef.current = mr;
     setIsRecording(true);
     setSeconds(0);
