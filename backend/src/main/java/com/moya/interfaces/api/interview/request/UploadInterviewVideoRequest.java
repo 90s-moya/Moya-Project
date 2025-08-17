@@ -17,7 +17,7 @@ public class UploadInterviewVideoRequest {
     private String calibDataJson;
 
     // 옵션 (기본값)
-    private String device = "cpu";
+    private String device = "cuda";
     private Integer stride = 5;
     private Boolean returnPoints = false;
 

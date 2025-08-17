@@ -26,6 +26,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class InterviewService {
 
+    @Value("${STT_PATH}")
+    private String sttPath;
 
     @Value("${PYTHON_PATH}")
     private String pythonPath;
@@ -71,7 +73,7 @@ public class InterviewService {
         HttpEntity<MultiValueMap<String, Object>> req = new HttpEntity<>(body, headers);
 
         var resp = restTemplate.exchange(
-                pythonPath + "/v1/followup-question",
+                sttPath + "/v1/followup-question",
                 HttpMethod.POST,
                 req,
                 Map.class
@@ -100,7 +102,7 @@ public class InterviewService {
         // 3) 분석 트리거 (URL 방식) — STT는 여기서 절대 호출하지 않음
         if (request.getInterviewSessionId() != null) {
             Integer stride = (request.getStride() != null) ? request.getStride() : 5;
-            String device = (request.getDevice() != null) ? request.getDevice() : "cpu";
+            String device = (request.getDevice() != null) ? request.getDevice() : "cuda";
             boolean returnPoints = Boolean.TRUE.equals(request.getReturnPoints());
 
             Integer order = toIntOrNull(String.valueOf(request.getOrder()));
