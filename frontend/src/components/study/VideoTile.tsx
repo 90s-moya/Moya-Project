@@ -7,6 +7,7 @@ interface VideoTileProps {
   stream: MediaStream | null;
   isLocal?: boolean;
   userId: string;
+  nickname?: string; // 닉네임 prop 추가
   roomId: string;
   userDocs?: {
     docsId: string;
@@ -23,6 +24,7 @@ export default function VideoTile({
   stream,
   isLocal = false,
   userId,
+  nickname,
   onDocsClick,
   onOpenFeedback,
   hideOverlay = false,
@@ -93,6 +95,19 @@ export default function VideoTile({
           <div className="text-center">
             <User className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-300 text-sm">연결 중...</p>
+          </div>
+        </div>
+      )}
+
+      {/* 닉네임 표시 - 왼쪽 아래 (썸네일에서는 숨김) */}
+      {!hideOverlay && (
+        <div className="absolute bottom-2 left-2">
+          <div className="bg-[#2b7fff] text-white px-2 py-1 rounded-md text-sm font-medium max-w-[120px] truncate">
+            {nickname && nickname.trim() !== ""
+              ? nickname
+              : isLocal
+              ? "나"
+              : `참가자 ${userId.slice(0, 4)}`}
           </div>
         </div>
       )}
