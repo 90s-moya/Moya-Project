@@ -1,11 +1,7 @@
 # app/services/analysis_service.py
-# 목적:
-# - WebM/MP4 입력을 임시로 MP4(H.264, yuv420p)로 변환해 모델에 전달
-# - NVDEC(디코더) 강제 금지: libnvcuvid.so.1 미노출 환경에서도 안전 동작
-# - 가능하면 GPU 스케일(scale_cuda) + NVENC 인코딩 사용 → CPU 사용 절감
-# - ffprobe가 실행 불가/실패(127 등)여도 소프트 폴백으로 계속 진행
-# - 변환 파일은 즉시 삭제(영구 저장 X)
-# - analyze_all: 단일 디코딩(프레임 기반) 자동 사용, 불가 시 bytes 경로로 폴백
+# - 전처리 파이프라인은 기존 유지
+# - 가능한 경우 single-decode(frames) 사용(auto)
+# - X264 기본값을 CPU 덜 먹는 ultrafast/CRF 30로 상향 가능(환경변수로 제어)
 
 from __future__ import annotations
 
@@ -15,7 +11,7 @@ import shutil
 import subprocess
 import tempfile
 from datetime import datetime
-from typing import Optional, Tuple, Dict, Any, Iterable, List
+from typing import Optional, Tuple, Dict, Any, Iterable
 
 # 기존 bytes 기반 API (호환)
 from app.utils.posture import analyze_video_bytes
@@ -38,11 +34,7 @@ try:
 except Exception:
     infer_face_frames = None  # type: ignore
 
-
-# ---------------- FFmpeg / FFprobe 유틸 ----------------
-
 def _which(ffbin_env: str, fallback_names: list[str]) -> str:
-    """환경변수 또는 후보 이름들 중에서 실행 파일 탐색."""
     cand = []
     envv = os.getenv(ffbin_env)
     if envv:
@@ -61,7 +53,6 @@ def _which_ffmpeg() -> str:
     ])
 
 def _which_ffprobe_soft() -> Optional[str]:
-    """ffprobe 경로 소프트 탐색(없어도 됨)."""
     for name in [os.getenv("FFPROBE_BIN"),
                  "/usr/local/bin/ffprobe", "/opt/ffmpeg/bin/ffprobe",
                  "ffprobe", "/usr/bin/ffprobe"]:
@@ -80,7 +71,6 @@ def _run_ffmpeg(cmd: list[str]) -> None:
         )
 
 def _ffprobe_soft(in_path: str) -> dict:
-    """ffprobe를 소프트하게 실행. 실패하면 {} 반환."""
     ffprobe = _which_ffprobe_soft()
     if not ffprobe:
         return {}
@@ -93,7 +83,6 @@ def _ffprobe_soft(in_path: str) -> dict:
         return {}
 
 def _has(ffmpeg: str, kind: str, name: str) -> bool:
-    """ffmpeg 기능 보유 여부(encoder/filter) 확인."""
     try:
         if kind == "encoder":
             out = subprocess.check_output([ffmpeg, "-v", "error", "-encoders"], text=True)
@@ -110,15 +99,13 @@ def _parse_fps(r_frame_rate: Optional[str]) -> float:
         return 0.0
     try:
         num, den = r_frame_rate.split("/")
-        num_i, den_i = int(num), int(den)
-        return (num_i / den_i) if den_i else 0.0
+        return (int(num) / int(den)) if int(den) else 0.0
     except Exception:
         return 0.0
 
 def _can_remux_to_mp4_without_reencode(info: dict,
                                        want_size: Optional[Tuple[int, int]],
                                        want_fps: Optional[int]) -> bool:
-    """입력이 mp4/h264/yuv420p이고 해상도·fps도 일치하면 copy 가능."""
     fmt = (info.get("format") or {}).get("format_name", "")
     v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
     if not v:
@@ -138,32 +125,21 @@ def _can_remux_to_mp4_without_reencode(info: dict,
             return False
     return True
 
-
-# --------------- 전처리(임시 파일 사용, 즉시 삭제) ---------------
-
 def preprocess_video_to_mp4_file(
     video_bytes: bytes,
-    target_fps: int = 15,              # 메모리/연산 절감
-    max_frames: Optional[int] = 1500,  # 최대 프레임 수
+    target_fps: int = 15,
+    max_frames: Optional[int] = 1500,
     resize_to: Optional[Tuple[int, int]] = (288, 216),
     keep_aspect: bool = False,
     drop_audio: bool = True,
 ) -> tuple[str, Dict[str, Any]]:
-    """
-    입력 바이트를 MP4(H.264, yuv420p)로 변환해 임시 파일 경로 반환 + debug 딕셔너리.
-    호출자가 사용 후 파일 삭제를 책임짐(analyze_all에서 즉시 삭제 보장).
-    - NVDEC(디코더) 강제하지 않음( -hwaccel / *_cuvid 미사용 )
-    - scale_cuda 있으면 GPU 스케일 + NVENC, 아니면 CPU 스케일 + NVENC
-    - NVENC 없으면 libx264(veryfast/CRF)로 폴백
-    """
     ffmpeg = _which_ffmpeg()
-    # Tesla T4 (4 vCPU) 최적화 설정
     threads = os.getenv("FFMPEG_THREADS", "1")
     filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
-    x264_preset = os.getenv("X264_PRESET", "veryfast")
-    x264_crf = int(os.getenv("X264_CRF", "28"))
+    x264_preset = os.getenv("X264_PRESET", "ultrafast")  # CPU 덜 먹는 기본값
+    x264_crf = int(os.getenv("X264_CRF", "30"))
+    ff_loglvl = os.getenv("FFMPEG_LOGLEVEL", "error")
 
-    # NVENC 설정
     nvenc_preset = os.getenv("NVENC_PRESET", "p1")
     nvenc_tune = os.getenv("NVENC_TUNE", "ull")
     nvenc_rc = os.getenv("NVENC_RC", "cbr")
@@ -171,7 +147,6 @@ def preprocess_video_to_mp4_file(
     nvenc_maxrate = os.getenv("NVENC_MAXRATE", "1.5M")
     nvenc_bufsize = os.getenv("NVENC_BUFSIZE", "3M")
 
-    # 입력을 임시 파일로 기록
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
         tmp_in.write(video_bytes)
         in_path = tmp_in.name
@@ -186,26 +161,21 @@ def preprocess_video_to_mp4_file(
             return None
         w, h = int(resize_to[0]), int(resize_to[1])
         if keep_aspect:
-            # 필요시 force_original_aspect_ratio=decrease 등으로 확장 가능
             return f"scale={w}:{h}:flags=fast_bilinear"
         return f"scale={w}:{h}:flags=fast_bilinear"
 
     vf_scale_cpu = _scale_vf()
 
     def build_copy_cmd() -> list[str]:
-        cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", in_path]
-        if drop_audio:
-            cmd += ["-an"]
-        else:
-            cmd += ["-c:a", "copy"]
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin", "-y", "-i", in_path]
+        if drop_audio: cmd += ["-an"]
+        else: cmd += ["-c:a", "copy"]
         cmd += ["-c:v", "copy", "-movflags", "+faststart", out_path]
         return cmd
 
     def build_nvenc_cmd() -> list[str]:
-        # CPU decode -> (hwupload_cuda) -> (scale_cuda/scale_npp) -> h264_nvenc
-        cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin",
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
                "-y", "-i", in_path, "-threads", threads, "-filter_threads", filter_threads]
-
         vf_parts = []
         if resize_to and has_scale_cuda:
             vf_parts.append("hwupload_cuda")
@@ -214,17 +184,14 @@ def preprocess_video_to_mp4_file(
             vf_parts.append(f"{scaler}={w}:{h}")
         elif resize_to:
             vf_parts.append(vf_scale_cpu)
-
         if vf_parts:
             cmd += ["-vf", ",".join(vf_parts)]
-
         if target_fps and target_fps > 0:
             cmd += ["-r", str(int(target_fps))]
         if max_frames is not None:
             cmd += ["-frames:v", str(int(max_frames))]
         if drop_audio:
             cmd += ["-an"]
-
         cmd += [
             "-movflags", "+faststart",
             "-c:v", "h264_nvenc",
@@ -248,7 +215,7 @@ def preprocess_video_to_mp4_file(
         vf_parts = []
         if vf_scale_cpu:
             vf_parts.append(vf_scale_cpu)
-        cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin",
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
                "-y", "-i", in_path, "-threads", threads, "-filter_threads", filter_threads]
         if vf_parts:
             cmd += ["-vf", ",".join(vf_parts)]
@@ -324,67 +291,19 @@ def preprocess_video_to_mp4_file(
 
         return out_path, debug
 
-    except Exception:
-        # 실패 시 임시 파일 정리
-        try:
-            if os.path.exists(out_path):
-                os.remove(out_path)
-        except Exception:
-            pass
-        raise
     finally:
-        # 입력 파일은 즉시 삭제
         try:
             if os.path.exists(in_path):
                 os.remove(in_path)
         except Exception:
             pass
 
-
-def preprocess_video_to_mp4_bytes(
-    video_bytes: bytes,
-    target_fps: int = 15,
-    max_frames: Optional[int] = 1500,
-    resize_to: Optional[Tuple[int, int]] = (288, 216),
-    keep_aspect: bool = False,
-    drop_audio: bool = True,
-) -> tuple[bytes, Dict[str, Any]]:
-    """
-    호환 경로: 변환 mp4를 bytes로 반환(임시 파일은 이 함수 내부에서 생성/삭제).
-    """
-    out_path, debug = preprocess_video_to_mp4_file(
-        video_bytes=video_bytes,
-        target_fps=target_fps,
-        max_frames=max_frames,
-        resize_to=resize_to,
-        keep_aspect=keep_aspect,
-        drop_audio=drop_audio,
-    )
-    try:
-        with open(out_path, "rb") as f:
-            processed = f.read()
-        return processed, debug
-    finally:
-        try:
-            if os.path.exists(out_path):
-                os.remove(out_path)
-        except Exception:
-            pass
-
-
-# ---------------- 프레임 리더(단일 디코딩) ----------------
-
 class VideoFrameIterator:
-    """
-    단일 디코딩을 위해 cv2 또는 PyAV로 mp4 파일을 순회하며 프레임(ndarray, RGB)을 yield.
-    - stride: 매 N번째 프레임만 반환
-    """
     def __init__(self, mp4_path: str, stride: int = 5):
         self.mp4_path = mp4_path
         self.stride = max(1, int(stride))
 
     def __iter__(self):
-        # 1) OpenCV 우선
         try:
             import cv2  # type: ignore
             cap = cv2.VideoCapture(self.mp4_path)
@@ -397,15 +316,13 @@ class VideoFrameIterator:
                     if not ok:
                         break
                     if (i % self.stride) == 0:
-                        yield bgr[..., ::-1]  # BGR->RGB
+                        yield bgr[..., ::-1]
                     i += 1
             finally:
                 cap.release()
             return
         except Exception:
             pass
-
-        # 2) PyAV 폴백
         try:
             import av  # type: ignore
             i = 0
@@ -418,31 +335,18 @@ class VideoFrameIterator:
         except Exception as e:
             raise RuntimeError(f"VideoFrameIterator failed: {e}")
 
-
-# ---------------- 분석 파이프라인(모델 호출) ----------------
-
 def analyze_all(
     video_bytes: bytes,
     device: Optional[str] = None,
-    stride: int = 5,  # bytes 경로에서 face stride로도 사용
+    stride: int = 5,
     return_points: bool = False,
     calib_data: Optional[dict] = None,
-    # 전처리 파라미터
     target_fps: int = 15,
     resize_to: Tuple[int, int] = (288, 216),
     max_frames: int = 1500,
     return_debug: bool = False,
-    # 선택: 단일 디코딩(auto), 강제 프레임/강제 바이트
     stream_mode: str = "auto",  # "auto" | "frames" | "bytes"
 ):
-    """
-    - 입력을 MP4(H.264, yuv420p, target_fps, resize_to)로 맞춘 뒤 모델 실행.
-    - stream_mode="auto": *_frames API가 모두 있으면 단일 디코딩, 아니면 bytes 경로 폴백.
-      "frames": 프레임 기반 강제(없으면 예외).
-      "bytes": 항상 기존(bytes) 경로 사용.
-    - debug 요청 시 전처리/실행 파이프라인 정보 포함.
-    """
-    # 디바이스 확정
     if device is None:
         try:
             import torch  # type: ignore
@@ -450,7 +354,6 @@ def analyze_all(
         except Exception:
             device = "cpu"
 
-    # 1) 전처리: 파일 경로로 받아서 프레임 순회 후 삭제
     mp4_path, dbg = preprocess_video_to_mp4_file(
         video_bytes=video_bytes,
         target_fps=target_fps,
@@ -464,16 +367,14 @@ def analyze_all(
                     (infer_face_frames is not None) and \
                     (infer_gaze_frames is not None)
 
-    def _run_frames_path() -> tuple[Any, Any, Any]:
-        # 단일 디코딩: 간단하게 리스트 캐싱 후 세 모델 호출
+    def _run_frames_path():
         frames = list(VideoFrameIterator(mp4_path, stride=stride))
         posture = analyze_video_frames(frames)  # type: ignore
         face = infer_face_frames(frames, device=device, stride=stride, return_points=return_points)  # type: ignore
         gaze = infer_gaze_frames(frames, calib_data=calib_data)  # type: ignore
         return posture, face, gaze
 
-    def _run_bytes_path() -> tuple[Any, Any, Any]:
-        # 기존 방식: 변환된 mp4를 bytes로 읽어서 각 서비스 호출(최대 3번 디코딩)
+    def _run_bytes_path():
         with open(mp4_path, "rb") as f:
             processed_bytes = f.read()
         posture = analyze_video_bytes(processed_bytes)
@@ -485,13 +386,11 @@ def analyze_all(
         use_frames = False
         if stream_mode == "frames":
             if not frames_api_ok:
-                raise RuntimeError(
-                    "stream_mode='frames'로 지정했지만, *_frames API가 모두 존재하지 않습니다."
-                )
+                raise RuntimeError("stream_mode='frames'인데 *_frames API가 없습니다.")
             use_frames = True
         elif stream_mode == "auto":
             use_frames = frames_api_ok
-        else:  # "bytes"
+        else:
             use_frames = False
 
         if use_frames:
@@ -522,7 +421,6 @@ def analyze_all(
         return out
 
     finally:
-        # 변환 파일은 즉시 삭제(영구 저장 X)
         try:
             if os.path.exists(mp4_path):
                 os.remove(mp4_path)

@@ -1,4 +1,4 @@
-# model.py (교체/패치)
+# model.py
 import os, torch, torch.nn as nn
 from torchvision.models import resnet18
 from contextlib import suppress
@@ -22,7 +22,6 @@ def _can_compile_when_opted_in() -> bool:
         return False
     if not torch.cuda.is_available():
         return False
-    # triton + C compiler + ptxas 체크
     with suppress(Exception):
         import triton  # noqa
     try:
@@ -51,7 +50,7 @@ def load_model(ckpt_path: str | None, device="cuda", num_classes=7):
 
     if use_cuda and _can_compile_when_opted_in():
         try:
-            model = torch.compile(model, mode="reduce-overhead")  # 옵트인일 때만
+            model = torch.compile(model, mode="reduce-overhead")
             print("[INFO] torch.compile enabled")
         except Exception as e:
             print(f"[WARN] torch.compile failed → using eager: {e}")

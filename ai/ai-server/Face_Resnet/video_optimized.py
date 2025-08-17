@@ -1,34 +1,12 @@
-# Face video_optimized.py
-# TensorFlow Lite CPU 델리게이트 강제 차단
+# video_optimized.py
+# - CPU 가속 강제 차단 제거 (XNNPACK 등 그대로 사용)
+# - 얼굴 탐지 N프레임마다 + 사이 프레임은 트래커(CSRT/KCF/MOSSE)로 추적
+# - 해피가드 기본 OFF, "happy" 추정 시 N프레임에 1번만 검사
+# - 출력 인코딩은 가벼운 코덱 우선 (MJPG/mp4v)
+# - 히스테리시스/EMA/로짓바이어스 그대로 유지
+# - bare call(옵션 없이 실행) 면접 프리셋 적용(수정된 값)
+
 import os
-# 모든 TensorFlow CPU 델리게이트 차단 (임포트 전)
-os.environ.update({
-    'TF_DISABLE_XNNPACK': '1',
-    'TF_DISABLE_ONEDNN': '1',
-    'TF_DISABLE_MKL': '1', 
-    'TF_DISABLE_SEGMENT_REDUCTION': '1',
-    'TF_LITE_DISABLE_CPU_DELEGATE': '1',
-    'TF_LITE_DISABLE_XNNPACK': '1',
-    'TF_LITE_FORCE_GPU_DELEGATE': '1',
-    'TF_XLA_FLAGS': '--tf_xla_auto_jit=0',
-    'TF_ENABLE_ONEDNN_OPTS': '0',
-    'TF_CPP_MIN_LOG_LEVEL': '3',
-    'MEDIAPIPE_DISABLE_XNNPACK': '1',
-    'MEDIAPIPE_DISABLE_CPU_INFERENCE': '1'
-})
-print("[PRE-IMPORT] All CPU delegates disabled before module imports")
-
-# video_optimized.py (완전 교체본: 기본 실행 시 '면접 최적 프리셋' 자동 적용)
-# - 얼굴 검출+크롭(MediaPipe)
-# - 블러/크기 품질 필터
-# - EMA(시간 스무딩)
-# - 히스테리시스(enter/exit/margin + 최소 지속 프레임)
-# - "불확실"은 세그먼트 전환으로 취급하지 않음
-# - 모델 선택 가능(--model)
-# - 도메인 로짓 바이어스(--logit-bias "happy=-0.4,neutral=0.2,fear=0.1")
-# - 해피-가드(--happy-guard): 입꼬리/눈가 단서 없으면 happy 강등
-# - ★ bare call(옵션 없이 실행) 시 면접 프리셋 자동 적용
-
 import sys
 import cv2
 import json
@@ -38,163 +16,51 @@ import numpy as np
 from PIL import Image
 from datetime import datetime
 from collections import Counter
-from transformers import ResNetForImageClassification, ResNetConfig, AutoImageProcessor
-
-# Tesla T4 GPU 가속 초기화 (폴백 모드 포함)
-def init_gpu_acceleration():
-    """Tesla T4 GPU 가속 초기화 - 폴백 모드 지원"""
-    import os
-    
-    # TensorFlow CPU 백엔드 완전 차단 (GPU 없어도 적용)
-    os.environ['TF_DISABLE_XNNPACK'] = '1'
-    os.environ['TF_DISABLE_ONEDNN'] = '1'  
-    os.environ['TF_DISABLE_MKL'] = '1'
-    os.environ['TF_LITE_DISABLE_CPU_DELEGATE'] = '1'
-    
-    # MediaPipe 설정 (GPU 우선, CPU 폴백 허용)
-    os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
-    os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
-    
-    gpu_available = False
-    
-    try:
-        # OpenCV GPU 백엔드 설정 시도
-        cuda_devices = cv2.cuda.getCudaEnabledDeviceCount()
-        if cuda_devices > 0:
-            print(f"[GPU] OpenCV CUDA devices: {cuda_devices}")
-            cv2.setUseOptimized(True)
-            
-            # DNN 백엔드를 CUDA로 설정
-            cv2.dnn.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-            cv2.dnn.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-            print("[GPU] OpenCV DNN backend set to CUDA")
-            
-            # GPU 전용 모드 설정
-            os.environ['TF_FORCE_GPU_ONLY'] = '1'
-            os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE'] = '1'
-            os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE'] = '1'
-            
-            gpu_available = True
-            print("[GPU] GPU-ONLY MODE ACTIVE - CPU delegates DISABLED")
-        else:
-            print("[WARNING] No CUDA devices found - using CPU fallback mode")
-            gpu_available = False
-    except Exception as e:
-        print(f"[WARNING] GPU initialization failed: {e} - using CPU fallback")
-        gpu_available = False
-    
-    if not gpu_available:
-        print("[FALLBACK] Running in CPU mode - GPU acceleration disabled")
-        # CPU 모드에서는 TF_FORCE_GPU_ONLY 해제
-        if 'TF_FORCE_GPU_ONLY' in os.environ:
-            del os.environ['TF_FORCE_GPU_ONLY']
-        if 'MEDIAPIPE_FORCE_GPU_DELEGATE' in os.environ:
-            del os.environ['MEDIAPIPE_FORCE_GPU_DELEGATE']
-        if 'MEDIAPIPE_DISABLE_CPU_DELEGATE' in os.environ:
-            del os.environ['MEDIAPIPE_DISABLE_CPU_DELEGATE']
-    
-    return gpu_available
-
-# GPU 가속 초기화 실행 (폴백 모드 지원)
-GPU_AVAILABLE = init_gpu_acceleration()
+from transformers import ResNetForImageClassification, AutoImageProcessor
 
 UNCERTAIN_LABEL = "불확실"
 
-# ===== MediaPipe 준비 (CPU 델리게이트 차단) =====
-# pip install mediapipe
+# (선택) 조용한 실행 + 스레드 상한
 try:
-    # MediaPipe 임포트 전 추가 CPU 델리게이트 차단
-    import os
-    os.environ['MEDIAPIPE_DISABLE_XNNPACK'] = '1'
-    os.environ['MEDIAPIPE_DISABLE_CPU_INFERENCE'] = '1'
-    os.environ['MEDIAPIPE_FORCE_GPU_ONLY'] = '1'
-    
-    # TensorFlow Lite 로그 억제
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-    
-    # absl 로그 억제
+    from app.utils.force_cpu_disable import make_things_quiet_and_sane  # 안전판
+    make_things_quiet_and_sane(max_threads=int(os.getenv("MAX_CPU_THREADS", "2")))
+except Exception:
+    pass
+
+# ===== MediaPipe 준비 (가속 차단하지 않음) =====
+try:
     import logging
     logging.getLogger('absl').setLevel(logging.ERROR)
-    
-    # stderr 리다이렉트
-    import sys
-    import io
-    from contextlib import redirect_stderr
-    
-    # MediaPipe 임포트 시 stderr 억제
-    stderr_backup = sys.stderr
-    try:
-        with redirect_stderr(io.StringIO()):
-            import mediapipe as mp
-        MP_AVAILABLE = True
-        mp_fd = mp.solutions.face_detection
-        mp_fm = mp.solutions.face_mesh
-        print("[MEDIAIPE] Imported with CPU delegate blocking")
-    finally:
-        sys.stderr = stderr_backup
-        
+    logging.getLogger('mediapipe').setLevel(logging.ERROR)
+    logging.getLogger('tensorflow').setLevel(logging.ERROR)
+
+    import mediapipe as mp
+    MP_AVAILABLE = True
+    mp_fd = mp.solutions.face_detection
+    mp_fm = mp.solutions.face_mesh
+    print("[MediaPipe] Imported (CPU accel enabled)")
 except Exception as e:
     print(f"[WARNING] MediaPipe import failed: {e}")
     MP_AVAILABLE = False
     mp_fd = None
     mp_fm = None
 
-def init_face_detector(min_conf=0.5, model_selection=1, gpu_available=True):
+def init_face_detector(min_conf=0.5, model_selection=1):
     if not MP_AVAILABLE or mp_fd is None:
         return None
-    
-    # GPU 사용 가능 여부에 따른 설정
-    detector_kwargs = {
-        'model_selection': model_selection,
-        'min_detection_confidence': min_conf
-    }
-    
-    if gpu_available:
-        # Tesla T4 GPU 가속 설정 (GPU 사용 가능시)
-        try:
-            detector_kwargs.update({
-                'enable_gpu': True,
-                'gpu_id': 0
-            })
-            print("[GPU] MediaPipe FaceDetection GPU mode enabled")
-        except Exception:
-            print("[WARNING] MediaPipe GPU parameters not supported - using default")
-    else:
-        print("[CPU] MediaPipe FaceDetection CPU mode")
-    
-    return mp_fd.FaceDetection(**detector_kwargs)
+    # MediaPipe Python 솔루션은 사실상 CPU 경로
+    return mp_fd.FaceDetection(model_selection=model_selection, min_detection_confidence=min_conf)
 
-def init_face_mesh(gpu_available=True):
+def init_face_mesh():
     if not MP_AVAILABLE or mp_fm is None:
         return None
-    
-    # GPU 사용 가능 여부에 따른 설정
-    mesh_kwargs = {
-        'static_image_mode': False,
-        'max_num_faces': 1,
-        'refine_landmarks': True
-    }
-    
-    if gpu_available:
-        # Tesla T4 GPU 가속 설정 (GPU 사용 가능시)
-        try:
-            mesh_kwargs.update({
-                'enable_gpu': True,
-                'gpu_id': 0
-            })
-            print("[GPU] MediaPipe FaceMesh GPU mode enabled")
-        except Exception:
-            print("[WARNING] MediaPipe GPU parameters not supported - using default")
-    else:
-        print("[CPU] MediaPipe FaceMesh CPU mode")
-    
-    return mp_fm.FaceMesh(**mesh_kwargs)
+    return mp_fm.FaceMesh(static_image_mode=False, max_num_faces=1, refine_landmarks=True)
 
 def detect_and_crop_face(frame_bgr, detector, margin=0.2, min_face=80):
-    h, w = frame_bgr.shape[:2]
-    frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
     if detector is None:
         return None
+    h, w = frame_bgr.shape[:2]
+    frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
     res = detector.process(frame_rgb)
     if not res or not res.detections:
         return None
@@ -234,31 +100,12 @@ def apply_clahe_on_face(face_bgr):
     return cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2BGR)
 
 def load_model_and_processor(model_name):
-    import os
     import logging
-    
-    # Tesla T4 GPU 가속 설정
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-    os.environ['TORCH_CUDNN_V8_API_ENABLED'] = '1'  # cuDNN v8 최적화
-    
-    # TensorFlow Lite GPU 델리게이트 설정 (MediaPipe용)
-    os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-    os.environ['TF_GPU_ALLOCATOR'] = 'cuda_malloc_async'
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # TF 로그 억제
-    
-    # MediaPipe GPU 설정
-    os.environ['MEDIAPIPE_ENABLE_GPU'] = '1'
-    os.environ['MEDIAPIPE_GPU_DEVICE'] = '0'
-    
-    # 경고 메시지 억제
     logging.getLogger('transformers').setLevel(logging.ERROR)
-    logging.getLogger('tensorflow').setLevel(logging.ERROR)
-    
-    # Tesla T4 최적화: 메모리 효율적 모델 로드
     model = ResNetForImageClassification.from_pretrained(
         model_name,
-        torch_dtype=torch.float16,  # Half precision for memory efficiency
-        low_cpu_mem_usage=True      # 메모리 효율적 로드
+        torch_dtype=torch.float16 if torch.cuda.is_available() else None,
+        low_cpu_mem_usage=True
     )
     processor = AutoImageProcessor.from_pretrained(model_name)
     id2label = model.config.id2label
@@ -270,17 +117,13 @@ class EmaSmoother:
         self.device = device
         self.state = None
         self.num_labels = num_labels
-        
     def update(self, logits):
         logits = logits.detach()
-        # GPU 메모리 최적화: 이미 올바른 디바이스와 타입이면 불필요한 변환 방지
-        if logits.device != self.device:
+        if str(logits.device) != str(self.device):
             logits = logits.to(self.device)
-            
         if self.state is None:
-            self.state = logits.clone()  # clone으로 메모리 분리
+            self.state = logits.clone()
         else:
-            # In-place 연산으로 메모리 절약
             self.state.mul_(self.alpha).add_(logits, alpha=(1.0 - self.alpha))
         return self.state
 
@@ -323,59 +166,29 @@ def happy_guard(face_bgr, face_mesh, smile_thr=0.02, ear_thr=0.18):
     ear_like = eye_gap / mouth_width
     return (smile_score > smile_thr) and (ear_like < ear_thr)
 
-def analyze_video_bytes(
-    video_bytes,
-    model_name="Celal11/resnet-50-finetuned-FER2013-0.001",
-    output_path=None,
-    show_video=False,
-    face_min_conf=0.5,
-    face_model_selection=1,
-    face_margin=0.2,
-    min_face_px=80,
-    blur_thr=60.0,
-    use_clahe=True,
-    ema_alpha=0.8,
-    enter_thr=0.55,
-    exit_thr=0.45,
-    margin_thr=0.15,
-    min_stable=5,
-    logit_bias_str="",
-    use_happy_guard=False
-):
-    import tempfile
-    import os
-    
-    # 다양한 비디오 포맷 지원
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
-    temp_file.write(video_bytes)
-    temp_file.flush()
-    temp_file.close()
-    video_path = temp_file.name
-    
-    try:
-        result = analyze_video(
-            video_path=video_path,
-            model_name=model_name,
-            output_path=output_path,
-            show_video=show_video,
-            face_min_conf=face_min_conf,
-            face_model_selection=face_model_selection,
-            face_margin=face_margin,
-            min_face_px=min_face_px,
-            blur_thr=blur_thr,
-            use_clahe=use_clahe,
-            ema_alpha=ema_alpha,
-            enter_thr=enter_thr,
-            exit_thr=exit_thr,
-            margin_thr=margin_thr,
-            min_stable=min_stable,
-            logit_bias_str=logit_bias_str,
-            use_happy_guard=use_happy_guard
-        )
-        return result
-    finally:
-        if os.path.exists(video_path):
-            os.unlink(video_path)
+def _create_tracker():
+    """
+    OpenCV 트래커 생성 (CSRT→KCF→MOSSE 폴백)
+    """
+    tracker = None
+    # legacy 우선
+    if hasattr(cv2, "legacy"):
+        for name in ("TrackerCSRT_create", "TrackerKCF_create", "TrackerMOSSE_create"):
+            if hasattr(cv2.legacy, name):
+                try:
+                    tracker = getattr(cv2.legacy, name)()
+                    return tracker
+                except Exception:
+                    continue
+    # non-legacy 폴백
+    for name in ("TrackerCSRT_create", "TrackerKCF_create", "TrackerMOSSE_create"):
+        if hasattr(cv2, name):
+            try:
+                tracker = getattr(cv2, name)()
+                return tracker
+            except Exception:
+                continue
+    return None
 
 def analyze_video(
     video_path,
@@ -394,42 +207,37 @@ def analyze_video(
     margin_thr=0.15,
     min_stable=5,
     logit_bias_str="",
-    use_happy_guard=False
+    use_happy_guard=False,
+    detect_interval=12,         # N프레임마다 탐지
+    happy_check_interval=10     # "happy"일 때 N프레임에 1번 해피가드
 ):
-    # Tesla T4 최적화 디바이스 설정
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     if device.type == 'cuda':
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         print(f"CUDA Version: {torch.version.cuda}")
-        # Tesla T4 최적화 설정
-        torch.backends.cudnn.benchmark = True  # 고정 크기 입력에 최적화
-        torch.backends.cudnn.deterministic = False  # 성능 우선
-        
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+
     model, processor, id2label = load_model_and_processor(model_name)
     model.to(device)
-    
-    # Half precision 사용시 모델을 half()로 변환
     if device.type == 'cuda':
-        model = model.half()  # FP16 추론
-    
+        model = model.half()
     model.eval()
+
     bias_vec = parse_logit_bias(logit_bias_str, id2label).to(device)
     if device.type == 'cuda':
         bias_vec = bias_vec.half()
-        
-    face_mesh = init_face_mesh(gpu_available=device.type == 'cuda') if use_happy_guard else None
 
-    # 다양한 코덱 지원을 위한 백엔드 시도
+    face_mesh = init_face_mesh() if use_happy_guard else None
+
+    # 비디오 열기
     cap = None
-    backends = [cv2.CAP_FFMPEG, cv2.CAP_ANY]
-    
-    for backend in backends:
+    for backend in (cv2.CAP_FFMPEG, cv2.CAP_ANY):
         cap = cv2.VideoCapture(video_path, backend)
         if cap.isOpened():
             break
         cap.release()
-    
     if cap is None or not cap.isOpened():
         print(f"동영상 파일을 열 수 없습니다: {video_path}")
         return
@@ -438,44 +246,31 @@ def analyze_video(
     total_frames_prop = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    
-    # WebM 파일의 경우 프레임 수가 부정확할 수 있으므로 안전한 기본값 사용
-    if total_frames_prop <= 0 or total_frames_prop > 1000000:  # 비정상적으로 큰 값 필터링
-        # 예상 프레임 수 계산 (최대 10분 영상 가정)
-        max_duration_seconds = 600  # 10분
-        total_frames = fps * max_duration_seconds
-        print(f"경고: 프레임 수가 비정상적입니다 ({total_frames_prop}). 예상값 {total_frames}로 설정합니다.")
-    else:
-        total_frames = total_frames_prop
+    total_frames = total_frames_prop if (0 < total_frames_prop <= 1_000_000) else fps * 600
 
+    # 출력 비디오(가벼운 코덱 우선)
     out = None
     if output_path:
-        # 더 안정적인 코덱 선택
-        codecs_to_try = ['H264', 'XVID', 'MJPG', 'mp4v']
-        out = None
-        
-        for codec in codecs_to_try:
+        for codec in ('MJPG', 'mp4v', 'XVID', 'H264'):
             try:
                 fourcc = cv2.VideoWriter_fourcc(*codec)
                 out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
                 if out.isOpened():
-                    print(f"[Face VideoWriter] {codec} 코덱으로 성공적으로 초기화")
+                    print(f"[VideoWriter] Init with {codec}")
                     break
                 else:
                     out.release()
                     out = None
             except Exception as e:
-                print(f"[Face VideoWriter] {codec} 코덱 실패: {e}")
+                print(f"[VideoWriter] {codec} failed: {e}")
                 if out:
                     out.release()
                     out = None
-                continue
-        
         if out is None:
-            print("[Face VideoWriter] 모든 코덱 실패, 출력 비디오 저장 없이 진행")
+            print("[VideoWriter] 모든 코덱 실패 → 저장 없이 진행")
             output_path = None
 
-    detector = init_face_detector(min_conf=face_min_conf, model_selection=face_model_selection, gpu_available=device.type == 'cuda')
+    detector = init_face_detector(min_conf=face_min_conf, model_selection=face_model_selection)
 
     all_frames_emotions = []
     detailed_logs = []
@@ -483,6 +278,9 @@ def analyze_video(
     candidate_emotion, candidate_count = None, 0
     frame_count = 0
     smoother = EmaSmoother(num_labels=len(id2label), alpha=ema_alpha, device=device)
+
+    tracker = None
+    tracked_bbox = None
 
     print(f"동영상 정보: {width}x{height}, {fps}fps, 예상 최대 {total_frames}프레임")
     print(f"모델: {model_name}")
@@ -494,11 +292,43 @@ def analyze_video(
             break
         frame_count += 1
 
-        # 성능 최적화: 매 프레임마다 얼굴 검출하지 않고 대략 5프레임마다 검출
-        if frame_count % 3 == 1 or frame_count <= 10:  # 초기에는 더 빠르게 검출
-            crop_res = detect_and_crop_face(frame, detector, margin=face_margin, min_face=min_face_px)
+        # N프레임마다 탐지, 사이에는 트래커 사용
+        crop_res = None
+        do_detect = (tracker is None) or (frame_count % max(1, int(detect_interval)) == 1) or (frame_count <= max(6, int(detect_interval)))
+        if do_detect:
+            res = detect_and_crop_face(frame, detector, margin=face_margin, min_face=min_face_px)
+            if res:
+                face, bbox = res
+                tracked_bbox = bbox
+                tracker = _create_tracker()
+                if tracker is not None:
+                    x0, y0, x1, y1 = bbox
+                    tracker.init(frame, (x0, y0, x1 - x0, y1 - y0))
+                crop_res = (face, bbox)
+            else:
+                # 탐지 실패 → 트래커 초기화 해제
+                tracker = None
+                tracked_bbox = None
         else:
-            crop_res = None  # 이전 결과 재사용
+            if tracker is not None:
+                ok, box = tracker.update(frame)
+                if ok:
+                    x, y, w, h = [int(v) for v in box]
+                    x0, y0, x1, y1 = x, y, x + w, y + h
+                    x0 = max(0, x0); y0 = max(0, y0)
+                    x1 = min(frame.shape[1], x1); y1 = min(frame.shape[0], y1)
+                    if x1 > x0 and y1 > y0:
+                        face = frame[y0:y1, x0:x1]
+                        if face.size > 0 and min(face.shape[0], face.shape[1]) >= min_face_px:
+                            crop_res = (face, (x0, y0, x1, y1))
+                            tracked_bbox = (x0, y0, x1, y1)
+                        else:
+                            crop_res = None
+                    else:
+                        crop_res = None
+                else:
+                    tracker = None
+                    tracked_bbox = None
 
         observed_label = UNCERTAIN_LABEL
         top_emotions = []
@@ -515,14 +345,11 @@ def analyze_video(
                     face = apply_clahe_on_face(face)
                 pil_image = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
                 inputs = processor(images=pil_image, return_tensors="pt")
-                
-                # GPU 최적화: 데이터 타입 맞춤
                 if device.type == 'cuda':
                     inputs = {k: v.to(device, dtype=torch.float16) for k, v in inputs.items()}
                 else:
                     inputs = {k: v.to(device) for k, v in inputs.items()}
-                
-                # GPU 추론 최적화
+
                 with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device.type == 'cuda')):
                     outputs = model(**inputs)
                     logits = outputs.logits[0] + bias_vec
@@ -537,20 +364,22 @@ def analyze_video(
                     margin = top1 - top2
                     main_idx = int(top_indices[0].item())
                     proposed = id2label[main_idx]
-                    if use_happy_guard and proposed.lower() == "happy":
+
+                    # 해피가드: "happy"고, 특정 프레임 간격에서만 검사
+                    if use_happy_guard and proposed.lower() == "happy" and (frame_count % max(1, int(happy_check_interval)) == 0):
                         if not happy_guard(face, face_mesh):
                             main_idx = int(top_indices[1].item())
                             proposed = id2label[main_idx]
                             top1 = float(top_probs[1].item())
                             top2 = float(top_probs[2].item())
                             margin = top1 - top2
-                    observed_label = proposed if top1 >= exit_thr else UNCERTAIN_LABEL
+                    observed_label = proposed if top1 is not None and top1 >= exit_thr else UNCERTAIN_LABEL
             else:
                 observed_label = UNCERTAIN_LABEL
         else:
             observed_label = UNCERTAIN_LABEL
 
-        # 히스테리시스 (성능 최적화: 불필요한 연산 감소)
+        # 히스테리시스
         if observed_label == UNCERTAIN_LABEL:
             predicted_emotion = current_emotion if current_emotion else UNCERTAIN_LABEL
             candidate_emotion, candidate_count = None, 0
@@ -620,19 +449,15 @@ def analyze_video(
                 print("사용자에 의해 분석이 중단되었습니다.")
                 break
 
-        # 500프레임마다 진행상황 출력 (더 안정적)
         if frame_count % 500 == 0:
             elapsed_time = frame_count / fps
             print(f"처리된 프레임: {frame_count}, 경과 시간: {elapsed_time:.1f}초")
-            
-        # Tesla T4 메모리 최적화: 500프레임마다 GPU 메모리 정리
-        if frame_count % 500 == 0:
-            import gc
-            gc.collect()
             if device.type == 'cuda':
-                torch.cuda.empty_cache()  # GPU 메모리 캐시 정리
-                memory_allocated = torch.cuda.memory_allocated(0) / 1024**3  # GB
-                memory_reserved = torch.cuda.memory_reserved(0) / 1024**3   # GB
+                import gc
+                gc.collect()
+                torch.cuda.empty_cache()
+                memory_allocated = torch.cuda.memory_allocated(0) / 1024**3
+                memory_reserved = torch.cuda.memory_reserved(0) / 1024**3
                 print(f"GPU Memory - Allocated: {memory_allocated:.2f}GB, Reserved: {memory_reserved:.2f}GB")
 
     if current_emotion is not None and current_emotion != UNCERTAIN_LABEL and start_frame is not None:
@@ -683,7 +508,9 @@ def analyze_video(
                 "clahe": bool(use_clahe),
                 "mediapipe": bool(MP_AVAILABLE),
                 "logit_bias": logit_bias_str,
-                "happy_guard": bool(use_happy_guard)
+                "happy_guard": bool(use_happy_guard),
+                "detect_interval": int(detect_interval),
+                "happy_check_interval": int(happy_check_interval)
             },
             "frame_distribution": frame_distribution,
             "detailed_logs": detailed_logs,
@@ -708,8 +535,62 @@ def analyze_video(
         print("감지된 프레임이 없어 리포트를 생성하지 않습니다.")
         return None
 
+def analyze_video_bytes(
+    video_bytes,
+    model_name="Celal11/resnet-50-finetuned-FER2013-0.001",
+    output_path=None,
+    show_video=False,
+    face_min_conf=0.5,
+    face_model_selection=1,
+    face_margin=0.2,
+    min_face_px=80,
+    blur_thr=60.0,
+    use_clahe=True,
+    ema_alpha=0.8,
+    enter_thr=0.55,
+    exit_thr=0.45,
+    margin_thr=0.15,
+    min_stable=5,
+    logit_bias_str="",
+    use_happy_guard=False,
+    detect_interval=12,
+    happy_check_interval=10
+):
+    import tempfile
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+    temp_file.write(video_bytes)
+    temp_file.flush()
+    temp_file.close()
+    video_path = temp_file.name
+    try:
+        result = analyze_video(
+            video_path=video_path,
+            model_name=model_name,
+            output_path=output_path,
+            show_video=show_video,
+            face_min_conf=face_min_conf,
+            face_model_selection=face_model_selection,
+            face_margin=face_margin,
+            min_face_px=min_face_px,
+            blur_thr=blur_thr,
+            use_clahe=use_clahe,
+            ema_alpha=ema_alpha,
+            enter_thr=enter_thr,
+            exit_thr=exit_thr,
+            margin_thr=margin_thr,
+            min_stable=min_stable,
+            logit_bias_str=logit_bias_str,
+            use_happy_guard=use_happy_guard,
+            detect_interval=detect_interval,
+            happy_check_interval=happy_check_interval
+        )
+        return result
+    finally:
+        if os.path.exists(video_path):
+            os.unlink(video_path)
+
 def main():
-    p = argparse.ArgumentParser(description='동영상 파일 표정 분석 (얼굴 크롭 + EMA + 히스테리시스 + 바이어스 + 해피-가드)')
+    p = argparse.ArgumentParser(description='동영상 파일 표정 분석 (탐지+트래킹 + EMA + 히스테리시스 + 바이어스 + 해피-가드)')
     p.add_argument('video_path', help='분석할 동영상 파일 경로')
     p.add_argument('--output', '-o', help='분석 결과 동영상 출력 경로')
     p.add_argument('--show', '-s', action='store_true', help='분석 과정을 실시간으로 표시')
@@ -729,9 +610,12 @@ def main():
     p.add_argument('--exit-thr', type=float, default=0.45)
     p.add_argument('--margin-thr', type=float, default=0.15)
     p.add_argument('--min-stable', type=int, default=5)
-    # 도메인 로짓 바이어스/해피-가드
+    # 로짓 바이어스/해피-가드
     p.add_argument('--logit-bias', type=str, default='')
     p.add_argument('--happy-guard', action='store_true')
+    # 탐지/해피 체크 주기
+    p.add_argument('--detect-interval', type=int, default=12)
+    p.add_argument('--happy-check-interval', type=int, default=10)
 
     args = p.parse_args()
 
@@ -739,10 +623,9 @@ def main():
         print(f"동영상 파일이 존재하지 않습니다: {args.video_path}")
         return
 
-    # ★ bare call(옵션 없이 실행) 감지 → 면접 최적 프리셋 자동 적용
-    # sys.argv: [script, video_path] 인 경우 길이 2
+    # ★ bare call(옵션 없이 실행) 감지 → 면접 프리셋 자동 적용
     if len(sys.argv) == 2:
-        # 면접 프리셋
+        # 면접 프리셋(수정본)
         args.ema = 0.92
         args.enter_thr = 0.60
         args.exit_thr  = 0.50
@@ -751,9 +634,11 @@ def main():
         args.face_margin = 0.25
         args.min_face = 112
         args.blur_thr = 90.0
-        args.no_clahe = True          # 기본은 CLAHE 끔
+        args.no_clahe = True
         args.logit_bias = "happy=-0.4,neutral=0.2,fear=0.1"
-        args.happy_guard = True
+        args.happy_guard = False           # 기본 OFF로 변경
+        args.detect_interval = 12          # 탐지 간격
+        args.happy_check_interval = 10     # 해피가드 체크 간격
         print("[Preset] Interview-defaults applied (bare call).")
 
     analyze_video(
@@ -773,7 +658,9 @@ def main():
         margin_thr=args.margin_thr,
         min_stable=args.min_stable,
         logit_bias_str=args.logit_bias,
-        use_happy_guard=args.happy_guard
+        use_happy_guard=args.happy_guard,
+        detect_interval=args.detect_interval,
+        happy_check_interval=args.happy_check_interval
     )
 
 if __name__ == "__main__":
