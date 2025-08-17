@@ -31,18 +31,6 @@ public class ReportController {
         return ResponseEntity.ok(reportService.fetchReportsByUser(user.getUserId().toString()));
     }
 
-//    // React → GET /api/reports/{reportId}?userId=...
-//    @GetMapping("/{reportId}")
-//    public ResponseEntity<ReportDto> getReport(@PathVariable String reportId, @AuthenticationPrincipal CustomUserDetails user) {
-//        return ResponseEntity.ok(service.fetchReportById(user.getUserId().toString(), reportId));
-//    }
-
-    // React → GET /api/reports/results/{resultId}?userId=...
-    // (reportId 없이 resultId만으로 단건 조회)
-//    @GetMapping("/")
-//    public ResponseEntity<ResultDto> getMyReportResult(@RequestParam("resultId") String resultId) {
-//        return ResponseEntity.ok(reportService.fetchResultById(resultId));
-//    }
     // 예: /v1/me/report/detail?resultId=...
     @GetMapping("/{reportId}/result/{resultId}")
     public ResponseEntity<ResultDetailResponse> getMyReportDetail(
