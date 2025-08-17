@@ -122,7 +122,7 @@ build-ai-ec2:
     - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
     - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
     - docker push gyujh630/moya-ai:cache
-    - docker image prune -f  # ✨ 여기에 정리 명령어 추가
+    - docker image prune -f
   tags:
     - ec2
   only:
@@ -139,7 +139,7 @@ build-ai-gpu:
     - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
     - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
     - docker push gyujh630/moya-ai:cache
-    - docker image prune -f  # ✨ 여기에 정리 명령어 추가
+    - docker image prune -f
   tags:
     - gcp
   only:
@@ -151,7 +151,7 @@ build-ai-gpu:
 # AI 개발 환경 배포 (EC2, GCP에서 각각 실행)
 # ----------------------------------------------------
 
-# EC2에 개발 버전 배포
+# EC2 개발 버전 배포
 deploy-ai-dev-ec2:
   stage: deploy
   script:
@@ -174,7 +174,7 @@ deploy-ai-dev-ec2:
   only:
     - ai-dev
 
-# GCP 서버에 개발 버전 배포
+# GCP 개발 버전 배포
 deploy-ai-dev-gpu:
   stage: deploy
   script:
@@ -202,7 +202,7 @@ deploy-ai-dev-gpu:
 # AI 운영 환경 배포 (EC2, GCP에서 각각 실행)
 # ----------------------------------------------------
 
-# EC2에 운영 버전 배포
+# EC2 운영 버전 배포
 deploy-ai-prod-ec2:
   stage: deploy
   script:
@@ -226,7 +226,7 @@ deploy-ai-prod-ec2:
     - ai-main
     - master
 
-# GCP 서버에 운영 버전 배포
+# GCP 운영 버전 배포
 deploy-ai-prod-gpu:
   stage: deploy
   script:
