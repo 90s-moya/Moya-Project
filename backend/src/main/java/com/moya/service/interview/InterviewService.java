@@ -29,7 +29,7 @@ public class InterviewService {
 
     private final RestTemplate restTemplate;
     private final FileStorageService fileStorageService;
-    private final AnalyzeService analyzeService;
+    private final AnalyzeService analyzeService; // 🔥 비동기 서비스 주입
 
     public Map<String, Object> followupQuestion(
             UUID sessionId, int order, int subOrder, MultipartFile audio
@@ -86,7 +86,7 @@ public class InterviewService {
             System.out.println("[upload] thumbnailUrl=" + thumbnailUrl);
         }
 
-
+        // 🔥 분석 비동기 트리거
         if (request.getInterviewSessionId() != null) {
             Integer stride = (request.getStride() != null) ? request.getStride() : 5;
             String device = (request.getDevice() != null) ? request.getDevice() : "cuda";
@@ -110,30 +110,6 @@ public class InterviewService {
                 );
             } else {
                 System.err.println("[analyze] skip: order/subOrder parse 실패");
-            }
-        }        if (request.getInterviewSessionId() != null) {
-            Integer stride = (request.getStride() != null) ? request.getStride() : 5;
-            String device = (request.getDevice() != null) ? request.getDevice() : "cuda";
-            boolean returnPoints = Boolean.TRUE.equals(request.getReturnPoints());
-
-            Integer order = toIntOrNull(String.valueOf(request.getOrder()));
-            Integer subOrder = toIntOrNull(String.valueOf(request.getSubOrder()));
-            String calibDataJson = request.getCalibDataJson();
-            if (order != null && subOrder != null) {
-                sendAnalyzeByUrlAsync(
-                        request.getInterviewSessionId(),
-                        order,
-                        subOrder,
-                        videoUrl,
-                        device,
-                        stride,
-                        returnPoints,
-                        calibDataJson,
-                        thumbnailUrl
-                );
-            } else {
-                System.err.println("[analyze] skip: order/subOrder parse 실패 (order="
-                        + request.getOrder() + ", subOrder=" + request.getSubOrder() + ")");
             }
         }
 
