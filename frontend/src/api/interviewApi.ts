@@ -26,9 +26,11 @@ export interface QAPair {
 }
 
 type FollowupResponse = {
-  order: number;
-  sub_order: number;
-  question: string;
+  order?: number;
+  sub_order?: number;
+  question?: string;
+  finished?: boolean;
+  analysis?: any;
 };
 
 export interface PdfExtractResponse {
@@ -72,7 +74,7 @@ export async function sendFollowupAudio(params: {
   subOrder: number
   audio: File
 
-}): Promise<void> {
+}): Promise<{ finished?: boolean }> {
   const { sessionId, order1, subOrder, audio } = params
 
   const form = new FormData()
@@ -92,10 +94,25 @@ export async function sendFollowupAudio(params: {
     validateStatus: () => true,
   })
   console.log("맞아 아니야 딱 말해 ",res)
-   const { order, sub_order, question } = res.data;
-    localStorage.setItem("currentOrder", String(order));
-    localStorage.setItem("currentSubOrder", String(sub_order));
-    localStorage.setItem("questions", question);
+  
+  // 면접 완료 체크
+  if (res.data.finished === true) {
+    console.log("🎉 면접이 모든 질문이 완료되었습니다!");
+    console.log("서버 응답:", res.data);
+    localStorage.setItem("interviewFinished", "true");
+    localStorage.setItem("interviewFinishedAt", new Date().toISOString());
+    
+    // 완료 상태 저장 (빈 question으로 UI가 완료 상태를 인식하도록)
+    localStorage.setItem("questions", "");
+    return { finished: true }; // 완료 상태 반환
+  }
+  
+  const { order, sub_order, question } = res.data;
+  localStorage.setItem("currentOrder", String(order));
+  localStorage.setItem("currentSubOrder", String(sub_order));
+  localStorage.setItem("questions", question);
+  
+  return { finished: false }; // 계속 진행
 
 }
 

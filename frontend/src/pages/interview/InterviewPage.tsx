@@ -8,8 +8,10 @@ import aiInterview from "@/assets/images/ai-character.png"
 import { useAnswerRecorder } from "@/lib/recording/useAnswerRecorder"
 import AnswerRecorder from "@/components/interview/AnswerRecorder"
 import { type QuestionKey } from "@/types/interview"
+import { useNavigate } from "react-router-dom"
 
 export default function InterviewScreen() {
+  const navigate = useNavigate()
   const [isMicOn, setIsMicOn] = useState(true)
   const [micLevel, setMicLevel] = useState(0)
   const [isWebcamVisible, setIsWebcamVisible] = useState(true)
@@ -26,10 +28,26 @@ export default function InterviewScreen() {
   const totalQuestions = parseInt(localStorage.getItem("totalQuestions") ?? "10", 10)
   const raw = localStorage.getItem("questions")
   const questionText = raw ?? ""
+  
+  // 면접 완료 상태 체크
+  const isInterviewFinished = localStorage.getItem("interviewFinished") === "true"
 
   useEffect(() => {
     if (questionText) localStorage.setItem("lastQuestion", questionText)
   }, [questionText])
+
+  // 면접 완료 상태 체크 및 콘솔 로그
+  useEffect(() => {
+    if (isInterviewFinished) {
+      console.log("🎊 UI에서 면접 완료 상태를 감지했습니다!")
+      console.log("완료 시간:", localStorage.getItem("interviewFinishedAt"))
+      console.log("현재 order:", currentOrder, "subOrder:", currentSubOrder)
+      console.log("마지막 질문:", localStorage.getItem("lastQuestion"))
+      
+      // 여기서 완료 모달을 보여주거나 다른 처리를 할 수 있음
+      // setShowCompleteModal(true) 같은 로직 추가 가능
+    }
+  }, [isInterviewFinished, currentOrder, currentSubOrder])
 
   const [nonce, setNonce] = useState(0)
   useEffect(() => { setNonce(n => n + 1) }, [questionText])
@@ -46,6 +64,12 @@ export default function InterviewScreen() {
     [sessionId, currentOrder, currentSubOrder]
   )
 
+  // 면접 완료 시 라우팅 처리
+  const handleInterviewFinished = useCallback(() => {
+    console.log("🚀 InterviewPage: 면접 완료! InterviewFinish 페이지로 이동")
+    navigate("/interview/finish")
+  }, [navigate])
+
   // useAnswerRecorder의 타이머/상태 사용
   const {
     start,
@@ -56,7 +80,8 @@ export default function InterviewScreen() {
     videoStream
   } = useAnswerRecorder({ 
     key: keyInfo,
-    onUploadComplete: () => setIsSubmitting(false)
+    onUploadComplete: () => setIsSubmitting(false),
+    onInterviewFinished: handleInterviewFinished
   })
 
   // keyInfo가 바뀔 때마다 로딩 상태 리셋 (질문 변경 시)
