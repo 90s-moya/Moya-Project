@@ -159,6 +159,56 @@ class GazeTracker:
             print(f"[ERROR] Failed to load calibration from local storage: {e}")
             return False
 
+    def load_calibration_from_data(self, calib_data):
+        """캘리브레이션 데이터를 딕셔너리에서 직접 로드"""
+        try:
+            if not calib_data:
+                print("[WARNING] No calibration data provided")
+                return False
+            
+            self.calib_vectors = calib_data.get('calibration_vectors', [])
+            self.calib_points = calib_data.get('calibration_points', [])
+            self.transform_method = calib_data.get('transform_method', None)
+            
+            # 변환 모델 복원
+            if self.transform_method == "polynomial" and "polynomial_models" in calib_data:
+                poly_data = calib_data["polynomial_models"]
+                degree = poly_data["degree"]
+                
+                # 다항식 모델 재생성
+                A = np.array(self.calib_vectors, dtype=np.float32)
+                B = np.array(self.calib_points, dtype=np.float32)
+                
+                self.poly_model_x = Pipeline([
+                    ('poly', PolynomialFeatures(degree=degree)),
+                    ('linear', LinearRegression())
+                ])
+                self.poly_model_y = Pipeline([
+                    ('poly', PolynomialFeatures(degree=degree)),
+                    ('linear', LinearRegression())
+                ])
+                
+                self.poly_model_x.fit(A, B[:, 0])
+                self.poly_model_y.fit(A, B[:, 1])
+                
+            elif self.transform_method == "geometric" and "transform_matrix" in calib_data:
+                self.transform_matrix = np.array(calib_data["transform_matrix"], dtype=np.float32)
+            
+            elif self.transform_method == "rbf":
+                # RBF 모델 재생성
+                A = np.array(self.calib_vectors, dtype=np.float32)
+                B = np.array(self.calib_points, dtype=np.float32)
+                
+                self.rbf_x = Rbf(A[:, 0], A[:, 1], B[:, 0], function='multiquadric', smooth=0.1)
+                self.rbf_y = Rbf(A[:, 0], A[:, 1], B[:, 1], function='multiquadric', smooth=0.1)
+            
+            print(f"[INFO] Calibration data loaded from dict: {len(self.calib_points)} points, method: {self.transform_method}")
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to load calibration data from dict: {e}")
+            return False
+
     def load_calibration_data(self, filename):
         """캘리브레이션 데이터 로드"""
         try:
@@ -297,7 +347,7 @@ class GazeTracker:
         }
         self.gaze_data.append(gaze_entry)
     
-    def process_frames(self, frames):
+    def process_frames(self, frames, calib_data=None):
         """프레임 리스트에서 시선 추적"""
         if not frames:
             print("[ERROR] No frames provided")
@@ -307,6 +357,14 @@ class GazeTracker:
                 "total_frames": 0,
                 "tracked_frames": 0
             }
+        
+        # 캘리브레이션 데이터 로드 시도
+        if calib_data:
+            print("[INFO] Loading calibration data from provided dict")
+            self.load_calibration_from_data(calib_data)
+        elif not self.calib_vectors:
+            print("[INFO] No calibration data provided, attempting auto-load")
+            self.load_calibration_from_localstorage()
         
         print(f"[INFO] Processing {len(frames)} frames for gaze tracking")
         

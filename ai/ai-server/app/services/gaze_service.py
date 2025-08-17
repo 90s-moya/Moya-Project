@@ -173,7 +173,7 @@ def infer_gaze_frames(frames: Iterable[Any], calib_data: Dict[str, Any] | None =
     tracker = get_tracker()
 
     # 네이티브/라이트 공통으로 처리될 수 있게 메소드 탐색
-    for name in ("infer_frames", "track_frames", "infer", "run"):
+    for name in ("process_frames", "infer_frames", "track_frames", "infer", "run"):
         if hasattr(tracker, name):
             fn = getattr(tracker, name)
             try:
