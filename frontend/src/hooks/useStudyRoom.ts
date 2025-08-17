@@ -448,7 +448,7 @@ export function useStudyRoom() {
 
   // WebRTC 연결 설정 (닉네임 로드 후에 시작)
   useEffect(() => {
-    if (signalingRef.current || !myNickname) return;
+    if (signalingRef.current) return;
 
     const userInfo = localStorage.getItem("auth-storage") || "{}";
     const parsed = JSON.parse(userInfo);
