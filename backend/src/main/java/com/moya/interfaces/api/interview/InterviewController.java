@@ -1,7 +1,6 @@
 package com.moya.interfaces.api.interview;
 
 import com.moya.interfaces.api.interview.request.UploadInterviewVideoRequest;
-import com.moya.interfaces.api.room.request.UploadVideoRequest;
 import com.moya.service.interview.InterviewService;
 import com.moya.service.interview.command.InterviewVideoCommand;
 import com.moya.support.security.auth.CustomUserDetails;
@@ -35,17 +34,17 @@ public class InterviewController {
                 interviewService.followupQuestion(sessionId, order, subOrder, audio);
         return ResponseEntity.ok(result);
     }
+
     @PostMapping(value="/v1/interview-video", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> uploadInterviewVideo(@ModelAttribute UploadInterviewVideoRequest uploadInterviewRequest) throws IOException{
+    public ResponseEntity<?> uploadInterviewVideo(@ModelAttribute UploadInterviewVideoRequest uploadInterviewRequest) throws IOException {
         MultipartFile file = uploadInterviewRequest.getFile();
         if (file == null || file.isEmpty()) {
             return ResponseEntity.badRequest().body("파일이 비어있습니다.");
         }
-        // 비디오 파일 저장
+        // 비디오 파일 저장 및 분석 트리거
         InterviewVideoCommand fileUrls = interviewService.createInterviewVideo(uploadInterviewRequest, "video");
         System.out.println(fileUrls.getVideoUrl());
 
         return ResponseEntity.ok(fileUrls);
     }
-
 }
