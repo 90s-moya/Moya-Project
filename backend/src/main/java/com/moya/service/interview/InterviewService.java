@@ -167,9 +167,11 @@ public class InterviewService {
             if (calibDataJson != null && !calibDataJson.isBlank()) {
                 HttpHeaders jsonHeaders = new HttpHeaders();
                 jsonHeaders.setContentType(MediaType.APPLICATION_JSON);
-                // 로그는 길이만 출력
+                // 로그는 길이만 출력;
                 System.out.println("[calib_data] length=" + calibDataJson.length());
                 body.add("calib_data", new HttpEntity<>(calibDataJson, jsonHeaders));
+                System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+                System.out.println(calibDataJson);
             }
 
 
