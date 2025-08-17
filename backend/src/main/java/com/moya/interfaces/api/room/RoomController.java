@@ -9,6 +9,8 @@ import com.moya.service.room.command.RoomDetailCommand;
 import com.moya.service.room.command.RoomDocsInfoCommand;
 import com.moya.service.room.command.RoomInfoCommand;
 import com.moya.service.room.RoomService;
+import com.moya.support.exception.BusinessError;
+import com.moya.support.exception.BusinessException;
 import com.moya.support.security.auth.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -51,13 +53,11 @@ public class RoomController {
     @PostMapping("/{roomId}")
     public ResponseEntity<RoomMemberId> joinRoom(@PathVariable UUID roomId, @AuthenticationPrincipal CustomUserDetails user){
         RoomMember rm = roomMemberService.joinRoom(roomId, user.getUserId());
-        System.out.println("가입완료" + rm.getRoomMemberId());
         return ResponseEntity.ok(rm.getRoomMemberId());
     }
     // 면접 스터디 방 생성
     @PostMapping()
     public UUID createRoom(@RequestBody CreateRoomRequest createRoomRequest, @AuthenticationPrincipal CustomUserDetails user) {
-        // 방 만들고
         UUID roomId = roomService.createRoom(createRoomRequest, user.getUserId());
         return roomId;
     }
@@ -69,8 +69,10 @@ public class RoomController {
 
         if(status.equals("done")) roomList = roomService.getMyDoneRooms(user.getUserId());
         else if(status.equals("todo")) roomList = roomService.getMyTodoRooms(user.getUserId());
-        else return ResponseEntity.badRequest().body("잘못된 형식의 요청입니다. url 값을 확인해주세요");
-
+        else {
+            BusinessError e = BusinessError.URL_NOT_FOUND;
+            throw new BusinessException(e.getHttpStatus(), e.getMessage());
+        }
         return ResponseEntity.ok(roomList);
     }
 

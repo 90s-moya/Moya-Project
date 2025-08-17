@@ -42,10 +42,29 @@ public enum BusinessError {
 	PDF_GET_URL_ERROR(NOT_FOUND,"유효한 PDF가 존재하지 않습니다."),
 	PDF_GET_TEXT_FAIL(BAD_REQUEST,"PDF 파일 추출에 실패했습니다"),
 	PDF_FAIL_TEXT(BAD_REQUEST,"PDF 파일을 텍스트 변환하는데 실패하였습니다."),
+
 	//ai 모의 면접 관련 Error
-;
+
 
 	//화상채팅 관련 Error
+
+
+	//면접 스터디 관련 ERROR
+	ROOM_NOT_FOUND(NOT_FOUND, "유효한 면접 스터디 방이 존재하지 않습니다."),
+	ALREADY_JOINED_ROOM(BAD_REQUEST, "이미 가입하거나 진행한 면접 스터디 입니다."),
+	ROOM_FULL(BAD_REQUEST, "이미 정원 초과된 방입니다."),
+	NOT_ROOM_OWNER(BAD_REQUEST, "방장만 삭제할 수 있습니다."),
+	JOIN_NOT_ALLOWED(FORBIDDEN, "해당 방에 참여하는 참여자가 아닙니다."),
+	ROOM_DELETE_FORBIDDEN(CONFLICT, "현재 상태에서는 방을 삭제할 수 없습니다."),
+	ALREADY_JOINED(CONFLICT, "이미 가입된 사용자입니다."),
+
+
+	URL_NOT_FOUND(NOT_FOUND, "잘못된 형식의 요청입니다. url 주소를 확인해주세요"),
+	INVALID_UUID(BAD_REQUEST, "잘못된 UUID 형식입니다."),
+	CATEGORY_NOT_FOUND(NOT_FOUND, "해당 카테고리가 없습니다."),
+	ROOM_MASTER_NOT_FOUND(NOT_FOUND, "방장이 존재하지 않습니다."),
+
+	;
 
 
 
