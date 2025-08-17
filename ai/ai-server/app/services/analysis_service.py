@@ -202,6 +202,10 @@ def _decode_frames_once_via_ffmpeg(
     target_fps: int = 30,
     max_frames: Optional[int] = None,
 ) -> Tuple[List[np.ndarray], Dict[str, Any]]:
+    """
+    NVDEC(+scale_cuda/npp)로 한 번만 디코딩 → RGB24 raw 프레임을 pipe로 읽어와
+    numpy 배열(H,W,3) 리스트로 반환. 실패 시 GPU 대체포맷 또는 CPU 디코드로 폴백.
+    """
     print(f"[{_ts()}][PIPE] ENTER resize_to={resize_to} target_fps={target_fps} max_frames={max_frames} "
           f"bytes={len(video_bytes)}")
     t_all = time.time()
@@ -234,13 +238,13 @@ def _decode_frames_once_via_ffmpeg(
                     break
                 chunk = proc.stdout.read(frame_size) if proc.stdout else b""
                 if not chunk or len(chunk) < frame_size:
-                    # EOF
-                    break
+                    break  # EOF
                 arr = np.frombuffer(chunk, dtype=np.uint8).reshape((h, w, 3))
                 if _env_true("DEBUG_FRAMES", "0") and read_frames < 3:
                     print(f"[{_ts()}][PIPE] frame#{read_frames} shape={arr.shape} dtype={arr.dtype}")
                 frames.append(arr)
                 read_frames += 1
+
             stderr = (proc.stderr.read().decode("utf-8", "ignore") if proc.stderr else "").strip()
             rc = proc.wait()
             dur = time.time() - t0
@@ -249,15 +253,18 @@ def _decode_frames_once_via_ffmpeg(
                     print(f"[{_ts()}][PIPE] STDERR({label}):\n{stderr}")
                 print(f"[{_ts()}][PIPE] {label} FAIL rc={rc} dur={dur:.3f}s")
                 raise RuntimeError(f"ffmpeg pipe failed (rc={rc})")
+
             if stderr:
                 print(f"[{_ts()}][PIPE] STDERR(non-fatal,{label}):\n{stderr}")
             print(f"[{_ts()}][PIPE] OK({label}) frames={read_frames} dur={dur:.3f}s")
             return True
+
         except Exception as e:
             print(f"[{_ts()}][PIPE] {label} FAILED -> {e}\n{tb.format_exc()}")
             debug.setdefault("notes", []).append(f"{label} failed: {e}")
             return False
 
+    # --- 하드웨어 경로 (NVDEC + scale_cuda/npp) 설정 ---
     has_scale_cuda = _has(ffmpeg, "filter", "scale_cuda")
     has_scale_npp  = _has(ffmpeg, "filter", "scale_npp")
     scaler = "scale_cuda" if has_scale_cuda else ("scale_npp" if has_scale_npp else None)
@@ -267,19 +274,34 @@ def _decode_frames_once_via_ffmpeg(
 
     hw_ok = False
     if scaler is not None and cuda_ok:
+        # 1차 시도: hwdownload 후 NV12로 내리고 SW에서 rgb24 변환
         cmd_hw = [
             ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
             "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
             "-threads", threads, "-filter_threads", filter_threads,
             "-i", in_path,
-            "-vf", f"{scaler}={w}:{h},fps={int(target_fps)},hwdownload,format=rgb24",
+            "-vf", f"{scaler}={w}:{h},fps={int(target_fps)},hwdownload,format=nv12,format=rgb24",
             "-an", "-sn", "-dn", "-vsync", "0",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
         ]
-        hw_ok = _run_pipe(cmd_hw, "nvdec+gpu-scale→hwdownload")
+        hw_ok = _run_pipe(cmd_hw, "nvdec+gpu-scale→hwdownload(nv12→rgb24)")
+
+        # 2차 대체 시도: nv12 대신 yuv420p로 내려서 rgb24 변환
+        if not hw_ok:
+            cmd_hw_alt = [
+                ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
+                "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
+                "-threads", threads, "-filter_threads", filter_threads,
+                "-i", in_path,
+                "-vf", f"{scaler}={w}:{h},fps={int(target_fps)},hwdownload,format=yuv420p,format=rgb24",
+                "-an", "-sn", "-dn", "-vsync", "0",
+                "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
+            ]
+            hw_ok = _run_pipe(cmd_hw_alt, "nvdec+gpu-scale→hwdownload(yuv420p→rgb24)")
     else:
         print(f"[{_ts()}][PIPE] skip HW path (scaler={scaler}, cuda_ok={cuda_ok})")
 
+    # --- CPU 폴백 ---
     if not hw_ok:
         print(f"[{_ts()}][PIPE] fallback to CPU decode+scale path")
         cmd_sw = [
@@ -297,7 +319,7 @@ def _decode_frames_once_via_ffmpeg(
                 pass
             raise RuntimeError("single-decode pipe failed (both GPU and CPU paths)")
 
-    # 입력 임시파일 정리
+    # --- 입력 임시파일 정리 ---
     try:
         os.remove(in_path)
         print(f"[{_ts()}][CLEAN] removed temp_in {in_path}")
@@ -310,6 +332,7 @@ def _decode_frames_once_via_ffmpeg(
     print(f"[{_ts()}][PIPE] EXIT frames={debug['frames']} size={debug['size']} fps={debug['fps']} "
           f"total_dur={time.time()-t_all:.3f}s")
     return frames, debug
+
 
 # ---------- (백업용) preprocess: NVDEC → (scale_cuda/npp) → NVENC ----------
 def preprocess_video_to_mp4_file(
