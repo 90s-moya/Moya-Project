@@ -7,6 +7,9 @@ import { useNavigate } from "react-router-dom"
 import Header from "@/components/common/Header"
 import ReadyModal from "@/components/interview/ReadyModal"
 import { WebCalibration } from "@/components/interview/WebCalibration"
+import CountdownOverlay from "@/components/interview/CountdownOverLay"
+
+
 
 
 enum TestStatus {
@@ -17,43 +20,8 @@ enum TestStatus {
 }
 
 
-function CountdownOverlay({
-  seconds,
-  onDone,
-}: {
-  seconds: number
-  onDone: () => void
-}) {
-  const [left, setLeft] = useState(seconds)
 
-  useEffect(() => {
-    setLeft(seconds)
-    const id = setInterval(() => {
-      setLeft(v => (v <= 1 ? 0 : v - 1))
-    }, 1000)
 
-    return () => clearInterval(id)
-  }, [seconds])
-
-  // 완료는 렌더 이후에만 콜백
-  useEffect(() => {
-    if (left === 0) onDone()
-  }, [left, onDone])
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-full blur-3xl animate-pulse" />
-        <div
-          aria-live="assertive"
-          className="relative text-white text-[120px] md:text-[140px] font-bold leading-none select-none bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent"
-        >
-          {left}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function InterviewSetupPage() {
   const webcamRef = useRef<Webcam>(null)
@@ -281,7 +249,7 @@ export default function InterviewSetupPage() {
                         className="text-xs bg-yellow-100 hover:bg-yellow-200 px-3 py-1.5 rounded-full text-yellow-700 font-medium transition-colors duration-200 hover:shadow-md"
                         title="재캘리브레이션"
                       >
-                        🔄 재설정
+                        재설정
                       </button>
                     )}
                   </div>
@@ -339,7 +307,7 @@ export default function InterviewSetupPage() {
                 variant="outline" 
                 className="h-12 px-8 rounded-2xl text-base font-semibold border-2 border-slate-300 hover:bg-slate-50 hover:border-blue-300 transition-all duration-200"
               >
-                🔄 테스트 다시하기
+                테스트 다시하기
               </Button>
               <Button 
                 onClick={openReady} 
