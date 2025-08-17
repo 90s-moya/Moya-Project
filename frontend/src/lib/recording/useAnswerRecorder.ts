@@ -287,7 +287,10 @@ export function useAnswerRecorder({
 
       try {
         abortRef.current = new AbortController();
-        const fileName = `answer_${key.sessionId}_o${key.order}_s${key.subOrder}_${Date.now()}.wav`;
+        const order = localStorage.getItem("currentOrder");
+        const subOrder = localStorage.getItem("currentSubOrder");
+        const sessionId = localStorage.getItem("interviewSessionId");
+        const fileName = `answer_${sessionId}_o${order}_s${subOrder}_${Date.now()}.wav`;
         const file = new File([wavBlob], fileName, { type: "audio/wav" });
         console.log("audiofile=======",file);
         const result = await sendFollowupAudio({
@@ -319,9 +322,9 @@ export function useAnswerRecorder({
       // let videoMR = new MediaRecorder(stream);
     let webmOptions: MediaRecorderOptions | undefined;
     const tryMime = (mt: string) => (window as any).MediaRecorder?.isTypeSupported?.(mt);
-    if (tryMime?.('video/webm;codecs=vp9,opus')) webmOptions = { mimeType: 'video/webm;codecs=vp9,opus', videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
-    else if (tryMime?.('video/webm;codecs=vp8,opus')) webmOptions = { mimeType: 'video/webm;codecs=vp8,opus', videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
-    else webmOptions = { videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 128_000 };
+    if (tryMime?.('video/webm;codecs=vp8')) webmOptions = { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 128_000 };
+    else if (tryMime?.('video/webm')) webmOptions = { mimeType: 'video/webm', videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 128_000 };
+    else webmOptions = { videoBitsPerSecond: 1_500_000, audioBitsPerSecond: 128_000 };
 
       let videoMR = new MediaRecorder(processed, webmOptions);
 
@@ -342,17 +345,19 @@ export function useAnswerRecorder({
             console.warn('녹화 비디오 없음')
             return;
           }
+          const order = localStorage.getItem("currentOrder");
+          const subOrder = localStorage.getItem("currentSubOrder");
         
           const file = new File([vblob],
-            `${key.order}_${key.subOrder}.webm`,
+            `${order}_${subOrder}.webm`,
             { type: usedMime }
           )
-          const calibData = localStorage.getItem("calibData");
+          const calibData = localStorage.getItem("gaze_calibration_data");
           const formData = new FormData();
           formData.append("file", file);
           formData.append("interviewSessionId", localStorage.getItem("interviewSessionId") ?? "");
-          formData.append("order", String(key.order));
-          formData.append("subOrder", String(key.subOrder));
+          formData.append("order", order ?? "0" );
+          formData.append("subOrder", subOrder ?? "0");
           formData.append("calibDataJson", JSON.stringify(calibData));
 
 
@@ -360,7 +365,7 @@ export function useAnswerRecorder({
           if (thumb) {
             const thumbFile = new File(
               [thumb],
-              `${key.order}_${key.subOrder}.jpg`,
+              `${order}_${subOrder}.jpg`,
               { type: "image/jpeg" }
             );
             formData.append("thumbnail", thumbFile)
@@ -381,7 +386,7 @@ export function useAnswerRecorder({
     
     mr.start(100);
     //비디오
-    videoMR.start();
+    videoMR.start(100);
     mediaRecorderRef.current = mr;
     setIsRecording(true);
     setSeconds(0);
