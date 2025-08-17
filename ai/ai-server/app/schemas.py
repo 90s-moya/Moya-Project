@@ -1,8 +1,7 @@
-# app/schemas.py
-
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from uuid import UUID   # ✅ UUID4 대신 UUID 사용
 
 # Q&A pair (기본 구조)
 class QuestionAnswerPairBase(BaseModel):
@@ -19,26 +18,26 @@ class QuestionAnswerPairBase(BaseModel):
     end_type: Optional[str] = ""
 
 class QuestionAnswerPairCreate(QuestionAnswerPairBase):
-    session_id: UUID4
+    session_id: UUID   # 
 
 class QuestionAnswerPairRead(QuestionAnswerPairBase):
-    id: UUID4
-    session_id: UUID4
+    id: UUID           # 
+    session_id: UUID
     created_at: datetime
 
     class Config:
-        from_attributes = True  # SQLAlchemy -> Pydantic 매핑
+        from_attributes = True
 
 # Evaluation session
 class EvaluationSessionBase(BaseModel):
-    user_id: UUID4
-    title:str
+    user_id: UUID      # 
+    title: str
 
 class EvaluationSessionCreate(EvaluationSessionBase):
     pass
 
 class EvaluationSessionRead(EvaluationSessionBase):
-    id: UUID4
+    id: UUID
     created_at: datetime
     qa_pairs: List[QuestionAnswerPairRead] = []
 
