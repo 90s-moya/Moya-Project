@@ -1,23 +1,11 @@
-# 경량화 버전 (GPU 파이프라인 고정)
-# - NVDEC → GPU 스케일(scale_cuda/npp) → (인퍼런스 직접)  
-# - 가능한 한 MP4 인코딩 생략(프레임 파이프 기본)  
-# - 직렬 처리 유지(병렬 X) + CPU 스레드 1 고정  
-# - 기본 해상도 960x540, 기본 fps 30  
-# - 성능 튜닝 포인트
-#   * posture/face 각각 stride 적용(기본 posture=2, face=3)
-#   * 프레임 파이프(USE_FAST_FRAMES=1)를 기본값으로 변경
-#   * CPU 폴백 기본 비활성화(ALLOW_CPU_FALLBACK=0)
-#   * 디버그에 실제 분석 프레임 수/유효 FPS 기록
-#
-# 환경 변수로 조정 가능:
-#   USE_FAST_FRAMES=1|0
-#   POSE_STRIDE=2  FACE_STRIDE=3
-#   ALLOW_CPU_FALLBACK=0|1
-#   FFMPEG_THREADS=1 FFMPEG_FILTER_THREADS=1 (이미 1로 고정)
-
+# - GPU 디코드(NVDEC) → GPU 스케일(scale_cuda/npp) → NVENC
+# - 직렬 처리(병렬 X)로 CPU 경합 최소
+# - 기본 해상도 960x540, 기본 fps 30
+# - posture/face 모두 전 프레임(stride=1)
+# - CPU thread 1 강제 (OpenMP/MKL/BLAS/OpenCV/TensorFlow/PyTorch)
 from __future__ import annotations
 
-import os, shutil, subprocess, tempfile, time
+import os, json, shutil, subprocess, tempfile, time
 from datetime import datetime
 from typing import Optional, Tuple, Dict, Any, List
 
@@ -31,9 +19,6 @@ os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
 # [CPU-LOW] ffmpeg 스레드도 1로 고정
 os.environ.setdefault("FFMPEG_THREADS", "1")
 os.environ.setdefault("FFMPEG_FILTER_THREADS", "1")
-# 빠른 경로 기본 활성화
-os.environ.setdefault("USE_FAST_FRAMES", "1")
-
 
 def _ts() -> str:
     return datetime.now().strftime("%H:%M:%S")
@@ -44,6 +29,7 @@ print(f"[{_ts()}][BOOT] OMP={os.getenv('OMP_NUM_THREADS')} MKL={os.getenv('MKL_N
 
 # bytes 경로 (호환)
 from app.utils.posture import analyze_video_bytes
+# [GAZE-REMOVED] from app.services.gaze_service import infer_gaze, infer_gaze_frames
 from app.services.face_service import infer_face_video, infer_face_frames
 
 # frames 경로 지원 여부 확인
@@ -54,18 +40,18 @@ except Exception as e:
     analyze_video_frames = None  # type: ignore
     print(f"[{_ts()}][IMPORT] analyze_video_frames NOT FOUND ({e})")
 
-# ---------- helpers ----------
 
+# ---------- helpers ----------
 def _env_true(name: str, default: str = "0") -> bool:
     v = os.getenv(name, default)
     return str(v).lower() in ("1", "true", "yes", "on")
 
 
+# ---------- ffmpeg helpers ----------
 def _which(ffbin_env: str, fallback_names: list[str]) -> str:
     cand = []
     envv = os.getenv(ffbin_env)
-    if envv:
-        cand.append(envv)
+    if envv: cand.append(envv)
     cand += fallback_names
     for name in cand:
         path = name if "/" in name else shutil.which(name or "")
@@ -74,33 +60,135 @@ def _which(ffbin_env: str, fallback_names: list[str]) -> str:
             return path
     raise RuntimeError(f"{ffbin_env} / ff binary not found among: {cand}")
 
-
 def _which_ffmpeg() -> str:
     return _which("FFMPEG_BIN", [
         "/usr/local/bin/ffmpeg", "/opt/ffmpeg/bin/ffmpeg",
         "ffmpeg", "/usr/bin/ffmpeg"
     ])
 
+def _which_ffprobe_soft() -> Optional[str]:
+    for name in [os.getenv("FFPROBE_BIN"),
+                 "/usr/local/bin/ffprobe", "/opt/ffmpeg/bin/ffprobe",
+                 "ffprobe", "/usr/bin/ffprobe"]:
+        if not name: continue
+        path = name if "/" in name else shutil.which(name)
+        if path:
+            print(f"[{_ts()}][FFPROBE] -> {path}")
+            return path
+    print(f"[{_ts()}][FFPROBE] not found (soft)")
+    return None
 
-# ---------- 빠른 MP4 변환 (NVDEC→GPU 스케일→NVENC, 실패 시 CPU 폴백) ----------
-# 주: 경량화를 위해 기본 CPU 폴백을 비활성화(ALLOW_CPU_FALLBACK=0)
+def _run_ffmpeg(cmd: list[str]) -> None:
+    print(f"[{_ts()}][FFMPEG] RUN: {' '.join(cmd)}")
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        if res.stderr.strip():
+            print(f"[{_ts()}][FFMPEG] STDERR:\n{res.stderr.strip()}")
+        raise RuntimeError(
+            f"FFmpeg 실패(code={res.returncode})\nCMD: {' '.join(cmd)}\nSTDERR:\n{res.stderr.strip()}"
+        )
+    if res.stderr.strip():
+        print(f"[{_ts()}][FFMPEG] STDERR(non-fatal):\n{res.stderr.strip()}")
+    if res.stdout.strip():
+        print(f"[{_ts()}][FFMPEG] STDOUT:\n{res.stdout.strip()}")
+    print(f"[{_ts()}][FFMPEG] OK")
 
-def preprocess_video_to_mp4_bytes(
+def _ffprobe_soft(in_path: str) -> dict:
+    ffprobe = _which_ffprobe_soft()
+    if not ffprobe: return {}
+    args = [ffprobe, "-v", "error", "-show_streams", "-show_format",
+            "-select_streams", "v:0", "-of", "json", in_path]
+    try:
+        out = subprocess.check_output(args, text=True)
+        info = json.loads(out)
+        v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
+        print(f"[{_ts()}][FFPROBE] codec={v.get('codec_name')} pix_fmt={v.get('pix_fmt')} "
+              f"size={v.get('width')}x{v.get('height')} rate={v.get('r_frame_rate')} "
+              f"fmt={info.get('format',{}).get('format_name')}")
+        return info
+    except Exception as e:
+        print(f"[{_ts()}][FFPROBE] failed: {e}")
+        return {}
+
+def _has(ffmpeg: str, kind: str, name: str) -> bool:
+    try:
+        if kind == "encoder":
+            out = subprocess.check_output([ffmpeg, "-v", "error", "-encoders"], text=True)
+        elif kind == "filter":
+            out = subprocess.check_output([ffmpeg, "-v", "error", "-filters"], text=True)
+        elif kind == "decoder":
+            out = subprocess.check_output([ffmpeg, "-v", "error", "-decoders"], text=True)
+        else:
+            return False
+        ok = name in out
+        print(f"[{_ts()}][FFMPEG] has {kind} {name}? -> {ok}")
+        return ok
+    except Exception as e:
+        print(f"[{_ts()}][FFMPEG] has {kind} {name}? -> fail ({e})")
+        return False
+
+def _parse_fps(r_frame_rate: Optional[str]) -> float:
+    if not r_frame_rate: return 0.0
+    try:
+        num, den = r_frame_rate.split("/")
+        return (int(num) / int(den)) if int(den) else 0.0
+    except Exception:
+        return 0.0
+
+def _can_remux_to_mp4_without_reencode(info: dict,
+                                       want_size: Optional[Tuple[int, int]],
+                                       want_fps: Optional[int]) -> bool:
+    fmt = (info.get("format") or {}).get("format_name", "")
+    v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
+    if not v: return False
+    is_mp4_like = any(x in fmt for x in ("mp4", "mov", "m4a"))
+    is_h264 = (v.get("codec_name") == "h264")
+    is_420 = (v.get("pix_fmt") == "yuv420p")
+    if not (is_mp4_like and is_h264 and is_420): return False
+    if want_size:
+        w, h = want_size
+        if v.get("width") != int(w) or v.get("height") != int(h): return False
+    if want_fps:
+        cur = int(round(_parse_fps(v.get("r_frame_rate", "0/1"))))
+        if cur != int(want_fps): return False
+    return True
+
+def _pick_cuvid_decoder(codec_name: str, ffmpeg_path: str) -> Optional[str]:
+    """입력 코덱에 맞는 NVDEC(cuvid) 디코더 선택"""
+    codec = (codec_name or "").lower()
+    mapping = {
+        "h264": "h264_cuvid",
+        "hevc": "hevc_cuvid",
+        "vp8": "vp8_cuvid",
+        "vp9": "vp9_cuvid",
+        "av1": "av1_cuvid",
+        "mpeg2video": "mpeg2_cuvid",
+        "mpeg4": "mpeg4_cuvid",
+        "vc1": "vc1_cuvid",
+        "h263": "h263_cuvid",
+    }
+    name = mapping.get(codec)
+    if name and _has(ffmpeg_path, "decoder", name):
+        return name
+    return None
+
+
+# ---------- preprocess: NVDEC → (scale_cuda/npp) → NVENC ----------
+def preprocess_video_to_mp4_file(
     video_bytes: bytes,
-    target_fps: int = 30,                  # 고정
-    resize_to: Tuple[int, int] = (960, 540),# 고정
+    target_fps: int = 30,
     max_frames: Optional[int] = None,
+    resize_to: Optional[Tuple[int, int]] = (960, 540),
+    keep_aspect: bool = False,
     drop_audio: bool = True,
-) -> tuple[bytes, Dict[str, Any]]:
-    """
-    입력 바이트를 빠르게 MP4(h264, yuv420p)로 변환하여 '바이트'로 반환.
-    - 1차: NVDEC + scale_cuda + h264_nvenc
-    - 2차: NVDEC + scale_npp  + h264_nvenc
-    - 3차: CPU scale + libx264   (ALLOW_CPU_FALLBACK=1 일 때만)
-    """
+) -> tuple[str, Dict[str, Any]]:
+    print(f"[{_ts()}][PRE] GPU-DECODE mode target_fps={target_fps} resize_to={resize_to} max_frames={max_frames}")
     ffmpeg = _which_ffmpeg()
+    # [CPU-LOW] 기본값 1로
     threads = os.getenv("FFMPEG_THREADS", "1")
     filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
+    x264_preset = os.getenv("X264_PRESET", "veryfast")
+    x264_crf = int(os.getenv("X264_CRF", "28"))
     ff_loglvl = os.getenv("FFMPEG_LOGLEVEL", "error")
 
     nvenc_preset = os.getenv("NVENC_PRESET", "p1")
@@ -110,381 +198,350 @@ def preprocess_video_to_mp4_bytes(
     nvenc_maxrate= os.getenv("NVENC_MAXRATE", "2.5M")
     nvenc_bufsize= os.getenv("NVENC_BUFSIZE", "5M")
 
-    # 성능 위주: 기본 0 (GPU 실패 시 전체가 매우 느려지는 것을 방지)
-    allow_cpu_fallback = _env_true("ALLOW_CPU_FALLBACK", "0")
-
-    # 입력 임시파일(파이프 동시 read/write 데드락 회피)
-    with tempfile.NamedTemporaryFile(suffix=".in", delete=False) as tmp_in:
+    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
         tmp_in.write(video_bytes)
         in_path = tmp_in.name
     out_path = in_path + "_processed.mp4"
+    print(f"[{_ts()}][PRE] temp in={in_path} out={out_path}")
 
-    base = [ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
-            "-threads", threads, "-filter_threads", filter_threads, "-y"]
+    info = _ffprobe_soft(in_path)
+    vstream = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
+    in_codec = (vstream or {}).get("codec_name", "")
+    has_nvenc = _has(ffmpeg, "encoder", "h264_nvenc")
+    has_scale_cuda = _has(ffmpeg, "filter", "scale_cuda")
+    has_scale_npp  = _has(ffmpeg, "filter", "scale_npp")
+    cuvid_name = _pick_cuvid_decoder(in_codec, ffmpeg)
+    allow_cpu_fallback = _env_true("ALLOW_CPU_FALLBACK", "0")
+    require_nvdec = _env_true("REQUIRE_NVDEC", "1")  # 기본적으로 NVDEC 요구
 
-    w, h = int(resize_to[0]), int(resize_to[1])
+    print(f"[{_ts()}][PRE] in_codec={in_codec} cuvid={cuvid_name} "
+          f"has_nvenc={has_nvenc} scale_cuda={has_scale_cuda} scale_npp={has_scale_npp} "
+          f"ALLOW_CPU_FALLBACK={allow_cpu_fallback} REQUIRE_NVDEC={require_nvdec}")
 
-    def _run(cmd: list[str]):
-        print(f"[{_ts()}][FFMPEG] RUN: {' '.join(cmd)}")
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        if res.returncode != 0:
-            if res.stderr.strip():
-                print(f"[{_ts()}][FFMPEG] STDERR:\n{res.stderr.strip()[-1200:]}")
-            raise RuntimeError(f"ffmpeg failed rc={res.returncode}")
-        if res.stderr.strip():
-            print(f"[{_ts()}][FFMPEG] STDERR(non-fatal):\n{res.stderr.strip()[-800:]}")
+    def _scale_vf_sw():
+        if not resize_to: return None
+        w, h = int(resize_to[0]), int(resize_to[1])
+        return f"scale={w}:{h}:flags=fast_bilinear"
 
-    tries: List[list[str]] = []
-    # 1) NVDEC + scale_cuda + NVENC
-    tries.append(base + [
-        "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
-        "-extra_hw_frames", "8",
-        "-i", in_path,
-        "-vf", f"scale_cuda={w}:{h}",
-        "-r", str(int(target_fps)),
-        *( ["-frames:v", str(int(max_frames))] if max_frames is not None else [] ),
-        *( ["-an"] if drop_audio else ["-c:a", "aac", "-b:a", "96k"] ),
-        "-movflags", "+faststart",
-        "-c:v", "h264_nvenc",
-        "-preset", nvenc_preset,
-        "-tune", nvenc_tune,
-        "-rc", nvenc_rc,
-        "-b:v", nvenc_bitrate, "-maxrate", nvenc_maxrate, "-bufsize", nvenc_bufsize,
-        "-gpu", "0",
-        "-pix_fmt", "yuv420p",
-        "-g", "60", "-forced-idr", "1", "-zerolatency", "1",
-        out_path
-    ])
-    # 2) NVDEC + scale_npp + NVENC
-    tries.append(base + [
-        "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
-        "-extra_hw_frames", "8",
-        "-i", in_path,
-        "-vf", f"scale_npp={w}:{h}",
-        "-r", str(int(target_fps)),
-        *( ["-frames:v", str(int(max_frames))] if max_frames is not None else [] ),
-        *( ["-an"] if drop_audio else ["-c:a", "aac", "-b:a", "96k"] ),
-        "-movflags", "+faststart",
-        "-c:v", "h264_nvenc",
-        "-preset", nvenc_preset,
-        "-tune", nvenc_tune,
-        "-rc", nvenc_rc,
-        "-b:v", nvenc_bitrate, "-maxrate", nvenc_maxrate, "-bufsize", nvenc_bufsize,
-        "-gpu", "0",
-        "-pix_fmt", "yuv420p",
-        "-g", "60", "-forced-idr", "1", "-zerolatency", "1",
-        out_path
-    ])
-    # 3) CPU fallback (옵션)
-    if allow_cpu_fallback:
-        tries.append(base + [
-            "-i", in_path,
-            "-vf", f"scale={w}:{h}:flags=fast_bilinear",
-            "-r", str(int(target_fps)),
-            *( ["-frames:v", str(int(max_frames))] if max_frames is not None else [] ),
-            *( ["-an"] if drop_audio else ["-c:a", "aac", "-b:a", "96k"] ),
+    vf_scale_cpu = _scale_vf_sw()
+
+    def build_copy_cmd() -> list[str]:
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin", "-y"]
+        cmd += ["-i", in_path]
+        if drop_audio: cmd += ["-an"]
+        else: cmd += ["-c:a", "copy"]
+        cmd += ["-c:v", "copy", "-movflags", "+faststart", out_path]
+        return cmd
+
+    def build_nvdec_nvenc_cmd() -> list[str]:
+        """NVDEC(디코드) → (GPU)scale → NVENC(인코드)"""
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin"]
+        cmd += ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"]
+        if cuvid_name:
+            cmd += ["-c:v", cuvid_name]
+        cmd += ["-extra_hw_frames", "8"]
+        cmd += ["-threads", threads, "-filter_threads", filter_threads]
+        cmd += ["-y", "-i", in_path]
+
+        vf_parts: List[str] = []
+        if resize_to:
+            w, h = int(resize_to[0]), int(resize_to[1])
+            scaler = "scale_cuda" if has_scale_cuda else ("scale_npp" if has_scale_npp else None)
+            if scaler is None:
+                raise RuntimeError("Neither scale_cuda nor scale_npp is available with NVDEC path")
+            vf_parts.append(f"{scaler}={w}:{h}")
+        if vf_parts:
+            cmd += ["-vf", ",".join(vf_parts)]
+
+        if target_fps and target_fps > 0:
+            cmd += ["-r", str(int(target_fps))]
+        if max_frames is not None:
+            cmd += ["-frames:v", str(int(max_frames))]
+        if drop_audio:
+            cmd += ["-an"]
+
+        cmd += [
             "-movflags", "+faststart",
-            "-pix_fmt", "yuv420p",
-            "-c:v", "libx264",
-            "-preset", os.getenv("X264_PRESET", "veryfast"),
-            "-crf", os.getenv("X264_CRF", "28"),
+            "-c:v", "h264_nvenc",
+            "-preset", nvenc_preset,
+            "-tune", nvenc_tune,
+            "-rc", nvenc_rc,
+            "-b:v", nvenc_bitrate,
+            "-maxrate", nvenc_maxrate,
+            "-bufsize", nvenc_bufsize,
+            "-gpu", "0",
+            "-zerolatency", "1",
+            "-forced-idr", "1",
             out_path
-        ])
+        ]
+        return cmd
 
-    info: Dict[str, Any] = {"pipeline": None, "cmd": None, "notes": []}
-    out_bytes: Optional[bytes] = None
-    last_err = None
+    def build_cpu_x264_cmd() -> list[str]:
+        """CPU 디코드/스케일 → libx264(폴백)"""
+        cmd = [ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
+               "-threads", threads, "-filter_threads", filter_threads,
+               "-y", "-i", in_path]
+        vf_parts: List[str] = []
+        if vf_scale_cpu: vf_parts.append(vf_scale_cpu)
+        if vf_parts: cmd += ["-vf", ",".join(vf_parts)]
+        if target_fps and target_fps > 0: cmd += ["-r", str(int(target_fps))]
+        if max_frames is not None: cmd += ["-frames:v", str(int(max_frames))]
+        if drop_audio: cmd += ["-an"]
+        cmd += [
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            "-c:v", "libx264",
+            "-preset", x264_preset,
+            "-crf", str(int(x264_crf)),
+            out_path
+        ]
+        return cmd
+
+    debug: Dict[str, Any] = {
+        "ffmpeg": ffmpeg,
+        "ffprobe_ok": bool(info),
+        "in_codec": in_codec,
+        "cuvid_decoder": cuvid_name,
+        "has_nvenc": has_nvenc,
+        "has_scale_cuda": has_scale_cuda,
+        "has_scale_npp": has_scale_npp,
+        "target_fps": target_fps,
+        "resize_to": resize_to,
+        "max_frames": max_frames,
+        "pipeline": None,
+        "cmd": None,
+        "notes": [],
+        "cpu_fallback_allowed": allow_cpu_fallback,
+    }
+
     try:
-        for i, cmd in enumerate(tries, 1):
+        can_copy = False
+        if info and not resize_to and (not target_fps or target_fps <= 0) and (max_frames is None):
+            can_copy = _can_remux_to_mp4_without_reencode(info, None, None)
+        print(f"[{_ts()}][PRE] remux_copy_possible={can_copy}")
+
+        if can_copy:
+            cmd = build_copy_cmd()
+            debug.update({"pipeline": "copy", "cmd": " ".join(cmd)})
+            _run_ffmpeg(cmd)
+            return out_path, debug
+
+        # === NVDEC 우선 경로 ===
+        if has_nvenc:
             try:
-                _run(cmd)
-                info["pipeline"] = f"try#{i}"
-                info["cmd"] = " ".join(cmd)
-                with open(out_path, "rb") as f:
-                    out_bytes = f.read()
-                break
+                cmd = build_nvdec_nvenc_cmd()
+                debug.update({"pipeline": "nvdec+gpu-scale+nvenc", "cmd": " ".join(cmd)})
+                _run_ffmpeg(cmd)
+                print(f"[{_ts()}][PRE] GPU path OK (NVDEC → NVENC)")
+                return out_path, debug
             except Exception as e:
-                print(f"[{_ts()}][FFMPEG] try#{i} FAILED -> {e}")
-                last_err = e
-                continue
-    finally:
-        # 정리
+                print(f"[{_ts()}][PRE] GPU path FAILED -> {e}")
+                debug.setdefault("notes", []).append(f"nvdec/nvenc failed: {e}")
+                if require_nvdec and not allow_cpu_fallback:
+                    print(f"[{_ts()}][PRE] REQUIRE_NVDEC=1 & ALLOW_CPU_FALLBACK=0 -> use original")
+                    return in_path, debug
+
+        # === CPU fallback (옵션) ===
+        if allow_cpu_fallback:
+            cmd = build_cpu_x264_cmd()
+            debug.update({"pipeline": "cpu-fallback", "cmd": " ".join(cmd)})
+            _run_ffmpeg(cmd)
+            print(f"[{_ts()}][PRE] CPU fallback OK")
+            return out_path, debug
+
+        debug.setdefault("notes", []).append("transcode skipped (no NVDEC/NVENC and fallback disabled)")
+        print(f"[{_ts()}][PRE] SKIP transcode -> use original")
+        return in_path, debug
+
+    except Exception as e:
+        debug.setdefault("notes", []).append(f"transcode failed; using original ({e})")
+        print(f"[{_ts()}][PRE] TRANSCODE FAILED -> use original ({e})")
+        return in_path, debug
+
+
+# ---------- single-decode iterator (분석 단계: OpenCV/PyAV) ----------
+class VideoFrameIterator:
+    def __init__(self, mp4_path: str, stride: int = 1):
+        self.mp4_path = mp4_path
+        self.stride = max(1, int(stride))
+        print(f"[{_ts()}][ITER] init path={mp4_path} stride={self.stride}")
+
+    def __iter__(self):
+        debug_frames = _env_true("DEBUG_FRAMES", "0")
+        printed = 0
         try:
-            if os.path.exists(in_path):
-                os.remove(in_path)
-        except Exception:
-            pass
-        try:
-            if os.path.exists(out_path):
-                os.remove(out_path)
-        except Exception:
-            pass
-
-    if out_bytes is not None:
-        return out_bytes, info
-
-    info["notes"].append(f"all attempts failed: {last_err}")
-    # 실패 시 원본 그대로(해상도/fps 보장은 안되지만 최소한 결과는 나옴)
-    return video_bytes, info
-
-
-# ---------- (선택) 초고속: FFmpeg 파이프 → RGB 프레임 ----------
-
-def _ffmpeg_read_frames_from_bytes(
-    video_bytes: bytes,
-    resize_to: Tuple[int, int] = (960, 540),
-    target_fps: int = 30,
-    max_frames: Optional[int] = None,
-) -> List["np.ndarray"]:
-    """
-    NVDEC(+scale_cuda/npp) 또는 CPU scale로 rgb24 rawvideo를 파이프로 받아 프레임 리스트 반환.
-    프레임 API 사용 시에만 호출(USE_FAST_FRAMES=1).
-    """
-    import numpy as np
-    ffmpeg = _which_ffmpeg()
-    threads = os.getenv("FFMPEG_THREADS", "1")
-    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
-    ff_loglvl = os.getenv("FFMPEG_LOGLEVEL", "error")
-
-    w, h = int(resize_to[0]), int(resize_to[1])
-    frame_size = w * h * 3  # rgb24
-
-    with tempfile.NamedTemporaryFile(suffix=".in", delete=False) as tmp_in:
-        tmp_in.write(video_bytes)
-        in_path = tmp_in.name
-
-    common = [
-        ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
-        "-threads", threads, "-filter_threads", filter_threads, "-y"
-    ]
-    tries = [
-        # 1) scale_cuda (권장)
-        ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", in_path,
-         "-vf", f"scale_cuda={w}:{h},fps={int(target_fps)},hwdownload,format=rgb24",
-         "-vsync", "0"],
-        # 2) scale_npp
-        ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", in_path,
-         "-vf", f"scale_npp={w}:{h},fps={int(target_fps)},hwdownload,format=rgb24",
-         "-vsync", "0"],
-        # 3) CPU (최후)
-        ["-i", in_path,
-         "-vf", f"scale={w}:{h}:flags=fast_bilinear,fps={int(target_fps)},format=rgb24",
-         "-vsync", "0"],
-    ]
-    if max_frames is not None:
-        for t in tries:
-            t += ["-frames:v", str(int(max_frames))]
-
-    def _run_try(args: List[str]) -> List["np.ndarray"]:
-        cmd = common + args + ["-an", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"]
-        print(f"[{_ts()}][FFMPEG] RUN: {' '.join(cmd)}")
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**7)
-        frames: List["np.ndarray"] = []
-        try:
-            while True:
-                buf = proc.stdout.read(frame_size)  # type: ignore
-                if not buf or len(buf) < frame_size:
-                    break
-                arr = np.frombuffer(buf, dtype=np.uint8).reshape((h, w, 3))
-                frames.append(arr)
-        finally:
+            import cv2
+            try: cv2.setNumThreads(0)
+            except Exception: pass
+            print(f"[{_ts()}][ITER] OpenCV {cv2.__version__} (VideoCapture)")
+            cap = cv2.VideoCapture(self.mp4_path)
+            if not cap.isOpened():
+                raise RuntimeError("cv2.VideoCapture open failed")
+            i = 0
             try:
-                _, err = proc.communicate(timeout=5)
-                if err and err.strip():
-                    print(f"[{_ts()}][FFMPEG] STDERR: {err.decode(errors='ignore')[-800:]}".rstrip())
-            except Exception:
-                pass
-        if proc.returncode not in (0, None):
-            raise RuntimeError(f"ffmpeg returncode={proc.returncode}")
-        return frames
+                while True:
+                    ok, bgr = cap.read()
+                    if not ok: break
+                    if (i % self.stride) == 0:
+                        if debug_frames and printed < 3:
+                            print(f"[{_ts()}][ITER] cv2 frame {i} shape={bgr.shape}")
+                            printed += 1
+                        yield bgr[..., ::-1]  # BGR->RGB
+                    i += 1
+            finally:
+                cap.release()
+            print(f"[{_ts()}][ITER] cv2 done")
+            return
+        except Exception as e:
+            print(f"[{_ts()}][ITER] cv2 path failed -> {e}")
 
-    last_err = None
-    try:
-        for i, args in enumerate(tries, 1):
-            try:
-                frames = _run_try(args)
-                if os.path.exists(in_path):
-                    os.remove(in_path)
-                if not frames:
-                    raise RuntimeError("No frames produced")
-                print(f"[{_ts()}][FFMPEG] path#{i} OK frames={len(frames)}")
-                return frames
-            except Exception as e:
-                print(f"[{_ts()}][FFMPEG] path#{i} FAILED -> {e}")
-                last_err = e
-                continue
-    finally:
         try:
-            if os.path.exists(in_path):
-                os.remove(in_path)
-        except Exception:
-            pass
-
-    raise RuntimeError(f"All ffmpeg attempts failed: {last_err}")
+            import av  # type: ignore
+            print(f"[{_ts()}][ITER] PyAV path")
+            i = 0
+            with av.open(self.mp4_path) as c:
+                for frame in c.decode(video=0):
+                    if (i % self.stride) == 0:
+                        arr = frame.to_ndarray(format="rgb24")
+                        if debug_frames and printed < 3:
+                            print(f"[{_ts()}][ITER] av frame {i} shape={arr.shape}")
+                            printed += 1
+                        yield arr
+                    i += 1
+            print(f"[{_ts()}][ITER] PyAV done")
+            return
+        except Exception as e:
+            print(f"[{_ts()}][ITER] PyAV path failed -> {e}")
+            raise RuntimeError(f"VideoFrameIterator failed: {e}")
 
 
 # ---------- posture meta fix ----------
-
-def _fix_posture_meta(posture: Dict[str, Any], decoded_frames: int, fps_used: float, sample_every: int = 1) -> None:
+def _fix_posture_meta(posture: Dict[str, Any], decoded_frames: int, fps_used: float) -> None:
     try:
         meta = posture.get("meta", {}) or {}
-        meta["sample_every"] = int(sample_every)
-        meta["decoded_fps"] = float(fps_used)
-        meta["effective_fps"] = float(fps_used / max(1, sample_every))
+        meta["sample_every"] = 1
+        meta["analyzed_fps"] = float(fps_used)
         meta["duration_s"] = float(decoded_frames / max(1e-6, fps_used))
         posture["meta"] = meta
-        print(f"[{_ts()}][POSTURE] meta fixed frames={decoded_frames} fps={fps_used} stride={sample_every}")
+        print(f"[{_ts()}][POSTURE] meta fixed frames={decoded_frames} fps={fps_used}")
     except Exception as e:
         print(f"[{_ts()}][POSTURE] meta fix skipped: {e}")
 
 
 # ---------- orchestration (직렬 실행) ----------
-
 def analyze_all(
     video_bytes: bytes,
     device: Optional[str] = None,
-    stride: int = 1,  # deprecated (유지 호환)
+    stride: int = 1,
     return_points: bool = False,
-    calib_data: Optional[dict] = None,  # 호환 파라미터(미사용)
-    target_fps: int = 30,               # 고정
-    resize_to: Tuple[int, int] = (960, 540),  # 고정
+    calib_data: Optional[dict] = None,  # [GAZE-REMOVED] 더 이상 사용하지 않음(호환 파라미터만 보존)
+    target_fps: int = 30,
+    resize_to: Tuple[int, int] = (960, 540),
     max_frames: Optional[int] = None,
     return_debug: bool = False,
     stream_mode: str = "auto",
-    # === 경량화 추가 ===
-    pose_stride: Optional[int] = None,  # None이면 환경변수 또는 기본값(2)
-    face_stride: Optional[int] = None,  # None이면 환경변수 또는 기본값(3)
 ):
     print(f"[{_ts()}][ENTRY] analyze_all target_fps={target_fps} resize_to={resize_to} stream_mode={stream_mode}")
 
-    # stride 기본값 결정(환경변수 우선)
-    pose_stride = int(os.getenv("POSE_STRIDE", "2")) if pose_stride is None else int(pose_stride)
-    face_stride = int(os.getenv("FACE_STRIDE", "3")) if face_stride is None else int(face_stride)
-    pose_stride = max(1, pose_stride)
-    face_stride = max(1, face_stride)
-
-    # device 선택
     if device is None:
         try:
             import torch  # type: ignore
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            try:
-                torch.set_num_threads(1)
-            except Exception:
-                pass
+            try: torch.set_num_threads(1)
+            except Exception: pass
             print(f"[{_ts()}][DEVICE] torch ok cuda={torch.cuda.is_available()} device={device}")
             if device == "cuda":
-                try:
-                    print(f"[{_ts()}][DEVICE] GPU: {torch.cuda.get_device_name(0)}")
-                except Exception:
-                    pass
+                try: print(f"[{_ts()}][DEVICE] GPU: {torch.cuda.get_device_name(0)}")
+                except Exception: pass
         except Exception as e:
             device = "cpu"
             print(f"[{_ts()}][DEVICE] torch not available -> CPU ({e})")
 
-    frames_api_ok = (analyze_video_frames is not None) and (infer_face_frames is not None)
-    use_fast_frames = _env_true("USE_FAST_FRAMES", "1")  # 기본 1로 변경
-    print(f"[{_ts()}][PATH] frames_api_ok={frames_api_ok} USE_FAST_FRAMES={use_fast_frames} pose_stride={pose_stride} face_stride={face_stride}")
+    print(f"[{_ts()}][ENV] ALLOW_CPU_FALLBACK={_env_true('ALLOW_CPU_FALLBACK','0')} "
+          f"REQUIRE_NVDEC={_env_true('REQUIRE_NVDEC','1')}")
 
-    t0 = time.time()
-    dbg: Dict[str, Any] = {
-        "mode": None,
-        "timings_s": {},
-        "stride_face": face_stride,
-        "stride_pose": pose_stride,
-        "postprocess_fps": target_fps,
-        "effective_fps_face": max(0.1, target_fps / max(1, face_stride)),
-        "effective_fps_pose": max(0.1, target_fps / max(1, pose_stride)),
-        "parallel": False,
-    }
+    mp4_path, dbg = preprocess_video_to_mp4_file(
+        video_bytes=video_bytes,
+        target_fps=target_fps,
+        max_frames=max_frames,
+        resize_to=resize_to,
+        keep_aspect=False,
+        drop_audio=True,
+    )
+
+    frames_api_ok = (analyze_video_frames is not None) and (infer_face_frames is not None)
+    print(f"[{_ts()}][PATH] frames_api_ok={frames_api_ok}")
 
     try:
-        if (stream_mode == "frames") or (stream_mode == "auto" and frames_api_ok and use_fast_frames):
-            # --- 초고속 모드: MP4 없이 바로 프레임 ---
-            print(f"[{_ts()}][MODE] FAST frames")
-            frames_all = _ffmpeg_read_frames_from_bytes(
-                video_bytes=video_bytes, resize_to=resize_to, target_fps=target_fps, max_frames=max_frames
-            )
+        t0 = time.time()
+
+        if stream_mode == "frames" or (stream_mode == "auto" and frames_api_ok):
+            print(f"[{_ts()}][MODE] single-decode FRAMES path")
+            frames_all = list(VideoFrameIterator(mp4_path, stride=1))
             n_all = len(frames_all)
             fps_used = float(target_fps) if target_fps else 0.0
-
-            # === 경량화: 모듈별 stride 샘플링 ===
-            frames_pose = frames_all[::pose_stride]
-            frames_face = frames_all[::face_stride]
+            print(f"[{_ts()}][FRAMES] decoded={n_all} fps_used={fps_used}")
 
             t_pose = time.time()
-            # posture API가 프레임만 받으므로 직접 stride 반영
-            posture = analyze_video_frames(frames_pose)  # type: ignore
-            _fix_posture_meta(posture, decoded_frames=n_all, fps_used=fps_used, sample_every=pose_stride)
-            dbg["timings_s"]["posture"] = time.time() - t_pose
+            posture = analyze_video_frames(frames_all)  # type: ignore
+            _fix_posture_meta(posture, decoded_frames=n_all, fps_used=fps_used)
+            print(f"[{_ts()}][TIME] posture={time.time()-t_pose:.3f}s")
 
             t_face = time.time()
-            face = infer_face_frames(frames_face, device=device, stride=1, return_points=return_points)  # type: ignore
-            dbg["timings_s"]["face"] = time.time() - t_face
+            face = infer_face_frames(frames_all, device=device, stride=1, return_points=return_points)  # type: ignore
+            print(f"[{_ts()}][TIME] face={time.time()-t_face:.3f}s")
 
             dbg.update({
-                "mode": "fast_frames",
+                "analyze_mode": "single-decode/frames",
+                "frames_api": True,
+                "stride_face": 1,
+                "postprocess_fps": target_fps,
+                "effective_fps_face": target_fps,
                 "frames_total_decoded": n_all,
-                "frames_pose": len(frames_pose),
-                "frames_face": len(frames_face),
+                "timings_s": {"total": time.time() - t0},
+                "parallel": False
             })
 
         else:
-            # --- 안전/호환 모드: 빠른 MP4 변환 후 bytes 경로 ---
-            print(f"[{_ts()}][MODE] SAFE mp4-bytes")
-            mp4_bytes, pre_info = preprocess_video_to_mp4_bytes(
-                video_bytes=video_bytes,
-                target_fps=target_fps,
-                resize_to=resize_to,
-                max_frames=max_frames,
-            )
-            dbg["preprocess"] = pre_info
+            print(f"[{_ts()}][MODE] BYTES(compat) path")
+            with open(mp4_path, "rb") as f:
+                processed_bytes = f.read()
 
             t_pose = time.time()
-            # bytes 경로는 posture stride를 직접 전달할 수 없으므로 그대로 진행
-            posture = analyze_video_bytes(mp4_bytes)
-            _fix_posture_meta(posture, decoded_frames=int((max_frames or 0) or 0), fps_used=float(target_fps), sample_every=1)
-            dbg["timings_s"]["posture"] = time.time() - t_pose
+            posture = analyze_video_bytes(processed_bytes)
+            print(f"[{_ts()}][TIME] posture(bytes)={time.time()-t_pose:.3f}s")
 
             t_face = time.time()
-            # face는 stride 인자가 있으므로 경량화 적용
-            face = infer_face_video(mp4_bytes, device, face_stride, None, return_points)
-            dbg["timings_s"]["face"] = time.time() - t_face
+            face = infer_face_video(processed_bytes, device, 1, None, return_points)
+            print(f"[{_ts()}][TIME] face(bytes)={time.time()-t_face:.3f}s")
 
             dbg.update({
-                "mode": "mp4_bytes",
+                "analyze_mode": "bytes(compat)",
+                "frames_api": False,
+                "stride_face": 1,
+                "postprocess_fps": target_fps,
+                "effective_fps_face": target_fps,
+                "timings_s": {"total": time.time() - t0},
+                "parallel": False
             })
 
-        dbg["timings_s"]["total"] = time.time() - t0
-        out: Dict[str, Any] = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "device": device,
-            "stride": 1,  # legacy
-            "posture": posture,
-            "emotion": face,
-            "gaze": None,  # gaze 제거 유지
-        }
-        if return_debug:
-            out["debug"] = dbg
-        print(f"[{_ts()}][DONE] total={dbg['timings_s']['total']:.3f}s mode={dbg['mode']}")
-        return out
-
-    except Exception as e:
-        # 최후 보루: 원본 바이트로 분석 시도(해상도/fps 보장 X)
-        print(f"[{_ts()}][WARN] main path failed -> fallback bytes ({e})")
-        t_pose = time.time()
-        posture = analyze_video_bytes(video_bytes)
-        t_face = time.time()
-        face = infer_face_video(video_bytes, device, face_stride, None, return_points)
         out: Dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "device": device,
             "stride": 1,
             "posture": posture,
             "emotion": face,
-            "gaze": None,
+            "gaze": None,  # [GAZE-REMOVED] 완전 제거(호환을 위해 None만 유지)
         }
         if return_debug:
-            out["debug"] = {"mode": "fallback_bytes", "error": str(e), "face_stride": face_stride}
-        print(f"[{_ts()}][DONE] fallback bytes posture={time.time()-t_pose:.3f}s face={time.time()-t_face:.3f}s")
+            out["debug"] = dbg
+        print(f"[{_ts()}][DONE] analyze_all total={time.time()-t0:.3f}s mode={dbg.get('analyze_mode')}")
         return out
+
+    finally:
+        try:
+            if os.path.exists(mp4_path):
+                os.remove(mp4_path)
+                print(f"[{_ts()}][CLEAN] removed {mp4_path}")
+        except Exception as e:
+            print(f"[{_ts()}][CLEAN] rm failed: {e}")
