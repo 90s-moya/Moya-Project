@@ -132,7 +132,7 @@ export interface TabDefinition {
 export type QualityScaleType = 'OUTSTANDING' | 'NORMAL' | 'INADEQUATE';
 export type SpeedType = 'SLOW' | 'SLIGHTLY SLOW' | 'NORMAL' | 'SLIGHTLY FAST' | 'FAST';
 export type PostureStatusType = 'Good Posture' | 'Shoulders Uneven' | 'Hands Above Shoulders' | 'Head Down' | 'Head Off-Center';
-export type FaceStatusType = 'sad' | 'fear';
+export type FaceStatusType = 'neutral' | 'negative' | 'positive';
 
 // 히트맵 색상 관련 타입
 export type Rgb = { r: number; g: number; b: number };
