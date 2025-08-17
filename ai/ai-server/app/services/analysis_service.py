@@ -1,7 +1,8 @@
 # app/services/analysis_service.py
-# - 전처리에서 ffmpeg **NVDEC + scale_cuda + NVENC** 경로 사용
+# - 전처리에서 ffmpeg NVDEC(+scale_cuda/npp)+NVENC 우선
 # - 디버그 dict에 실행 커맨드/경로/사용 기능 기록
-# - 가능한 경우 single-decode(frames) 사용(auto)
+# - single-decode(frames) 사용(auto)
+# - GAZE 완전 OFF 스위치(환경변수 DISABLE_GAZE=1) + 예외 시 fail-open
 
 from __future__ import annotations
 
@@ -34,6 +35,17 @@ try:
 except Exception:
     infer_face_frames = None  # type: ignore
 
+
+# ---------- Helpers ----------
+def _ts() -> str:
+    return datetime.now().strftime("%H:%M:%S")
+
+def _env_true(name: str, default: str = "0") -> bool:
+    v = os.getenv(name, default)
+    return str(v).lower() in ("1", "true", "yes", "on")
+
+
+# ---------- FFmpeg utils ----------
 def _which(ffbin_env: str, fallback_names: list[str]) -> str:
     cand = []
     envv = os.getenv(ffbin_env)
@@ -125,6 +137,8 @@ def _can_remux_to_mp4_without_reencode(info: dict,
             return False
     return True
 
+
+# ---------- Preprocess to MP4 (NVDEC→scale_cuda/npp→NVENC) ----------
 def preprocess_video_to_mp4_file(
     video_bytes: bytes,
     target_fps: int = 15,
@@ -219,7 +233,7 @@ def preprocess_video_to_mp4_file(
         if vf_parts:
             cmd += ["-vf", ",".join(vf_parts)]
         if target_fps and target_fps > 0:
-            cmd += ["-r", str(int(target_fps))]
+            cmd += ["-r", str(int(target_fps))]  # output fps
         if max_frames is not None:
             cmd += ["-frames:v", str(int(max_frames))]
         if drop_audio:
@@ -246,7 +260,8 @@ def preprocess_video_to_mp4_file(
         "encoder": None,
         "decoder": None,
         "scale": None,
-        "cmd": None
+        "cmd": None,
+        "notes": [],
     }
 
     try:
@@ -295,8 +310,8 @@ def preprocess_video_to_mp4_file(
         except Exception:
             pass
 
-# --- 이하 analyze_all 등은 기존과 동일 (필요 시 디버깅 필드만 추가) ---
 
+# ---------- Single-decode iterator ----------
 class VideoFrameIterator:
     def __init__(self, mp4_path: str, stride: int = 5):
         self.mp4_path = mp4_path
@@ -315,7 +330,7 @@ class VideoFrameIterator:
                     if not ok:
                         break
                     if (i % self.stride) == 0:
-                        yield bgr[..., ::-1]
+                        yield bgr[..., ::-1]  # BGR->RGB
                     i += 1
             finally:
                 cap.release()
@@ -334,6 +349,8 @@ class VideoFrameIterator:
         except Exception as e:
             raise RuntimeError(f"VideoFrameIterator failed: {e}")
 
+
+# ---------- Orchestration ----------
 def analyze_all(
     video_bytes: bytes,
     device: Optional[str] = None,
@@ -346,6 +363,7 @@ def analyze_all(
     return_debug: bool = False,
     stream_mode: str = "auto",  # "auto" | "frames" | "bytes"
 ):
+    # device
     if device is None:
         try:
             import torch  # type: ignore
@@ -353,6 +371,7 @@ def analyze_all(
         except Exception:
             device = "cpu"
 
+    # 전처리
     mp4_path, dbg = preprocess_video_to_mp4_file(
         video_bytes=video_bytes,
         target_fps=target_fps,
@@ -362,15 +381,29 @@ def analyze_all(
         drop_audio=True,
     )
 
-    frames_api_ok = (analyze_video_frames is not None) and \
-                    (infer_face_frames is not None) and \
-                    (infer_gaze_frames is not None)
+    # 게이즈 OFF 스위치
+    disable_gaze = _env_true("DISABLE_GAZE", "0")
+    if disable_gaze:
+        dbg.setdefault("notes", []).append("gaze: disabled via env")
+
+    # frames API 사용 가능성(게이즈는 옵션)
+    frames_api_ok = (analyze_video_frames is not None) and (infer_face_frames is not None) and \
+                    (disable_gaze or (infer_gaze_frames is not None))
 
     def _run_frames_path():
         frames = list(VideoFrameIterator(mp4_path, stride=stride))
         posture = analyze_video_frames(frames)  # type: ignore
         face = infer_face_frames(frames, device=device, stride=stride, return_points=return_points)  # type: ignore
-        gaze = infer_gaze_frames(frames, calib_data=calib_data)  # type: ignore
+
+        if disable_gaze:
+            print(f"[{_ts()}][GAZE] disabled via env DISABLE_GAZE=1")
+            gaze = {"status": "disabled", "reason": "env", "count": len(frames)}
+        else:
+            try:
+                gaze = infer_gaze_frames(frames, calib_data=calib_data)  # type: ignore
+            except Exception as e:
+                print(f"[{_ts()}][GAZE] disabled (exception): {e}")
+                gaze = {"status": "disabled", "error": str(e)}
         return posture, face, gaze
 
     def _run_bytes_path():
@@ -378,7 +411,16 @@ def analyze_all(
             processed_bytes = f.read()
         posture = analyze_video_bytes(processed_bytes)
         face = infer_face_video(processed_bytes, device, stride, None, return_points)
-        gaze = infer_gaze(processed_bytes, calib_data=calib_data)
+
+        if disable_gaze:
+            print(f"[{_ts()}][GAZE] disabled via env DISABLE_GAZE=1")
+            gaze = {"status": "disabled", "reason": "env"}
+        else:
+            try:
+                gaze = infer_gaze(processed_bytes, calib_data=calib_data)
+            except Exception as e:
+                print(f"[{_ts()}][GAZE] disabled (exception): {e}")
+                gaze = {"status": "disabled", "error": str(e)}
         return posture, face, gaze
 
     try:
