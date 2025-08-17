@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from uuid import UUID   # ✅ UUID4 대신 UUID 사용
+from uuid import UUID
 
-# Q&A pair (기본 구조)
+
 class QuestionAnswerPairBase(BaseModel):
     order: int
     sub_order: int
@@ -17,24 +17,28 @@ class QuestionAnswerPairBase(BaseModel):
     stopwords: Optional[str] = ""
     end_type: Optional[str] = ""
 
+
 class QuestionAnswerPairCreate(QuestionAnswerPairBase):
-    session_id: UUID   # 
+    session_id: UUID
+
 
 class QuestionAnswerPairRead(QuestionAnswerPairBase):
-    id: UUID           # 
+    id: UUID
     session_id: UUID
     created_at: datetime
 
     class Config:
         from_attributes = True
 
-# Evaluation session
+
 class EvaluationSessionBase(BaseModel):
-    user_id: UUID      # 
+    user_id: UUID
     title: str
+
 
 class EvaluationSessionCreate(EvaluationSessionBase):
     pass
+
 
 class EvaluationSessionRead(EvaluationSessionBase):
     id: UUID
