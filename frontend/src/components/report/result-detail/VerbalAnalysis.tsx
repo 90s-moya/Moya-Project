@@ -100,7 +100,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
                </div>
 
                {/* 문장 끝맺음 - 가로 배치 */}
-               <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
+               {/* <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
                  <div className="flex items-center justify-between">
                    <div className="flex items-center gap-2">
                      <ListEnd size={16} className="text-blue-500" />
@@ -116,7 +116,7 @@ const VerbalAnalysis: React.FC<VerbalResultProps> = ({ verbal_result }) => {
                  {verbal_result.reason_end && (
                    <p className="text-xs text-gray-500 mt-2">{verbal_result.reason_end}</p>
                  )}
-               </div>
+               </div> */}
 
                {/* 문맥 일치 - 가로 배치 */}
                <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
