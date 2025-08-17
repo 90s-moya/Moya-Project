@@ -101,7 +101,7 @@ const DocsUpload: React.FC<DocsUploadProps> = ({
       const response = await DocsApi.uploadDoc(file, uploadStatus);
 
       await fetchDocs();
-      alert(`${file.name} 파일이 업로드되었습니다.`);
+      // alert(`${file.name} 파일이 업로드되었습니다.`);
     } catch (error: unknown) {
       console.error("파일 업로드 실패:", error);
       alert("파일 업로드에 실패했습니다.");
