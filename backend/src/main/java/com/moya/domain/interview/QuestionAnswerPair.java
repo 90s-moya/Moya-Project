@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.Type;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -19,8 +18,10 @@ import java.util.UUID;
 public class QuestionAnswerPair {
 
     @Id
-    @Column(name = "id", length = 36, nullable = false)
-    private String id; // UUID 문자열
+    @GeneratedValue(generator = "uuid2")
+    @org.hibernate.annotations.GenericGenerator(name = "uuid2", strategy = "uuid2")
+    @Column(name = "id", columnDefinition = "BINARY(16)")
+    private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "session_id", referencedColumnName = "id", nullable = false)
@@ -40,7 +41,6 @@ public class QuestionAnswerPair {
     @Column(name = "video_url")
     private String videoUrl;
 
-    // MySQL JSON 컬럼 → String으로 매핑
     @Column(name = "gaze_result", columnDefinition = "json")
     private String gazeResult;
 
@@ -79,9 +79,11 @@ public class QuestionAnswerPair {
     @Lob
     @Column(name = "end_type")
     private String endType;
+
     @Lob
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
+
     @Lob
     @Column(name = "speech_label")
     private String speechLabel;
@@ -91,17 +93,10 @@ public class QuestionAnswerPair {
     private String syllArt;
 
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    public void prePersist() {
-        if (this.id == null) {
-            this.id = UUID.randomUUID().toString();
-        }
-    }
 }
