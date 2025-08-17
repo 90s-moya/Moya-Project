@@ -7,14 +7,14 @@ import traceback, re, ast
 from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
+
 from app.utils.urls import to_files_relative
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Tuple
-from sqlalchemy import String, or_
 from sqlalchemy.orm import Session
 import httpx
+
 from app.database import get_db, SessionLocal
 from app.models import EvaluationSession, QuestionAnswerPair
 from app.schemas import EvaluationSessionRead
@@ -42,6 +42,28 @@ log = logging.getLogger(__name__)
 
 # 한 대질문에서 최대 꼬리질문 2개(sub_order: 0 -> 1 -> 2)
 MAX_FOLLOWUPS_PER_ORDER = 2
+
+
+# --------------------------
+# UUID 변환 유틸
+# --------------------------
+def to_uuid_bytes(u) -> bytes:
+    """str/UUID/bytes 입력을 받아 항상 BINARY(16) bytes로 변환"""
+    if isinstance(u, (bytes, bytearray)):
+        return bytes(u)
+    if isinstance(u, UUID):
+        return u.bytes
+    return UUID(str(u)).bytes
+
+
+def to_uuid_str(v) -> str:
+    """bytes/UUID/str 입력을 받아 항상 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx' 문자열로 변환"""
+    if isinstance(v, (bytes, bytearray)):
+        return str(UUID(bytes=v))
+    if isinstance(v, UUID):
+        return str(v)
+    return str(v)
+
 
 def _parse_questions_list(qs_raw):
     """
@@ -71,6 +93,7 @@ def _parse_questions_list(qs_raw):
 
     raise HTTPException(status_code=500, detail="GPT 질문 파싱 실패")
 
+
 # --------------------------
 # 매핑 유틸
 # --------------------------
@@ -82,6 +105,7 @@ def map_end_type(result: Dict[str, Any]) -> str:
         return "NORMAL"
     return "INADEQUATE"
 
+
 def map_stop_words(result: Dict[str, Any]) -> str:
     comment = (result.get("gpt_comment") or "").lower()
     if "추임새 거의 없음" in comment or "매우 깔끔" in comment:
@@ -90,9 +114,12 @@ def map_stop_words(result: Dict[str, Any]) -> str:
         return "NORMAL"
     return "INADEQUATE"
 
+
 # NULL 또는 빈 문자열을 미답변으로 간주
+from sqlalchemy import or_  # 여기서만 사용
 def _is_unanswered(col):
     return or_(col.is_(None), col == "")
+
 
 # --------------------------
 # 시작: 대질문 3개 생성
@@ -101,10 +128,11 @@ class PromptStartRequest(BaseModel):
     userId: UUID
     text: str
 
+
 @router.post("/v1/prompt-start", response_model=EvaluationSessionRead)
 async def prompt_start(payload: PromptStartRequest, db: Session = Depends(get_db)):
     try:
-        user_id = payload.userId
+        user_id = payload.userId  # UUID 객체
         text = payload.text
 
         qs_raw = await generate_initial_question(text)     # list[str]
@@ -113,8 +141,8 @@ async def prompt_start(payload: PromptStartRequest, db: Session = Depends(get_db
         if not qs:
             raise HTTPException(status_code=500, detail="GPT 질문 생성 실패")
 
-        # 세션 생성
-        session = EvaluationSession(user_id=str(user_id), created_at=datetime.utcnow())
+        # 세션 생성 (BINARY(16) 저장)
+        session = EvaluationSession(user_id=to_uuid_bytes(user_id), created_at=datetime.utcnow())
         db.add(session)
         db.commit()
         db.refresh(session)
@@ -123,7 +151,7 @@ async def prompt_start(payload: PromptStartRequest, db: Session = Depends(get_db
         qa_list = []
         for idx, q in enumerate(qs[:3], start=1):
             qa = QuestionAnswerPair(
-                session_id=session.id,
+                session_id=session.id,  # bytes
                 order=idx,
                 sub_order=0,
                 question=q,
@@ -150,6 +178,7 @@ async def prompt_start(payload: PromptStartRequest, db: Session = Depends(get_db
         log.exception("prompt-start 실패: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # --------------------------
 # 꼬리질문 생성 & 평가 (빠른 경로 + 백그라운드 분석)
 # --------------------------
@@ -170,9 +199,8 @@ async def followup_question(
         except Exception:
             raise HTTPException(status_code=422, detail="session_id가 유효한 UUID가 아닙니다.")
 
-        # 2) 세션 컬럼 타입 정합성
-        session_col = QuestionAnswerPair.__table__.c.session_id
-        session_val = str(session_uuid) if isinstance(session_col.type, String) else session_uuid
+        # 2) BINARY(16)로 변환
+        session_val = to_uuid_bytes(session_uuid)
 
         # 3) 현재 질문 선택: ① 요청 order의 미답변 우선 ② 없으면 보정 생성 ③ 그래도 없으면 전역 미답변
         # 3-1) 요청 order에서 '미답변(NULL 또는 빈문자열)' 중 가장 작은 sub_order
@@ -273,7 +301,7 @@ async def followup_question(
             return {"finished": True, "analysis": None}
 
         log.info("[followup] session=%s -> current(order=%s, sub=%s, id=%s)",
-                 session_val, current.order, current.sub_order, current.id)
+                 to_uuid_str(session_val), current.order, current.sub_order, to_uuid_str(current.id))
 
         # 4) 과거 데이터 호환: question이 리스트 문자열이면 1회 정규화
         raw_q = (current.question or "").strip()
@@ -338,7 +366,7 @@ async def followup_question(
         db.refresh(current)
 
         # 7-1) 음성 분석은 백그라운드에서 실행하여 DB에만 저장
-        background_tasks.add_task(_bg_analyze_and_persist, current.id, audio_bytes)
+        background_tasks.add_task(_bg_analyze_and_persist, current.id, audio_bytes)  # current.id: bytes
 
         # 8) 같은 order에서 꼬리질문 계속 (종결 여부 무시)
         if current.sub_order < MAX_FOLLOWUPS_PER_ORDER:
@@ -433,6 +461,7 @@ async def followup_question(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal error in followup_question")
 
+
 # --------------------------
 # (선택) 분석 관련 라우트
 # --------------------------
@@ -460,7 +489,7 @@ async def analyze_complete(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid calib_data JSON: {e}")
 
-    # (1) QA 조회/생성
+    # (1) QA 조회/생성 (문자열 UUID 받아서 내부에서 bytes로 처리)
     qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order)
 
     # (2) 분석 실행 (+ 디버그)
@@ -477,7 +506,7 @@ async def analyze_complete(
         log.exception("complete analysis 실패")
         raise HTTPException(status_code=500, detail=f"complete analysis 실패: {e}")
 
-    # FFmpeg/전처리 디버그를 서버 로그에 남김 (키가 없어도 .get으로 안전)
+    # FFmpeg/전처리 디버그를 서버 로그에 남김
     try:
         dbg = out.get("debug") if isinstance(out, dict) else None
         if dbg:
@@ -489,10 +518,10 @@ async def analyze_complete(
     # (3) 결과 저장
     qa = save_results_to_qa(db, qa, video_url=qa.video_url, result=out)
 
-    # (4) 응답
+    # (4) 응답 (UUID 문자열로 변환)
     resp = {
-        "result_id": qa.id,
-        "report_id": qa.session_id,
+        "result_id": to_uuid_str(qa.id),
+        "report_id": to_uuid_str(qa.session_id),
         "order": qa.order,
         "sub_order": qa.sub_order,
         "video_url": qa.video_url,
@@ -505,6 +534,7 @@ async def analyze_complete(
     if return_debug and isinstance(out, dict) and out.get("debug") is not None:
         resp["preprocess_debug"] = out["debug"]
     return resp
+
 
 # --- PATCH: /v1/analyze/complete-by-url --------------------------------------
 @router.post("/v1/analyze/complete-by-url")
@@ -528,7 +558,7 @@ async def analyze_complete_by_url(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid calib_data JSON: {e}")
 
-    # (1) QA 조회/생성
+    # (1) QA 조회/생성 (문자열 UUID → 내부 bytes)
     qa = get_or_create_qa_pair(db, session_id=session_id, order=order, sub_order=sub_order, calib_data=parsed_calib_data)
 
     # (2) URL에서 비디오 다운로드
@@ -569,10 +599,10 @@ async def analyze_complete_by_url(
     rel_thumb = to_files_relative(thumbnail_url)
     qa = save_results_to_qa(db, qa, video_url=rel_video, thumbnail_url=rel_thumb, result=out)
 
-    # (5) 응답
+    # (5) 응답 (UUID 문자열 변환)
     resp = {
-        "result_id": qa.id,
-        "report_id": qa.session_id,
+        "result_id": to_uuid_str(qa.id),
+        "report_id": to_uuid_str(qa.session_id),
         "order": qa.order,
         "sub_order": qa.sub_order,
         "video_url": qa.video_url,
@@ -586,6 +616,7 @@ async def analyze_complete_by_url(
         resp["preprocess_debug"] = out["debug"]
     return resp
 
+
 @router.post("/v1/face/predict")
 async def face_predict(file: UploadFile = File(...), device: str = "cpu"):
     data = await file.read()
@@ -596,6 +627,7 @@ async def face_predict(file: UploadFile = File(...), device: str = "cpu"):
         return {"ok": True, "result": out}
     except Exception as e:
         raise HTTPException(500, f"face inference 실패: {e}")
+
 
 @router.post("/v1/gaze/predict")
 async def gaze_predict(file: UploadFile = File(...)):
@@ -631,6 +663,7 @@ async def gaze_predict(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(500, f"gaze inference 실패: {e}")
 
+
 @router.post("/v1/posture/report")
 async def posture_report(file: UploadFile = File(...)):
     if not file.filename.lower().endswith((".mp4", ".mov", ".avi", ".mkv")):
@@ -643,18 +676,19 @@ async def posture_report(file: UploadFile = File(...)):
     report = analyze_video_bytes(data)
     return JSONResponse(content=report)
 
+
 # --------------------------
 # 백그라운드 작업: 음성 상세 분석 저장
 # --------------------------
-async def _bg_analyze_and_persist(qa_id: int, audio_bytes: bytes):
+async def _bg_analyze_and_persist(qa_id: bytes, audio_bytes: bytes):
     """
     무거운 분석은 응답 후에 실행. 새 DB 세션을 쓰고, 실패해도 서비스 흐름엔 영향 X.
+    PK는 BINARY(16) bytes.
     """
     db = SessionLocal()
     try:
         analysis = await transcribe_and_analyze(audio_bytes)
-        # SQLAlchemy 2.x 호환: db.get 사용
-        qa = db.get(QuestionAnswerPair, qa_id)
+        qa = db.get(QuestionAnswerPair, qa_id)  # PK: bytes
         if qa:
             try:
                 if hasattr(qa, "speech_label") and hasattr(qa, "syll_art"):
@@ -668,7 +702,7 @@ async def _bg_analyze_and_persist(qa_id: int, audio_bytes: bytes):
                 db.add(qa)
                 db.commit()
             except Exception:
-                log.exception("[bg] 분석 결과 저장 실패 (qa_id=%s)", qa_id)
+                log.exception("[bg] 분석 결과 저장 실패 (qa_id=%s)", to_uuid_str(qa_id))
     except Exception as e:
         log.exception("Background analysis failed: %s", e)
     finally:
