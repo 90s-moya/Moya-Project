@@ -5,8 +5,6 @@ from pathlib import Path
 from functools import lru_cache
 from typing import List, Dict, Any, Optional, Iterable
 from datetime import datetime
-from collections import Counter
-
 import torch
 import torch.nn.functional as F
 from PIL import Image
@@ -27,93 +25,105 @@ except ImportError as e:
     def load_model(*args, **kwargs):
         raise RuntimeError("Face_Resnet model not available")
 
-# 원본 모델의 7클래스 라벨
 CLASS_NAMES = ["angry","disgust","fear","happy","sad","surprise","neutral"]
 
-# 7→3 카테고리 집계용 인덱스 (장치 맞춤은 함수 내에서 처리)
-NEG_NAMES = ["angry","disgust","fear","sad","surprise"]
-POS_NAMES = ["happy"]
-NEU_NAMES = ["neutral"]
-
-# ─────────────────────────────────────────────────────────────
-# 7→3 카테고리로 '확률'을 합산해서 한 번만 결정
-# ─────────────────────────────────────────────────────────────
-def _idx_tensor(names: List[str], device):
-    idxs = [CLASS_NAMES.index(n) for n in names if n in CLASS_NAMES]
-    if not idxs:
-        return None
-    return torch.tensor(idxs, dtype=torch.long, device=device)
-
-def probs7_to_threecat(probs: torch.Tensor, min_conf: float = 0.45, margin: float = 0.10):
-    """
-    probs: shape (7,) 소프트맥스 확률(합=1).
-    7클래스 확률을 3카테고리(positive/neutral/negative)로 합산해 단방향으로 라벨을 정함.
-    - min_conf: 탑 카테고리 확률이 이 값 미만이면 neutral
-    - margin: 1위와 2위 확률 차가 이 값 미만이면 neutral
-    """
-    device = probs.device
-    pos_idx = _idx_tensor(POS_NAMES, device)
-    neu_idx = _idx_tensor(NEU_NAMES, device)
-    neg_idx = _idx_tensor(NEG_NAMES, device)
-
-    p_pos = probs[pos_idx].sum() if pos_idx is not None else torch.tensor(0.0, device=device, dtype=probs.dtype)
-    p_neu = probs[neu_idx].sum() if neu_idx is not None else torch.tensor(0.0, device=device, dtype=probs.dtype)
-    p_neg = probs[neg_idx].sum() if neg_idx is not None else torch.tensor(0.0, device=device, dtype=probs.dtype)
-
-    cat_names = ["positive", "neutral", "negative"]
-    cat_probs = torch.stack([p_pos, p_neu, p_neg])
-
-    top = int(torch.argmax(cat_probs))
-    sorted_vals, _ = torch.sort(cat_probs, descending=True)
-    top_prob = float(sorted_vals[0].item())
-    sec_prob = float(sorted_vals[1].item())
-
-    if (top_prob < min_conf) or ((top_prob - sec_prob) < margin):
-        return "neutral", {n: float(cat_probs[i].item()) for i, n in enumerate(cat_names)}
-    return cat_names[top], {n: float(cat_probs[i].item()) for i, n in enumerate(cat_names)}
-
-# 이전 버전 호환용(가능하면 사용하지 마세요)
 def classify_emotion_to_3_categories(emotion: str, confidence: float = 1.0) -> str:
-    """(구) 탑1 라벨만으로 판단하던 함수를 호환 목적으로 유지.
-       새 파이프라인에서는 probs7_to_threecat()만 사용."""
+    """7가지 감정을 3가지 카테고리로 분류 (negative 감정 비중 조정)"""
     if emotion == "happy":
         return "positive"
     elif emotion == "neutral":
         return "neutral"
-    else:
-        # 구 로직의 과도한 neutral화 방지를 위해 완화
-        return "negative" if confidence >= 0.45 else "neutral"
+    else:  # angry, disgust, fear, sad, surprise
+        # negative 감정들의 threshold를 높여서 neutral로 더 많이 분류
+        if confidence < 0.7:  # negative 감정은 더 확실할 때만 negative로 분류
+            return "neutral"
+        return "negative"
 
 def _convert_distribution_to_3_categories(distribution: Dict[str, int]) -> Dict[str, int]:
-    """이미 3카테고리로 라벨링된 분포라면 그대로 반환."""
+    """이미 3가지 카테고리로 분류된 분포 반환 (그대로 반환)"""
     return distribution
 
 def _convert_segments_to_3_categories(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """(구) 7→3 변환용. 현재 파이프라인은 처음부터 3카테고리라 사실상 no-op."""
-    return segments
+    """세그먼트의 감정 라벨을 3가지 카테고리로 변환"""
+    result = []
+    current_category = None
+    current_start = None
+    
+    for segment in segments:
+        category = classify_emotion_to_3_categories(segment["label"])
+        
+        if current_category == category:
+            # 같은 카테고리면 연장
+            continue
+        else:
+            # 다른 카테고리면 이전 세그먼트 종료하고 새 세그먼트 시작
+            if current_category is not None:
+                result.append({
+                    "label": current_category,
+                    "start_frame": current_start,
+                    "end_frame": segment["start_frame"] - 1
+                })
+            
+            current_category = category
+            current_start = segment["start_frame"]
+    
+    # 마지막 세그먼트 추가
+    if current_category is not None and segments:
+        result.append({
+            "label": current_category,
+            "start_frame": current_start,
+            "end_frame": segments[-1]["end_frame"]
+        })
+    
+    return result
 
 def _convert_timeline_to_3_categories(timeline: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """(구) 7→3 변환용. 현재 파이프라인은 처음부터 3카테고리라 사실상 no-op."""
-    return timeline
+    """타임라인의 감정 라벨을 3가지 카테고리로 변환"""
+    return [
+        {
+            "frame": item["frame"],
+            "label": classify_emotion_to_3_categories(item["label"])
+        }
+        for item in timeline
+    ]
 
 def _analyze_dominant_emotions_by_window(labels_seq: List[str], window_size: int = 30) -> List[Dict[str, Any]]:
-    """라벨(이미 3카테고리)을 윈도우 단위로 카운트."""
+    """윈도우 단위로 dominant emotion 분석 (3가지 카테고리)"""
     if not labels_seq:
         return []
+    
     windows = []
+    
     for start_idx in range(0, len(labels_seq), window_size):
         end_idx = min(start_idx + window_size, len(labels_seq))
         window_labels = labels_seq[start_idx:end_idx]
-        ctr = Counter(window_labels)  # positive/neutral/negative
-        dominant = max(ctr.keys(), key=lambda k: ctr[k])
+        
+        # 윈도우 내 3가지 카테고리별 카운트
+        category_counts = {"positive": 0, "neutral": 0, "negative": 0}
+        original_counts = {}
+        
+        for label in window_labels:
+            category = classify_emotion_to_3_categories(label)
+            category_counts[category] += 1
+            original_counts[label] = original_counts.get(label, 0) + 1
+        
+        # dominant emotion 결정
+        dominant_category = max(category_counts.keys(), key=lambda k: category_counts[k])
+        
+        # 원본 감정 중 가장 많은 것 (참고용)
+        dominant_original = max(original_counts.keys(), key=lambda k: original_counts[k]) if original_counts else "unknown"
+        
         windows.append({
             "window_start": start_idx + 1,  # 1-based
-            "window_end": end_idx,
+            "window_end": end_idx,          # 1-based
             "frame_count": len(window_labels),
-            "dominant_emotion": dominant,
-            "category_distribution": dict(ctr),
-            "confidence": ctr[dominant] / len(window_labels) if window_labels else 0.0
+            "dominant_emotion": dominant_category,
+            "dominant_original_emotion": dominant_original,
+            "category_distribution": category_counts,
+            "original_distribution": original_counts,
+            "confidence": category_counts[dominant_category] / len(window_labels) if window_labels else 0.0
         })
+    
     return windows
 
 _preprocess = transforms.Compose([
@@ -194,7 +204,8 @@ def get_face_model(device: str = "cuda"):
 
 def _detect_face_roi(bgr: np.ndarray, margin: float = 0.25) -> np.ndarray:
     """
-    간단 Haar 기반. 실패 시 중앙크롭 폴백 → 항상 ROI 반환
+    간단 Haar 기반. 실패 시 중앙크롭 폴백 → 항상 ROI 반환하도록 해서
+    'total_frames == 처리한 프레임 수'가 되도록 보장.
     """
     try:
         cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
@@ -219,7 +230,7 @@ def _detect_face_roi(bgr: np.ndarray, margin: float = 0.25) -> np.ndarray:
 
 def _compress_runs_1based(labels: List[str]) -> List[Dict[str, int | str]]:
     """
-    라벨 시퀀스를 1-based 연속구간으로 압축. (이미 3카테고리 라벨)
+    라벨 시퀀스를 1-based 연속구간으로 압축.
     """
     n = len(labels)
     if n == 0: return []
@@ -237,29 +248,28 @@ def infer_face_frames(
     device: str = "cuda",
     stride: int = 5,
     return_points: bool = False,
-    batch: int = 16,
-    min_conf_cat: float = 0.45,
-    margin_cat: float = 0.10,
+    batch: int = 16
 ) -> Dict[str, Any]:
     """
     반환 형식:
     {
       "timestamp": "...",
       "total_frames": N,                 # 처리된 프레임 개수 (stride 반영)
-      "frame_distribution": {"positive":..., "neutral":..., "negative":...},
-      "detailed_logs": [                 # 연속 구간 (3카테고리)
-        {"label":"neutral","start_frame":1,"end_frame":23},
+      "frame_distribution": {"fear":186, "sad":22, ...},
+      "detailed_logs": [
+        {"label":"sad","start_frame":1,"end_frame":5},
+        {"label":"fear","start_frame":6,"end_frame":8},
         ...
       ],
-      # (옵션)
-      "window_summary": [ ... ]          # 30프레임 윈도우 요약
+      # (옵션) return_points=True면
+      "timeline": [{"frame": i, "label": "..."} ...]
     }
     """
     model, dev = get_face_model(device)
     xs: List[torch.Tensor] = []
     frame_ids: List[int] = []          # 원본 인덱스(0-based)
-    labels_seq: List[str] = []         # 처리 순서대로 3카테고리 라벨
-    timeline: List[Dict[str, Any]] = []
+    labels_seq: List[str] = []         # 처리 순서대로 라벨(1프레임=1라벨; stride 반영)
+    timeline: List[Dict[str, int | str]] = []
 
     def _flush():
         nonlocal xs, frame_ids, labels_seq, timeline
@@ -269,22 +279,22 @@ def infer_face_frames(
             x = x.half()
         with torch.no_grad():
             with _autocast_ctx(dev):
-                logits = model(x)                 # (B, 7)
-        probs = F.softmax(logits, dim=1)          # (B, 7)
-
-        for j in range(probs.shape[0]):
-            cat_label, cat_prob_dict = probs7_to_threecat(
-                probs[j], min_conf=min_conf_cat, margin=margin_cat
-            )
-            labels_seq.append(cat_label)
+                logits = model(x)
+        probs = F.softmax(logits, dim=1)  # (B, C)
+        top_idx = torch.argmax(probs, dim=1).tolist()
+        top_probs = torch.max(probs, dim=1)[0].tolist()  # confidence 점수
+        
+        for j, (tid, confidence) in enumerate(zip(top_idx, top_probs)):
+            original_emotion = CLASS_NAMES[int(tid)]
+            # confidence를 고려한 3가지 카테고리 분류
+            categorized_emotion = classify_emotion_to_3_categories(original_emotion, confidence)
+            labels_seq.append(categorized_emotion)
+            
             if return_points:
-                timeline.append({
-                    "frame": frame_ids[j],
-                    "label": cat_label,
-                    "probs": cat_prob_dict,      # 디버깅 확인용(원하면 제거 가능)
-                })
+                timeline.append({"frame": frame_ids[j], "label": categorized_emotion})
         xs.clear(); frame_ids.clear()
 
+    # iterate frames
     processed = 0
     for i, bgr in enumerate(frames):
         if i % max(1, stride) != 0:
@@ -296,22 +306,46 @@ def infer_face_frames(
         processed += 1
         if len(xs) >= batch:
             _flush()
+
     _flush()  # 남은 배치
 
-    # 리포트 생성 (이미 3카테고리 라벨)
-    total_frames = len(labels_seq)
-    dist_3 = dict(Counter(labels_seq))
+    # 리포트 생성
+    total_frames = len(labels_seq)      # stride 반영된 샘플 개수
+    # 분포
+    dist: Dict[str, int] = {}
+    for lb in labels_seq:
+        dist[lb] = dist.get(lb, 0) + 1
+    # 연속구간(1-based)
     segments = _compress_runs_1based(labels_seq)
 
-    # 30프레임 윈도우 요약(선택)
-    window_summary = _analyze_dominant_emotions_by_window(labels_seq, window_size=30)
-
+    # 3가지 카테고리로 변환
+    dist_3_categories = _convert_distribution_to_3_categories(dist)
+    
+    # 30프레임 단위 윈도우 분석
+    window_analysis = _analyze_dominant_emotions_by_window(labels_seq, window_size=30)
+    
+    # detailed_logs를 30프레임 윈도우 기반으로 변경 (confidence 0.5 이하는 neutral로)
+    detailed_logs_windowed = []
+    for window in window_analysis:
+        emotion = window["dominant_emotion"]
+        confidence = window["confidence"]
+        
+        # confidence가 0.5 이하면 neutral로 변경
+        if confidence <= 0.5:
+            emotion = "neutral"
+        
+        detailed_logs_windowed.append({
+            "label": emotion,
+            "start_frame": window["window_start"],
+            "end_frame": window["window_end"],
+            "confidence": confidence
+        })
+    
     result: Dict[str, Any] = {
         "timestamp": datetime.utcnow().isoformat(),
         "total_frames": int(total_frames),
-        "frame_distribution": dist_3,     # 3카테고리 분포
-        "detailed_logs": segments,        # 연속 구간(3카테고리)
-        "window_summary": window_summary, # (옵션) 요약
+        "frame_distribution": dist_3_categories,  # 3가지 카테고리 분포
+        "detailed_logs": detailed_logs_windowed,
     }
 
     if dev == "cuda":
@@ -326,8 +360,6 @@ def infer_face_video(
     max_frames: Optional[int] = None,
     return_points: bool = False,
     optimization_level: str = "balanced",
-    min_conf_cat: float = 0.45,
-    margin_cat: float = 0.10,
 ) -> Dict[str, Any]:
     """
     비디오 바이트를 읽어 프레임 시퀀스로 변환 후 infer_face_frames에 위임.
@@ -352,6 +384,5 @@ def infer_face_video(
         raise RuntimeError("no frames")
 
     return infer_face_frames(
-        frames, device=device, stride=stride, return_points=return_points,
-        min_conf_cat=min_conf_cat, margin_cat=margin_cat
+        frames, device=device, stride=stride, return_points=return_points
     )
