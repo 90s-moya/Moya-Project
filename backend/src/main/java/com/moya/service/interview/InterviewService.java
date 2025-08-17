@@ -111,6 +111,30 @@ public class InterviewService {
             } else {
                 System.err.println("[analyze] skip: order/subOrder parse 실패");
             }
+        }        if (request.getInterviewSessionId() != null) {
+            Integer stride = (request.getStride() != null) ? request.getStride() : 5;
+            String device = (request.getDevice() != null) ? request.getDevice() : "cuda";
+            boolean returnPoints = Boolean.TRUE.equals(request.getReturnPoints());
+
+            Integer order = toIntOrNull(String.valueOf(request.getOrder()));
+            Integer subOrder = toIntOrNull(String.valueOf(request.getSubOrder()));
+            String calibDataJson = request.getCalibDataJson();
+            if (order != null && subOrder != null) {
+                sendAnalyzeByUrlAsync(
+                        request.getInterviewSessionId(),
+                        order,
+                        subOrder,
+                        videoUrl,
+                        device,
+                        stride,
+                        returnPoints,
+                        calibDataJson,
+                        thumbnailUrl
+                );
+            } else {
+                System.err.println("[analyze] skip: order/subOrder parse 실패 (order="
+                        + request.getOrder() + ", subOrder=" + request.getSubOrder() + ")");
+            }
         }
 
         return InterviewVideoCommand.builder()
