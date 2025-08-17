@@ -23,7 +23,7 @@ public class PDFService {
 
     private final RestTemplate restTemplate;
 
-    @Value("${PYTHON_PATH}")
+    @Value("${STT_PATH}")
     private String pythonPath;
 
     // 공통 호출 메서드: 파이썬 응답을 그대로 리턴
