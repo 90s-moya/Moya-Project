@@ -177,12 +177,13 @@ export function useAnswerRecorder({
     setVideoStream(stream);
 
    // 시작 시점 썸네일 캡쳐
-    try {
-      thumbBlobRef.current = await captureThumbFromStream(stream);
-    } catch {
-      thumbBlobRef.current = null;
-    }
-
+    setTimeout(async () => {
+      try {
+        thumbBlobRef.current = await captureThumbFromStream(stream);
+      } catch {
+        thumbBlobRef.current = null;
+      }
+    }, 1000);
     
     // 캔버스 그리기 30fps
     const w = 960, h = 540;
