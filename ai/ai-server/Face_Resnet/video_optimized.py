@@ -1,6 +1,5 @@
 # video_optimized.py
 # GPU 중심 파이프라인 + 세그먼트 리포트(face_result형) 출력
-
 import os
 import sys
 import cv2
@@ -233,6 +232,39 @@ def _create_tracker():
                 continue
     return None
 
+# ─────────────────────────────────────────────────────────────
+# 7→3 카테고리 확률 합산 (HF id2label 기반)
+# ─────────────────────────────────────────────────────────────
+def probs7_to_threecat_from_id2label(probs: torch.Tensor, id2label, min_conf=0.45, margin=0.10):
+    label2id = {v: k for k, v in id2label.items()}
+    idx = lambda n: label2id.get(n)
+    pos_idx = [idx("happy")]
+    neu_idx = [idx("neutral")]
+    neg_idx = [idx(n) for n in ["angry","disgust","fear","sad","surprise"] if idx(n) is not None]
+
+    device = probs.device
+    dtype = probs.dtype
+    def _sum_index(idxs):
+        if not idxs or any(i is None for i in idxs):
+            return torch.tensor(0.0, device=device, dtype=dtype)
+        t = torch.tensor(idxs, dtype=torch.long, device=device)
+        return probs[t].sum()
+
+    p_pos = _sum_index(pos_idx)
+    p_neu = _sum_index(neu_idx)
+    p_neg = _sum_index(neg_idx)
+
+    cat_names = ["positive","neutral","negative"]
+    cat_probs = torch.stack([p_pos, p_neu, p_neg])
+
+    top = int(torch.argmax(cat_probs))
+    sorted_vals, _ = torch.sort(cat_probs, descending=True)
+    top_prob = float(sorted_vals[0].item())
+    sec_prob = float(sorted_vals[1].item())
+    if top_prob < min_conf or (top_prob - sec_prob) < margin:
+        return "neutral", cat_probs
+    return cat_names[top], cat_probs
+
 # ====== run-compress helpers (불확실 제외) ======
 def _compress_runs_1based(labels, exclude_label=UNCERTAIN_LABEL):
     """
@@ -250,7 +282,6 @@ def _compress_runs_1based(labels, exclude_label=UNCERTAIN_LABEL):
                 segs.append({"label": cur, "start_frame": start, "end_frame": end})
             cur = labels[i - 1]
             start = i
-    # tail
     if cur != exclude_label:
         segs.append({"label": cur, "start_frame": start, "end_frame": n})
     return segs
@@ -272,12 +303,12 @@ def analyze_video(
     min_face_px=80,
     blur_thr=60.0,
     use_clahe=True,
-    # 스무딩/히스테리시스
+    # 스무딩/히스테리시스 (3카테고리 기준으로 동작)
     ema_alpha=0.8,
-    enter_thr=0.55,
-    exit_thr=0.45,
-    margin_thr=0.15,
-    min_stable=5,
+    enter_thr=0.55,   # 전환 허용 최소확신(3cat)
+    exit_thr=0.45,    # 관측 최소확신(3cat, 낮으면 불확실)
+    margin_thr=0.10,  # 1-2위 차이(3cat)
+    min_stable=5,     # 전환 확정에 필요한 지속 프레임
     # 바이어스/해피가드
     logit_bias_str="",
     use_happy_guard=False,
@@ -374,7 +405,7 @@ def analyze_video(
         detector_mp = None
 
     # ===== Stats =====
-    per_frame_label = []           # 프레임별 관측 라벨(1프레임=1라벨, 불확실 포함)
+    per_frame_label = []           # 프레임별 관측 라벨(3cat or 불확실)
     detailed_logs = []             # (히스테리시스 기반 전환 로그: 내부 사용/디버그)
     current_emotion, start_frame = None, None
     candidate_emotion, candidate_count = None, 0
@@ -388,7 +419,8 @@ def analyze_video(
     t_det_sum = t_cls_sum = t_draw_sum = 0.0
     det_calls = cls_calls = draw_calls = 0
     last_observed_label = UNCERTAIN_LABEL
-    last_top_emotions = []
+    last_top_emotions = []  # 7클래스 Top-3 (디버그용)
+    last_cat_probs = None   # 최근 3카테고리 확률 텐서
 
     # micro-batch accumulators
     batch_faces_pil = []
@@ -447,6 +479,7 @@ def analyze_video(
         # (C) 분류(마이크로배칭 + cls_interval)
         observed_label = last_observed_label
         top_emotions = last_top_emotions
+        cat_probs = last_cat_probs  # 3카테고리 확률
         bbox = None
         is_blur = False
 
@@ -472,38 +505,46 @@ def analyze_video(
                 inputs = {k: v.to(device) for k, v in inputs.items()}
             with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device.type == 'cuda')):
                 outputs = model(**inputs)
-                logits_batch = outputs.logits  # (B, C)
+                logits_batch = outputs.logits  # (B, 7)
                 top_emotions = []
-                last_label = observed_label
+                last_label = observed_label  # 문자열(3카테고리)
+                cat_probs = None
+
                 for i in range(logits_batch.shape[0]):
                     logits = logits_batch[i] + bias_vec
                     smoothed = smoother.update(logits)
-                    probs = torch.nn.functional.softmax(smoothed, dim=-1)
-                    top_probs, top_indices = torch.topk(probs, 3)
+                    probs7 = torch.nn.functional.softmax(smoothed, dim=-1)
+
+                    # (디버그) 7클래스 Top-3 기록
                     trio = []
-                    for prob, idx in zip(top_probs, top_indices):
+                    top_probs7, top_indices7 = torch.topk(probs7, 3)
+                    for prob, idx in zip(top_probs7, top_indices7):
                         trio.append((id2label[idx.item()], float(prob.item())))
                     top_emotions = trio
-                    if trio:
-                        top1 = trio[0][1]
-                        last_label = trio[0][0] if top1 >= exit_thr else UNCERTAIN_LABEL
+
+                    # ★ 7→3 카테고리 확률로 직접 결정
+                    cat_label, cat_probs = probs7_to_threecat_from_id2label(
+                        probs7, id2label, min_conf=exit_thr, margin=margin_thr
+                    )
+                    last_label = cat_label
+
                 observed_label = last_label
             t_cls = timing_ms(t1); t_cls_sum += t_cls; cls_calls += 1
             batch_faces_pil = []
 
-            # 해피가드(조건부+간헐)
-            if use_happy_guard and observed_label and observed_label.lower() == "happy" and (frame_count % max(1, int(happy_check_interval)) == 0) and crop_res:
-                if not happy_guard(face, face_mesh):
-                    if len(top_emotions) >= 2:
-                        observed_label = top_emotions[1][0]
-                        top_emotions[0], top_emotions[1] = top_emotions[1], top_emotions[0]
+            # 해피가드(양성일 때만, 조건부)
+            if use_happy_guard and observed_label == "positive" and (frame_count % max(1, int(happy_check_interval)) == 0) and crop_res:
+                # 탑1이 happy가 아닐 수도 있으니 happy가 아니면 굳이 체크하지 않음
+                if top_emotions and top_emotions[0][0] == "happy":
+                    if not happy_guard(face, face_mesh):
+                        observed_label = "neutral"
 
-        # (D) 히스테리시스(디버그용 detailed_logs)
-        if observed_label == UNCERTAIN_LABEL:
+        # (D) 히스테리시스(3카테고리 확률 기반)
+        if observed_label == UNCERTAIN_LABEL or cat_probs is None:
             predicted_emotion = current_emotion if current_emotion else UNCERTAIN_LABEL
             candidate_emotion, candidate_count = None, 0
         else:
-            if crop_res and not is_blur and top_emotions:
+            if crop_res and not is_blur:
                 if current_emotion is None:
                     current_emotion = observed_label
                     start_frame = frame_count
@@ -511,10 +552,11 @@ def analyze_video(
                     candidate_emotion, candidate_count = None, 0
                 else:
                     if observed_label != current_emotion:
-                        top1_val = top_emotions[0][1] if top_emotions else None
-                        top2_val = top_emotions[1][1] if len(top_emotions) > 1 else None
-                        margin = (top1_val - top2_val) if (top1_val is not None and top2_val is not None) else None
-                        if (top1_val is not None) and (margin is not None) and (top1_val >= enter_thr) and (margin >= margin_thr):
+                        vals = [float(v) for v in cat_probs.tolist()]  # [p_pos, p_neu, p_neg]
+                        vals_sorted = sorted(vals, reverse=True)
+                        top1_val, top2_val = vals_sorted[0], vals_sorted[1]
+                        margin_val = top1_val - top2_val
+                        if (top1_val >= enter_thr) and (margin_val >= margin_thr):
                             if candidate_emotion == observed_label:
                                 candidate_count += 1
                             else:
@@ -544,14 +586,14 @@ def analyze_video(
                 predicted_emotion = current_emotion if current_emotion else UNCERTAIN_LABEL
                 candidate_emotion, candidate_count = None, 0
 
-        # 프레임 레벨 라벨 기록(세그먼트 리포트용)
+        # 프레임 레벨 라벨 기록
         per_frame_label.append(observed_label)
         last_observed_label = observed_label
         last_top_emotions = top_emotions
+        last_cat_probs = cat_probs
 
-        # (E) 시각화
+        # (E) 시각화 생략 (draw omitted)
         t2 = time.perf_counter()
-        # draw omitted for brevity (same as before)
         t_draw = timing_ms(t2); t_draw_sum += t_draw; draw_calls += 1
 
         if out: out.write(frame)
@@ -588,17 +630,15 @@ def analyze_video(
     if out: out.release()
     if show_video: cv2.destroyAllWindows()
 
-    # ======== 최종 face_result(요구 포맷) ========
-    # 1) 프레임 분포(불확실 제외)
+    # ======== 최종 face_result ========
     frame_distribution = _count_distribution(per_frame_label, exclude_label=UNCERTAIN_LABEL)
-    # 2) 연속 구간 압축(불확실 제외), 1-based 인덱스
     segments = _compress_runs_1based(per_frame_label, exclude_label=UNCERTAIN_LABEL)
 
     face_result = {
         "timestamp": datetime.now().isoformat(),
         "total_frames": frame_count,
-        "frame_distribution": frame_distribution,
-        "detailed_logs": segments
+        "frame_distribution": frame_distribution,  # {"positive":..,"neutral":..,"negative":..}
+        "detailed_logs": segments                  # 3카테고리 연속구간 (불확실 제외)
     }
 
     # (선택) JSON 파일 저장
@@ -640,11 +680,11 @@ def main():
     p.add_argument('--min-face', type=int, default=80)
     p.add_argument('--blur-thr', type=float, default=60.0)
     p.add_argument('--no-clahe', action='store_true')
-    # 스무딩/히스테리시스
+    # 스무딩/히스테리시스(3cat)
     p.add_argument('--ema', type=float, default=0.8)
     p.add_argument('--enter-thr', type=float, default=0.55)
     p.add_argument('--exit-thr', type=float, default=0.45)
-    p.add_argument('--margin-thr', type=float, default=0.15)
+    p.add_argument('--margin-thr', type=float, default=0.10)
     p.add_argument('--min-stable', type=int, default=5)
     p.add_argument('--logit-bias', type=str, default='')
     p.add_argument('--happy-guard', action='store_true')
@@ -666,18 +706,18 @@ def main():
         print(f"[{_ts()}] 동영상 파일이 존재하지 않습니다: {args.video_path}")
         return
 
-    # ★ bare call(옵션 없이 실행) → 면접 프리셋
+    # ★ bare call(옵션 없이 실행) → 면접 프리셋(중립 쏠림 완화)
     if len(sys.argv) == 2:
         args.ema = 0.92
         args.enter_thr = 0.60
-        args.exit_thr  = 0.50
-        args.margin_thr = 0.20
+        args.exit_thr  = 0.45
+        args.margin_thr = 0.10
         args.min_stable = 6
         args.face_margin = 0.25
         args.min_face = 112
         args.blur_thr = 90.0
         args.no_clahe = True
-        args.logit_bias = "happy=-0.4,neutral=0.2,fear=0.1"
+        args.logit_bias = ""  # 과한 편향 제거
         args.happy_guard = False
         args.detect_interval = 12
         args.happy_check_interval = 10
