@@ -1,22 +1,22 @@
 package com.moya.service.report;
 
 
-import java.net.URI;
-import java.util.List;
-import java.util.NoSuchElementException;
-
 import com.moya.infras.report.ReportDto;
 import com.moya.infras.report.ResultDetailResponse;
 import com.moya.infras.report.ResultDto;
 import com.moya.infras.report.TitleUpdateDto;
-import com.moya.interfaces.api.report.request.TitleUpdateRequest;
-import com.moya.interfaces.api.report.request.UserIdRequest;
+import com.moya.interfaces.api.report.TitleUpdateRequest;
+import com.moya.interfaces.api.report.UserIdRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+
+import java.net.URI;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 @Service
 public class ReportService {
