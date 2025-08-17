@@ -9,6 +9,7 @@ import { Link, useNavigate } from "react-router-dom";
 import InterviewGif from "@/assets/images/Interview.gif";
 import StudyGif from "@/assets/images/study.gif";
 import StudyGif2 from "@/assets/images/studymeeting.gif";
+import StudyGif3 from "@/assets/images/studyfeedback.gif";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -167,7 +168,8 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden aspect-[4/3]">
+
                       <img 
                         src={InterviewGif} 
                         alt="AI Interview" 
@@ -187,7 +189,8 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row-reverse gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden aspect-[4/3]">
+
                       <img 
                         src={CloudFriends} // import 한 gif 파일 경로
                         alt="AI Interview" 
@@ -206,7 +209,8 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden aspect-[16/9]">
+
                       <img 
                         src={StudyGif} 
                         alt="AI Interview" 
@@ -225,7 +229,8 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row-reverse gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden aspect-[16/9]">
+
                       <img 
                         src={StudyGif2}
                         alt="AI Interview" 
@@ -244,9 +249,10 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden aspect-[4/3]">
+
                       <img 
-                        src={CloudFriends} // import 한 gif 파일 경로
+                        src={StudyGif3}
                         alt="AI Interview" 
                         className="w-full h-full object-cover"
                       />
