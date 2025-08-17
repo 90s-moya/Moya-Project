@@ -1,4 +1,4 @@
-r# - GPU 디코드(NVDEC) → GPU 스케일(scale_cuda/npp) → NVENC
+# - GPU 디코드(NVDEC) → GPU 스케일(scale_cuda/npp) → NVENC
 # - 직렬 처리(병렬 X)로 CPU 경합 최소
 # - 기본 해상도 960x540, 기본 fps 30
 # - posture/face 모두 전 프레임(stride=1)
