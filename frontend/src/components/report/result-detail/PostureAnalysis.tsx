@@ -61,6 +61,28 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
     return data;
   };
 
+  // X축 틱 간격을 동적으로 계산하는 함수
+  const calculateXAxisInterval = () => {
+    if (!posture_result?.detailed_logs || posture_result.detailed_logs.length === 0) {
+      return 1;
+    }
+    
+    const firstStart = posture_result.detailed_logs[0]?.start_frame || 0;
+    const lastEnd = posture_result.detailed_logs[posture_result.detailed_logs.length - 1]?.end_frame || 0;
+    const totalSeconds = (lastEnd - firstStart) / 30; // 총 영상 길이 (초)
+    
+    // 영상 길이에 따른 적절한 간격 계산
+    if (totalSeconds <= 15) {
+      return 1; // 15초 이하: 1초마다 표시
+    } else if (totalSeconds <= 30) {
+      return 2; // 30초 이하: 2초마다 표시
+    } else if (totalSeconds <= 60) {
+      return 4; // 60초 이하: 4초마다 표시
+    } else {
+      return Math.ceil(totalSeconds / 15); // 60초 초과: 약 15개 틱이 되도록 조정
+    }
+  };
+
   // 원형 그래프용 데이터 생성
   const generatePieChartData = () => {
     if (!posture_result?.frame_distribution) {
@@ -76,6 +98,7 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
 
   const lineChartData = generateLineChartData();
   const pieChartData = generatePieChartData();
+  const xAxisInterval = calculateXAxisInterval();
 
   // 데이터가 없는 경우 처리
   if (!posture_result || !posture_result.detailed_logs || posture_result.detailed_logs.length === 0) {
@@ -115,7 +138,7 @@ const PostureAnalysis: React.FC<PostureResultProps> = ({ posture_result, onFrame
                     tickFormatter={frameToTime}
                     fontSize={10}
                     tick={{ fill: '#9CA3AF' }}
-                    interval={2}
+                    interval={xAxisInterval}
                   />
                   <YAxis
                     domain={[0.5, 5.5]}

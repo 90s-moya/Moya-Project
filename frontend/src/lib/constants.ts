@@ -135,8 +135,9 @@ export const getPostureColor = (status: string): string => {
 
 // 표정 상태 매핑
 export const FACE_STATUS_MAP = {
-  'sad': '슬픔',
-  'fear': '두려움',
+  'neutral': '중립',
+  'negative': '부정',
+  'positive': '긍정',
 } as const;
 
 export const getFaceStatusText = (status: FaceStatusType): string => {
@@ -145,8 +146,9 @@ export const getFaceStatusText = (status: FaceStatusType): string => {
 
 // 표정 상태별 색상 매핑
 export const FACE_COLOR_MAP = {
-  'sad': '#3B82F6', // 파란색
-  'fear': '#EF4444', // 빨간색
+  'neutral': '#10B981', // 초록색 (중립)
+  'negative': '#EF4444', // 빨간색 (부정)
+  'positive': '#3B82F6', // 파란색 (긍정)
 } as const;
 
 export const getFaceColor = (status: string): string => {
