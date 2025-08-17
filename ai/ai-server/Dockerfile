@@ -76,9 +76,9 @@ RUN set -eux; \
 # ============================ #
 # (이전 Dockerfile의 모든 최적화 ENV 설정을 여기에 그대로 붙여넣으세요)
 # 예시:
-# ENV OMP_NUM_THREADS=2 ...
-# ENV NVENC_PRESET=p1 ...
-# ENV CUDA_VISIBLE_DEVICES=0 ...
+# ENV OMP_NUM_THREADS=2
+# ENV NVENC_PRESET=p1
+# ENV CUDA_VISIBLE_DEVICES=0
 
 # ============================ #
 # 빌더 산출물 복사
@@ -91,4 +91,5 @@ COPY --from=builder /app /app
 # 실행 설정
 # ============================ #
 EXPOSE 8000
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# ✨ [수정] python 대신 가상 환경의 파이썬 실행 파일 전체 경로를 명시
+CMD ["/opt/venv/bin/python", "-m", "uvicorn", "app.main:app", "—host", "0.0.0.0", "—port", "8000"]
