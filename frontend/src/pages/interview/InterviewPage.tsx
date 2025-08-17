@@ -54,6 +54,12 @@ export default function InterviewScreen() {
     navigate("/interview/finish")
   }, [navigate])
 
+  // 자동 종료 시 로딩 상태 설정
+  const handleAutoStop = useCallback(() => {
+    console.log("🚀 InterviewPage: 1분 자동 종료 - 로딩 상태 설정")
+    setIsSubmitting(true)
+  }, [])
+
   // useAnswerRecorder의 타이머/상태 사용
   const {
     start,
@@ -65,7 +71,8 @@ export default function InterviewScreen() {
   } = useAnswerRecorder({ 
     key: keyInfo,
     onUploadComplete: () => setIsSubmitting(false),
-    onInterviewFinished: handleInterviewFinished
+    onInterviewFinished: handleInterviewFinished,
+    onAutoStop: handleAutoStop
   })
 
   // keyInfo가 바뀔 때마다 로딩 상태 리셋 (질문 변경 시)
@@ -223,7 +230,7 @@ export default function InterviewScreen() {
       <div className="fixed bottom-0 left-0 w-full bg-white/95 backdrop-blur shadow-[0_-10px_28px_rgba(0,0,0,0.08)]">
         <div className="max-w-6xl mx-auto px-8 py-5 flex items-center justify-between gap-6">
           <div className="text-gray-700 text-sm">
-            답변 시간
+            남은 시간
             <div className="text-2xl font-extrabold text-gray-900 mt-1">{formatTime(timeLeft)}</div>
           </div>
 

@@ -19,12 +19,14 @@ export function useAnswerRecorder({
   key, 
   maxDurationSec = 60,
   onUploadComplete,
-  onInterviewFinished
+  onInterviewFinished,
+  onAutoStop
 }: { 
   key: QuestionKey; 
   maxDurationSec?: number;
   onUploadComplete?: () => void;
   onInterviewFinished?: () => void;
+  onAutoStop?: () => void;
 }) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -392,9 +394,16 @@ export function useAnswerRecorder({
     setSeconds(0);
 
     timerRef.current = window.setInterval(() => {
-      setSeconds((s) => { const n = s + 1; if (n >= maxDurationSec) stop(); return n; });
+      setSeconds((s) => { 
+        const n = s + 1; 
+        if (n >= maxDurationSec) {
+          onAutoStop?.(); // UI 상태 업데이트 콜백 호출
+          stop(); 
+        }
+        return n; 
+      });
     }, 1000);
-  }, [maxDurationSec, setLocalPending, markSynced, markFailed, stop]);
+  }, [maxDurationSec, setLocalPending, markSynced, markFailed, stop, onAutoStop]);
 
   useEffect(() => {
     if (onUploadComplete && audioUploaded && videoUploaded) {

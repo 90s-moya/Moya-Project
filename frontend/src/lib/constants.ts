@@ -186,7 +186,7 @@ export const RESULT_DETAIL_TABS = [
   { id: 'verbal' as const, label: '답변 분석' },
   { id: 'face' as const, label: '표정 분석' },
   { id: 'posture' as const, label: '자세 분석' },
-  { id: 'eye' as const, label: '시선 분석' }
+  // { id: 'eye' as const, label: '시선 분석' }
 ] as const;
 
 // 시선 분포 패턴 매핑
