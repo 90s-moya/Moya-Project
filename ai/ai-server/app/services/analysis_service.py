@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # - GPU 디코드(NVDEC) → GPU 스케일(scale_cuda/npp) → 단일 디코드 파이프(rawvideo)
 # - posture/face/gaze 모두 같은 프레임 배열을 공유(stride=1)
 # - 기본 해상도 960x540, 기본 fps 30
@@ -6,7 +7,7 @@
 
 from __future__ import annotations
 
-import os, json, shutil, subprocess, tempfile, time, traceback as tb
+import os, json, shutil, subprocess, tempfile, time, traceback as tb, math
 from datetime import datetime
 from typing import Optional, Tuple, Dict, Any, List
 
@@ -18,6 +19,10 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
 os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
 
+# FFmpeg 스레드도 기본 1로 제한(경합 최소화) — 필요 시 env로 덮어쓰기
+os.environ.setdefault("FFMPEG_THREADS", "1")
+os.environ.setdefault("FFMPEG_FILTER_THREADS", "1")
+
 def _ts() -> str:
     return datetime.now().strftime("%H:%M:%S")
 
@@ -26,6 +31,56 @@ print(f"[{_ts()}][BOOT] OMP={os.getenv('OMP_NUM_THREADS')} MKL={os.getenv('MKL_N
       f"TF_INTER={os.getenv('TF_NUM_INTEROP_THREADS')}")
 print(f"[{_ts()}][BOOT] ENV ALLOW_CPU_FALLBACK={os.getenv('ALLOW_CPU_FALLBACK','0')} "
       f"REQUIRE_NVDEC={os.getenv('REQUIRE_NVDEC','1')} DEBUG_FRAMES={os.getenv('DEBUG_FRAMES','0')}")
+
+# ===== Optional CPU/mem monitor (psutil 우선) =====
+_HPS = None
+try:
+    import psutil  # type: ignore
+    _HAVE_PSUTIL = True
+    _PROC_SELF = psutil.Process(os.getpid())
+    _PROC_SELF.cpu_percent(None)  # prime
+    _HPS = psutil
+    print(f"[{_ts()}][BOOT] psutil available (pid={os.getpid()})")
+except Exception as _e:
+    _HAVE_PSUTIL = False
+    _PROC_SELF = None
+    print(f"[{_ts()}][BOOT] psutil not available ({_e})")
+
+try:
+    import resource
+except Exception:
+    resource = None
+
+def _fmt_mb(x: float) -> str:
+    return f"{x/1024/1024:.1f}MB"
+
+def _snap_cpu_mem(tag: str, extra: str = "") -> Dict[str, Any]:
+    """
+    현재 프로세스 및 시스템 개략 상태를 스냅샷.
+    psutil 있으면 정확한 RSS/CPU%; 없으면 대체 지표 사용.
+    """
+    snap: Dict[str, Any] = {"ts": _ts(), "tag": tag}
+    try:
+        if _HAVE_PSUTIL and _PROC_SELF is not None:
+            rss = _PROC_SELF.memory_info().rss
+            cpu_p = _PROC_SELF.cpu_percent(interval=None)
+            sys_p = psutil.cpu_percent(interval=None)
+            snap.update({"self_cpu%": cpu_p, "sys_cpu%": sys_p, "rss": rss})
+            print(f"[{_ts()}][CPU] {tag} | self={cpu_p:.1f}% sys={sys_p:.1f}% rss={_fmt_mb(rss)} {extra}")
+        else:
+            # fallback: process_time으로 경향만 확인
+            ptime = time.process_time()
+            snap.update({"proc_time": ptime})
+            if resource:
+                ru = resource.getrusage(resource.RUSAGE_SELF)
+                rss_kb = getattr(ru, "ru_maxrss", 0) * (1024 if os.name != "posix" else 1)
+                snap.update({"rss": rss_kb})
+                print(f"[{_ts()}][CPU] {tag} | proc_time={ptime:.3f}s rss={_fmt_mb(rss_kb)} {extra}")
+            else:
+                print(f"[{_ts()}][CPU] {tag} | proc_time={ptime:.3f}s {extra}")
+    except Exception as e:
+        print(f"[{_ts()}][CPU] snap fail ({e})")
+    return snap
 
 # bytes 경로 (호환)
 from app.utils.posture import analyze_video_bytes
@@ -98,22 +153,88 @@ def _which_ffprobe_soft() -> Optional[str]:
     return None
 
 def _run_ffmpeg(cmd: list[str]) -> None:
-    print(f"[{_ts()}][FFMPEG] RUN: {' '.join(cmd)}")
+    """
+    기존 단발 커맨드 실행(전처리 등). MONITOR_CHILD_CPU=1 이고 psutil 있으면
+    자식 ffmpeg CPU%를 폴링해 로그 남김.
+    """
+    ff_loglvl = os.getenv("FFMPEG_LOGLEVEL", "error")
+    monitor = _env_true("MONITOR_CHILD_CPU", "1") and _HAVE_PSUTIL
+    print(f"[{_ts()}][FFMPEG] RUN(monitored={monitor}): {' '.join(cmd)}")
     t0 = time.time()
-    res = subprocess.run(cmd, capture_output=True, text=True)
-    dur = time.time() - t0
-    if res.returncode != 0:
+
+    if monitor:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        child = psutil.Process(proc.pid)  # type: ignore
+        child.cpu_percent(None)
+        stderr_buf = []
+        stdout_buf = []
+        interval = max(50, int(os.getenv("CPU_LOG_INTERVAL_MS", "500"))) / 1000.0
+        try:
+            last_log = 0.0
+            while True:
+                if proc.poll() is not None:
+                    break
+                # drain small amounts to avoid pipe blocking
+                try:
+                    out = proc.stdout.read(1024) if proc.stdout else ""
+                    if out: stdout_buf.append(out)
+                except Exception:
+                    pass
+                try:
+                    err = proc.stderr.read(2048) if proc.stderr else ""
+                    if err: stderr_buf.append(err)
+                except Exception:
+                    pass
+
+                now = time.time()
+                if now - last_log >= interval:
+                    try:
+                        c_cpu = child.cpu_percent(None)
+                        c_mem = child.memory_info().rss
+                        _snap_cpu_mem("ffmpeg-child", extra=f"| child={c_cpu:.1f}% rss={_fmt_mb(c_mem)}")
+                    except Exception:
+                        pass
+                    last_log = now
+                time.sleep(0.05)
+            # collect leftovers
+            try:
+                if proc.stdout: stdout_buf.append(proc.stdout.read() or "")
+            except Exception: pass
+            try:
+                if proc.stderr: stderr_buf.append(proc.stderr.read() or "")
+            except Exception: pass
+            rc = proc.returncode
+            dur = time.time() - t0
+            stderr = "".join(stderr_buf).strip()
+            stdout = "".join(stdout_buf).strip()
+            if rc != 0:
+                if stderr: print(f"[{_ts()}][FFMPEG] STDERR:\n{stderr}")
+                print(f"[{_ts()}][FFMPEG] FAIL code={rc} dur={dur:.3f}s")
+                raise RuntimeError(
+                    f"FFmpeg 실패(code={rc})\nCMD: {' '.join(cmd)}\nSTDERR:\n{stderr}"
+                )
+            if stderr: print(f"[{_ts()}][FFMPEG] STDERR(non-fatal):\n{stderr}")
+            if stdout and ff_loglvl.lower() == "debug":
+                print(f"[{_ts()}][FFMPEG] STDOUT:\n{stdout}")
+            print(f"[{_ts()}][FFMPEG] OK dur={dur:.3f}s")
+        finally:
+            try: proc.kill()
+            except Exception: pass
+    else:
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        dur = time.time() - t0
+        if res.returncode != 0:
+            if res.stderr.strip():
+                print(f"[{_ts()}][FFMPEG] STDERR:\n{res.stderr.strip()}")
+            print(f"[{_ts()}][FFMPEG] FAIL code={res.returncode} dur={dur:.3f}s")
+            raise RuntimeError(
+                f"FFmpeg 실패(code={res.returncode})\nCMD: {' '.join(cmd)}\nSTDERR:\n{res.stderr.strip()}"
+            )
         if res.stderr.strip():
-            print(f"[{_ts()}][FFMPEG] STDERR:\n{res.stderr.strip()}")
-        print(f"[{_ts()}][FFMPEG] FAIL code={res.returncode} dur={dur:.3f}s")
-        raise RuntimeError(
-            f"FFmpeg 실패(code={res.returncode})\nCMD: {' '.join(cmd)}\nSTDERR:\n{res.stderr.strip()}"
-        )
-    if res.stderr.strip():
-        print(f"[{_ts()}][FFMPEG] STDERR(non-fatal):\n{res.stderr.strip()}")
-    if res.stdout.strip():
-        print(f"[{_ts()}][FFMPEG] STDOUT:\n{res.stdout.strip()}")
-    print(f"[{_ts()}][FFMPEG] OK dur={dur:.3f}s")
+            print(f"[{_ts()}][FFMPEG] STDERR(non-fatal):\n{res.stderr.strip()}")
+        if res.stdout.strip():
+            print(f"[{_ts()}][FFMPEG] STDOUT:\n{res.stdout.strip()}")
+        print(f"[{_ts()}][FFMPEG] OK dur={dur:.3f}s")
 
 def _ffprobe_soft(in_path: str) -> dict:
     ffprobe = _which_ffprobe_soft()
@@ -208,11 +329,16 @@ def _decode_frames_once_via_ffmpeg(
     """
     print(f"[{_ts()}][PIPE] ENTER resize_to={resize_to} target_fps={target_fps} max_frames={max_frames} "
           f"bytes={len(video_bytes)}")
+    _snap_cpu_mem("decode-enter")
+
     t_all = time.time()
     ffmpeg = _which_ffmpeg()
     ff_loglvl = os.getenv("FFMPEG_LOGLEVEL", "error")
-    threads = os.getenv("FFMPEG_THREADS", "3")
-    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "2")
+    threads = os.getenv("FFMPEG_THREADS", "1")
+    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
+    log_every_n = max(1, int(os.getenv("LOG_EVERY_N_FRAMES", "120")))
+    child_interval = max(50, int(os.getenv("CPU_LOG_INTERVAL_MS", "500"))) / 1000.0
+    monitor_child = _env_true("MONITOR_CHILD_CPU", "1") and _HAVE_PSUTIL
 
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
         tmp_in.write(video_bytes)
@@ -222,16 +348,23 @@ def _decode_frames_once_via_ffmpeg(
     w, h = int(resize_to[0]), int(resize_to[1])
     frame_size = w * h * 3  # rgb24
     frames: List[np.ndarray] = []
-    debug: Dict[str, Any] = {"pipeline": None, "cmd": None, "notes": [], "temp_in": in_path}
+    debug: Dict[str, Any] = {"pipeline": None, "cmd": None, "notes": [], "temp_in": in_path, "cpu_stats": []}
 
     def _run_pipe(cmd: List[str], label: str) -> bool:
         print(f"[{_ts()}][PIPE] RUN({label}): {' '.join(cmd)}")
         debug["pipeline"] = label
         debug["cmd"] = " ".join(cmd)
         t0 = time.time()
+        _snap_cpu_mem(f"{label}-start")
+
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            child = psutil.Process(proc.pid) if (monitor_child and _HAVE_PSUTIL) else None  # type: ignore
+            if child: child.cpu_percent(None)
             read_frames = 0
+            last_child_log = 0.0
+            last_snap = 0.0
+
             while True:
                 if max_frames is not None and read_frames >= max_frames:
                     print(f"[{_ts()}][PIPE] max_frames reached: {max_frames}")
@@ -245,6 +378,19 @@ def _decode_frames_once_via_ffmpeg(
                 frames.append(arr)
                 read_frames += 1
 
+                # 주기적 로깅
+                if read_frames % log_every_n == 0:
+                    _snap_cpu_mem(f"{label}-progress", extra=f"| frames={read_frames}")
+                now = time.time()
+                if child and (now - last_child_log) >= child_interval:
+                    try:
+                        c_cpu = child.cpu_percent(None)
+                        c_mem = child.memory_info().rss
+                        print(f"[{_ts()}][PIPE] {label} child-ffmpeg cpu={c_cpu:.1f}% rss={_fmt_mb(c_mem)} frames={read_frames}")
+                    except Exception:
+                        pass
+                    last_child_log = now
+
             stderr = (proc.stderr.read().decode("utf-8", "ignore") if proc.stderr else "").strip()
             rc = proc.wait()
             dur = time.time() - t0
@@ -257,6 +403,7 @@ def _decode_frames_once_via_ffmpeg(
             if stderr:
                 print(f"[{_ts()}][PIPE] STDERR(non-fatal,{label}):\n{stderr}")
             print(f"[{_ts()}][PIPE] OK({label}) frames={read_frames} dur={dur:.3f}s")
+            debug["cpu_stats"].append(_snap_cpu_mem(f"{label}-end", extra=f"| frames={read_frames} dur={dur:.3f}s"))
             return True
 
         except Exception as e:
@@ -274,26 +421,30 @@ def _decode_frames_once_via_ffmpeg(
 
     hw_ok = False
     if scaler is not None and cuda_ok:
-        # 1차 시도: hwdownload 후 NV12로 내리고 SW에서 rgb24 변환
+        # ⚠ 주의 로그: fps 소프트웨어 필터가 들어가면 CPU 사용이 증가할 수 있음
+        vf_chain_a = f"{scaler}={w}:{h},fps={int(target_fps)},hwdownload,format=nv12,format=rgb24"
+        print(f"[{_ts()}][WARN] VF includes 'fps' and CPU colorspace (nv12→rgb24). This may raise CPU usage.")
         cmd_hw = [
             ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
             "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
             "-threads", threads, "-filter_threads", filter_threads,
             "-i", in_path,
-            "-vf", f"{scaler}={w}:{h},fps={int(target_fps)},hwdownload,format=nv12,format=rgb24",
+            "-vf", vf_chain_a,
             "-an", "-sn", "-dn", "-vsync", "0",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
         ]
         hw_ok = _run_pipe(cmd_hw, "nvdec+gpu-scale→hwdownload(nv12→rgb24)")
 
-        # 2차 대체 시도: nv12 대신 yuv420p로 내려서 rgb24 변환
+        # 2차 대체 시도
         if not hw_ok:
+            vf_chain_b = f"{scaler}={w}:{h},fps={int(target_fps)},hwdownload,format=yuv420p,format=rgb24"
+            print(f"[{_ts()}][INFO] Trying alternate VF chain: {vf_chain_b}")
             cmd_hw_alt = [
                 ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
                 "-hwaccel", "cuda", "-hwaccel_output_format", "cuda",
                 "-threads", threads, "-filter_threads", filter_threads,
                 "-i", in_path,
-                "-vf", f"{scaler}={w}:{h},fps={int(target_fps)},hwdownload,format=yuv420p,format=rgb24",
+                "-vf", vf_chain_b,
                 "-an", "-sn", "-dn", "-vsync", "0",
                 "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
             ]
@@ -303,7 +454,7 @@ def _decode_frames_once_via_ffmpeg(
 
     # --- CPU 폴백 ---
     if not hw_ok:
-        print(f"[{_ts()}][PIPE] fallback to CPU decode+scale path")
+        print(f"[{_ts()}][PIPE] fallback to CPU decode+scale path (this is CPU heavy)")
         cmd_sw = [
             ffmpeg, "-hide_banner", "-loglevel", ff_loglvl, "-nostdin",
             "-threads", threads, "-filter_threads", filter_threads,
@@ -312,6 +463,7 @@ def _decode_frames_once_via_ffmpeg(
             "-an", "-sn", "-dn", "-vsync", "0",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1",
         ]
+        debug.setdefault("notes", []).append("CPU fallback used: decode+scale+fps+rgb24 on CPU")
         if not _run_pipe(cmd_sw, "cpu-decode+scale"):
             try:
                 os.remove(in_path)
@@ -329,6 +481,7 @@ def _decode_frames_once_via_ffmpeg(
     debug["frames"] = len(frames)
     debug["size"] = {"w": w, "h": h}
     debug["fps"] = target_fps
+    _snap_cpu_mem("decode-exit", extra=f"| frames={debug['frames']}")
     print(f"[{_ts()}][PIPE] EXIT frames={debug['frames']} size={debug['size']} fps={debug['fps']} "
           f"total_dur={time.time()-t_all:.3f}s")
     return frames, debug
@@ -345,10 +498,12 @@ def preprocess_video_to_mp4_file(
 ) -> tuple[str, Dict[str, Any]]:
     print(f"[{_ts()}][PRE] ENTER GPU-DECODE mode target_fps={target_fps} resize_to={resize_to} max_frames={max_frames} "
           f"bytes={len(video_bytes)}")
+    _snap_cpu_mem("preprocess-enter")
+
     t_all = time.time()
     ffmpeg = _which_ffmpeg()
-    threads = os.getenv("FFMPEG_THREADS", "3")
-    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "2")
+    threads = os.getenv("FFMPEG_THREADS", "1")
+    filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
     x264_preset = os.getenv("X264_PRESET", "veryfast")
     x264_crf = int(os.getenv("X264_CRF", "28"))
     ff_loglvl = os.getenv("FFMPEG_LOGLEVEL", "error")
@@ -420,6 +575,7 @@ def preprocess_video_to_mp4_file(
         if vf_parts:
             cmd += ["-vf", ",".join(vf_parts)]
         if target_fps and target_fps > 0:
+            # 출력단 -r 사용(소프트 fps 필터보다 CPU 덜 사용)
             cmd += ["-r", str(int(target_fps))]
         if max_frames is not None:
             cmd += ["-frames:v", str(int(max_frames))]
@@ -490,6 +646,7 @@ def preprocess_video_to_mp4_file(
             cmd = build_copy_cmd()
             debug.update({"pipeline": "copy", "cmd": " ".join(cmd)})
             _run_ffmpeg(cmd)
+            _snap_cpu_mem("preprocess-exit(copy)")
             print(f"[{_ts()}][PRE] EXIT via copy total_dur={time.time()-t_all:.3f}s")
             return out_path, debug
 
@@ -498,6 +655,7 @@ def preprocess_video_to_mp4_file(
                 cmd = build_nvdec_nvenc_cmd()
                 debug.update({"pipeline": "nvdec+gpu-scale+nvenc", "cmd": " ".join(cmd)})
                 _run_ffmpeg(cmd)
+                _snap_cpu_mem("preprocess-exit(nvenc)")
                 print(f"[{_ts()}][PRE] GPU path OK")
                 print(f"[{_ts()}][PRE] EXIT via NVENC total_dur={time.time()-t_all:.3f}s")
                 return out_path, debug
@@ -506,25 +664,30 @@ def preprocess_video_to_mp4_file(
                 debug.setdefault("notes", []).append(f"nvdec/nvenc failed: {e}")
                 if require_nvdec and not allow_cpu_fallback:
                     print(f"[{_ts()}][PRE] REQUIRE_NVDEC=1 & ALLOW_CPU_FALLBACK=0 -> use original")
+                    _snap_cpu_mem("preprocess-exit(original)")
                     print(f"[{_ts()}][PRE] EXIT via original total_dur={time.time()-t_all:.3f}s")
                     return in_path, debug
 
         if allow_cpu_fallback or not _cuda_device_present():
+            print(f"[{_ts()}][PRE] CPU fallback encode (heavy CPU)")
             cmd = build_cpu_x264_cmd()
             debug.update({"pipeline": "cpu-fallback", "cmd": " ".join(cmd)})
             _run_ffmpeg(cmd)
+            _snap_cpu_mem("preprocess-exit(cpu)")
             print(f"[{_ts()}][PRE] CPU fallback OK")
             print(f"[{_ts()}][PRE] EXIT via CPU total_dur={time.time()-t_all:.3f}s")
             return out_path, debug
 
         debug.setdefault("notes", []).append("transcode skipped (no NVDEC/NVENC and fallback disabled)")
         print(f"[{_ts()}][PRE] SKIP transcode -> use original")
+        _snap_cpu_mem("preprocess-exit(skip)")
         print(f"[{_ts()}][PRE] EXIT via original total_dur={time.time()-t_all:.3f}s")
         return in_path, debug
 
     except Exception as e:
         debug.setdefault("notes", []).append(f"transcode failed; using original ({e})")
         print(f"[{_ts()}][PRE] TRANSCODE FAILED -> use original ({e})\n{tb.format_exc()}")
+        _snap_cpu_mem("preprocess-exit(failed)")
         print(f"[{_ts()}][PRE] EXIT via original total_dur={time.time()-t_all:.3f}s")
         return in_path, debug
 
@@ -547,6 +710,7 @@ class VideoFrameIterator:
             if not cap.isOpened():
                 raise RuntimeError("cv2.VideoCapture open failed")
             i = 0
+            _snap_cpu_mem("iterator-cv2-start")
             try:
                 while True:
                     ok, bgr = cap.read()
@@ -556,9 +720,12 @@ class VideoFrameIterator:
                             print(f"[{_ts()}][ITER] cv2 frame {i} shape={bgr.shape}")
                             printed += 1
                         yield bgr[..., ::-1]  # BGR->RGB
+                    if i and (i % 300 == 0):
+                        _snap_cpu_mem("iterator-cv2-progress", extra=f"| i={i}")
                     i += 1
             finally:
                 cap.release()
+            _snap_cpu_mem("iterator-cv2-end", extra=f"| total={i}")
             print(f"[{_ts()}][ITER] cv2 done total_frames={i}")
             return
         except Exception as e:
@@ -568,6 +735,7 @@ class VideoFrameIterator:
             import av  # type: ignore
             print(f"[{_ts()}][ITER] PyAV path")
             i = 0
+            _snap_cpu_mem("iterator-pyav-start")
             with av.open(self.mp4_path) as c:
                 for frame in c.decode(video=0):
                     if (i % self.stride) == 0:
@@ -576,7 +744,10 @@ class VideoFrameIterator:
                             print(f"[{_ts()}][ITER] av frame {i} shape={arr.shape}")
                             printed += 1
                         yield arr
+                    if i and (i % 300 == 0):
+                        _snap_cpu_mem("iterator-pyav-progress", extra=f"| i={i}")
                     i += 1
+            _snap_cpu_mem("iterator-pyav-end", extra=f"| total={i}")
             print(f"[{_ts()}][ITER] PyAV done total_frames={i}")
             return
         except Exception as e:
@@ -599,7 +770,7 @@ def _fix_posture_meta(posture: Dict[str, Any], decoded_frames: int, fps_used: fl
 def analyze_all(
     video_bytes: bytes,
     device: Optional[str] = None,
-    stride: int = 1,
+    stride: int = 3,
     return_points: bool = False,
     calib_data: Optional[dict] = None,
     target_fps: int = 30,
@@ -611,6 +782,7 @@ def analyze_all(
 ):
     print(f"[{_ts()}][ENTRY] analyze_all target_fps={target_fps} resize_to={resize_to} "
           f"stream_mode={stream_mode} single_decode={single_decode} bytes={len(video_bytes)}")
+    _snap_cpu_mem("analyze-enter")
 
     if device is None:
         dev_note = ""
@@ -668,16 +840,18 @@ def analyze_all(
             n_all = len(frames_all)
             fps_used = float(target_fps) if target_fps else 0.0
 
+            _snap_cpu_mem("posture-start", extra=f"| n={n_all}")
             t_pose = time.time()
-            print(f"[{_ts()}][RUN] posture(frames) START n={n_all}")
             posture = analyze_video_frames(frames_all)  # type: ignore
             _fix_posture_meta(posture, decoded_frames=n_all, fps_used=fps_used)
             print(f"[{_ts()}][TIME] posture(frames)={time.time()-t_pose:.3f}s")
+            _snap_cpu_mem("posture-end")
 
+            _snap_cpu_mem("face-start", extra=f"| n={n_all}")
             t_face = time.time()
-            print(f"[{_ts()}][RUN] face(frames) START n={n_all} device={device}")
             face = infer_face_frames(frames_all, device=device, stride=1, return_points=return_points)  # type: ignore
             print(f"[{_ts()}][TIME] face(frames)={time.time()-t_face:.3f}s")
+            _snap_cpu_mem("face-end")
 
             if disable_gaze:
                 print(f"[{_ts()}][GAZE] disabled via env")
@@ -691,14 +865,15 @@ def analyze_all(
                     }
                     print(f"[{_ts()}][GAZE] calib provided: points={dbg['gaze_calib_meta']['points']} "
                           f"vectors={dbg['gaze_calib_meta']['vectors']}")
+                _snap_cpu_mem("gaze-start", extra=f"| n={n_all}")
                 t_gaze = time.time()
-                print(f"[{_ts()}][RUN] gaze(frames) START n={n_all}")
                 try:
                     gaze = infer_gaze_frames(frames_all, calib_data=calib_data)  # type: ignore
                     print(f"[{_ts()}][TIME] gaze(frames)={time.time()-t_gaze:.3f}s")
                 except Exception as e:
                     print(f"[{_ts()}][GAZE] disabled (exception): {e}\n{tb.format_exc()}")
                     gaze = {"status": "disabled", "error": str(e)}
+                _snap_cpu_mem("gaze-end")
 
             dbg.update({
                 "analyze_mode": "single-decode/pipe",
@@ -714,6 +889,7 @@ def analyze_all(
         else:
             # --- 2) 백업 경로: (기존) mp4로 전처리 후 재디코드 ---
             print(f"[{_ts()}][MODE] fallback -> preprocess to mp4 then re-decode")
+            _snap_cpu_mem("preprocess-call")
             mp4_path, pre_dbg = preprocess_video_to_mp4_file(
                 video_bytes=video_bytes,
                 target_fps=target_fps,
@@ -726,21 +902,25 @@ def analyze_all(
 
             if stream_mode == "frames" or (stream_mode == "auto" and frames_api_ok):
                 print(f"[{_ts()}][MODE] frames(file) path")
+                _snap_cpu_mem("iterator-start")
                 frames_all = list(VideoFrameIterator(mp4_path, stride=1))
                 n_all = len(frames_all)
                 fps_used = float(target_fps) if target_fps else 0.0
                 print(f"[{_ts()}][FRAMES] decoded={n_all} fps_used={fps_used}")
+                _snap_cpu_mem("iterator-end", extra=f"| n={n_all}")
 
+                _snap_cpu_mem("posture-start", extra=f"| n={n_all}")
                 t_pose = time.time()
-                print(f"[{_ts()}][RUN] posture(frames-from-file) START n={n_all}")
                 posture = analyze_video_frames(frames_all)  # type: ignore
                 _fix_posture_meta(posture, decoded_frames=n_all, fps_used=fps_used)
                 print(f"[{_ts()}][TIME] posture(frames-from-file)={time.time()-t_pose:.3f}s")
+                _snap_cpu_mem("posture-end")
 
+                _snap_cpu_mem("face-start", extra=f"| n={n_all}")
                 t_face = time.time()
-                print(f"[{_ts()}][RUN] face(frames-from-file) START n={n_all} device={device}")
                 face = infer_face_frames(frames_all, device=device, stride=1, return_points=return_points)  # type: ignore
                 print(f"[{_ts()}][TIME] face(frames-from-file)={time.time()-t_face:.3f}s")
+                _snap_cpu_mem("face-end")
 
                 if disable_gaze:
                     print(f"[{_ts()}][GAZE] disabled via env")
@@ -754,14 +934,15 @@ def analyze_all(
                         }
                         print(f"[{_ts()}][GAZE] calib provided: points={dbg['gaze_calib_meta']['points']} "
                               f"vectors={dbg['gaze_calib_meta']['vectors']}")
+                    _snap_cpu_mem("gaze-start", extra=f"| n={n_all}")
                     t_gaze = time.time()
-                    print(f"[{_ts()}][RUN] gaze(frames-from-file) START n={n_all}")
                     try:
                         gaze = infer_gaze_frames(frames_all, calib_data=calib_data)  # type: ignore
                         print(f"[{_ts()}][TIME] gaze(frames-from-file)={time.time()-t_gaze:.3f}s")
                     except Exception as e:
                         print(f"[{_ts()}][GAZE] disabled (exception): {e}\n{tb.format_exc()}")
                         gaze = {"status": "disabled", "error": str(e)}
+                    _snap_cpu_mem("gaze-end")
 
                 dbg.update({
                     "analyze_mode": "single-decode/frames(file)",
@@ -779,15 +960,17 @@ def analyze_all(
                 with open(mp4_path, "rb") as f:
                     processed_bytes = f.read()
 
+                _snap_cpu_mem("posture-start(bytes)")
                 t_pose = time.time()
-                print(f"[{_ts()}][RUN] posture(bytes) START")
                 posture = analyze_video_bytes(processed_bytes)
                 print(f"[{_ts()}][TIME] posture(bytes)={time.time()-t_pose:.3f}s")
+                _snap_cpu_mem("posture-end(bytes)")
 
+                _snap_cpu_mem("face-start(bytes)")
                 t_face = time.time()
-                print(f"[{_ts()}][RUN] face(bytes) START device={device}")
                 face = infer_face_video(processed_bytes, device, 1, None, return_points)
                 print(f"[{_ts()}][TIME] face(bytes)={time.time()-t_face:.3f}s")
+                _snap_cpu_mem("face-end(bytes)")
 
                 if disable_gaze:
                     print(f"[{_ts()}][GAZE] disabled via env")
@@ -801,14 +984,15 @@ def analyze_all(
                         }
                         print(f"[{_ts()}][GAZE] calib provided: points={dbg['gaze_calib_meta']['points']} "
                               f"vectors={dbg['gaze_calib_meta']['vectors']}")
+                    _snap_cpu_mem("gaze-start(bytes)")
                     t_gaze = time.time()
-                    print(f"[{_ts()}][RUN] gaze(bytes) START")
                     try:
                         gaze = infer_gaze(processed_bytes, calib_data=calib_data)
                         print(f"[{_ts()}][TIME] gaze(bytes)={time.time()-t_gaze:.3f}s")
                     except Exception as e:
                         print(f"[{_ts()}][GAZE] disabled (exception): {e}\n{tb.format_exc()}")
                         gaze = {"status": "disabled", "error": str(e)}
+                    _snap_cpu_mem("gaze-end(bytes)")
 
                 dbg.update({
                     "analyze_mode": "bytes(compat)",
@@ -830,6 +1014,7 @@ def analyze_all(
         }
         if return_debug:
             out["debug"] = dbg
+        _snap_cpu_mem("analyze-exit", extra=f"| mode={dbg.get('analyze_mode')}")
         print(f"[{_ts()}][DONE] analyze_all total={time.time()-t0:.3f}s mode={dbg.get('analyze_mode')}")
         return out
 
