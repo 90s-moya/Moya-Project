@@ -122,8 +122,7 @@ build-ai-ec2:
     - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
     - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
     - docker push gyujh630/moya-ai:cache
-    - docker image prune -f  # ✨ 여기에 정리 명령어 추가
-  tags:
+    - docker image prune -f
     - ec2
   only:
     - ai-dev
@@ -139,7 +138,7 @@ build-ai-gpu:
     - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
     - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
     - docker push gyujh630/moya-ai:cache
-    - docker image prune -f  # ✨ 여기에 정리 명령어 추가
+    - docker image prune -f
   tags:
     - gcp
   only:
