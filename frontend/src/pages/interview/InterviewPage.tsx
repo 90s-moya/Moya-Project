@@ -154,12 +154,7 @@ export default function InterviewScreen() {
     <div className="h-screen bg-white relative overflow-hidden" aria-busy={isSubmitting}>
       {/* 상단 바 */}
       <div className="w-full py-5 px-8 flex items-center justify-between">
-        <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 bg-blue-100 text-blue-700 font-semibold shadow-sm">
-          <span>{`Q${currentOrder}${currentSubOrder > 0 ? `-${currentSubOrder}` : ""}`}</span>
-        </div>
-        <div className="mx-6 flex-1 text-center text-gray-900 text-lg md:text-xl font-medium truncate">
-          {questionText}
-        </div>
+        <div className="flex-1"></div>
         {/* AI 면접 안내 + 캐릭터 이미지 */}
         <div className="flex items-center gap-2">
           <img src={aiInterview} alt="AI 면접관" className="w-8 h-8 rounded-full object-cover border-2 border-blue-200 shadow-sm" style={{ minWidth: 32, minHeight: 32 }} />
@@ -172,8 +167,22 @@ export default function InterviewScreen() {
         
           <div className="absolute inset-0 p-10 flex flex-col">
             <div className="flex-1 grid place-items-center">
-              <div className="w-[68%] lg:w-[64%] max-w-[720px] aspect-[16/9]">
-                <img src={aiCharacter} alt="AI 면접관" className="w-full h-full object-contain rounded-lg" />
+              <div className="flex flex-col items-center w-full max-w-6xl">
+                {/* AI 면접관 이미지 */}
+                <div className="w-3/5 min-w-md max-w-4xl aspect-[16/9]">
+                  <img src={aiCharacter} alt="AI 면접관" className="w-full h-full object-cover rounded-lg" />
+                </div>
+                {/* AI 면접관 밑에 질문번호와 질문 텍스트 표시 - 더 넓은 너비 */}
+                <div className="mt-8 w-full max-w-7xl flex justify-center px-4">
+                  <div className="flex items-center gap-4">
+                    <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 bg-blue-100 text-blue-700 font-semibold shadow-sm flex-shrink-0">
+                      <span>{`Q${currentOrder}${currentSubOrder > 0 ? `-${currentSubOrder}` : ""}`}</span>
+                    </div>
+                    <div className="text-gray-900 text-2xl font-medium">
+                      {questionText}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -196,7 +205,7 @@ export default function InterviewScreen() {
           </div>
 
           {/* 우하단 내 화면 카드 */}
-          <div className="absolute bottom-32 right-6 z-10 w-[300px]">
+          <div className="absolute bottom-[30%] right-6 z-10 w-[300px] shadow-lg">
             <AnswerRecorder
               keyInfo={keyInfo}
               ttsFinished={isAnswerPhase}
