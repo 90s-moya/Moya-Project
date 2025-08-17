@@ -100,31 +100,31 @@ public class InterviewService {
         }
 
         // 3) 분석 트리거 (URL 방식) — STT는 여기서 절대 호출하지 않음
-        if (request.getInterviewSessionId() != null) {
-            Integer stride = (request.getStride() != null) ? request.getStride() : 5;
-            String device = (request.getDevice() != null) ? request.getDevice() : "cuda";
-            boolean returnPoints = Boolean.TRUE.equals(request.getReturnPoints());
-
-            Integer order = toIntOrNull(String.valueOf(request.getOrder()));
-            Integer subOrder = toIntOrNull(String.valueOf(request.getSubOrder()));
-            String calibDataJson = request.getCalibDataJson();
-            if (order != null && subOrder != null) {
-                sendAnalyzeByUrlAsync(
-                        request.getInterviewSessionId(),
-                        order,
-                        subOrder,
-                        videoUrl,
-                        device,
-                        stride,
-                        returnPoints,
-                        calibDataJson,
-                        thumbnailUrl
-                );
-            } else {
-                System.err.println("[analyze] skip: order/subOrder parse 실패 (order="
-                        + request.getOrder() + ", subOrder=" + request.getSubOrder() + ")");
-            }
-        }
+//        if (request.getInterviewSessionId() != null) {
+//            Integer stride = (request.getStride() != null) ? request.getStride() : 5;
+//            String device = (request.getDevice() != null) ? request.getDevice() : "cuda";
+//            boolean returnPoints = Boolean.TRUE.equals(request.getReturnPoints());
+//
+//            Integer order = toIntOrNull(String.valueOf(request.getOrder()));
+//            Integer subOrder = toIntOrNull(String.valueOf(request.getSubOrder()));
+//            String calibDataJson = request.getCalibDataJson();
+//            if (order != null && subOrder != null) {
+//                sendAnalyzeByUrlAsync(
+//                        request.getInterviewSessionId(),
+//                        order,
+//                        subOrder,
+//                        videoUrl,
+//                        device,
+//                        stride,
+//                        returnPoints,
+//                        calibDataJson,
+//                        thumbnailUrl
+//                );
+//            } else {
+//                System.err.println("[analyze] skip: order/subOrder parse 실패 (order="
+//                        + request.getOrder() + ", subOrder=" + request.getSubOrder() + ")");
+//            }
+//        }
 
         // 4) 응답: 저장된 URL들만 반환
         return InterviewVideoCommand.builder()
@@ -167,9 +167,11 @@ public class InterviewService {
             if (calibDataJson != null && !calibDataJson.isBlank()) {
                 HttpHeaders jsonHeaders = new HttpHeaders();
                 jsonHeaders.setContentType(MediaType.APPLICATION_JSON);
-                // 로그는 길이만 출력
+                // 로그는 길이만 출력;
                 System.out.println("[calib_data] length=" + calibDataJson.length());
                 body.add("calib_data", new HttpEntity<>(calibDataJson, jsonHeaders));
+                System.out.println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+                System.out.println(calibDataJson);
             }
 
 
