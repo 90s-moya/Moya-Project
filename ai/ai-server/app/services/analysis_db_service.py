@@ -1,40 +1,34 @@
-# app/services/analyze_db_service.py
+# app/services/analysis_db_service.py
 from __future__ import annotations
-from typing import Optional, Dict, Any
-from sqlalchemy.orm import Session
 from datetime import datetime
-from uuid import UUID
-import uuid
+from typing import Optional, Dict, Any
 
-from app.models import QuestionAnswerPair, EvaluationSession
+from sqlalchemy.orm import Session
 
-# UUID 변환 유틸
-def to_uuid_bytes(u) -> bytes:
-    if isinstance(u, (bytes, bytearray)):
-        return bytes(u)
-    if isinstance(u, UUID):
-        return u.bytes
-    return UUID(str(u)).bytes
-
+from app.models import QuestionAnswerPair, EvaluationSession, generate_uuid
+from app.utils.uuid_tools import to_uuid_bytes
 
 def get_or_create_qa_pair(
     db: Session,
     session_id: str,
     order: int,
     sub_order: int,
-    **kwargs
+    **kwargs,
 ) -> QuestionAnswerPair:
-    # session_id 정리 (개행 제거) + bytes 변환
-    session_id = session_id.strip()
-    session_id_bytes = to_uuid_bytes(session_id)
+    # 문자열 UUID -> bytes
+    sid = to_uuid_bytes(session_id.strip())
 
-    # 먼저 세션이 존재하는지 확인하고, 없으면 생성
-    session = db.query(EvaluationSession).filter(EvaluationSession.id == session_id_bytes).one_or_none()
+    # 세션 존재 확인 (없으면 생성)
+    session = (
+        db.query(EvaluationSession)
+        .filter(EvaluationSession.id == sid)
+        .one_or_none()
+    )
     if session is None:
-        # user_id NOT NULL이면 임시 UUID 채움 (또는 적절한 값으로 교체)
+        # user_id NOT NULL이므로 더미라도 bytes 필요
         session = EvaluationSession(
-            id=session_id_bytes,
-            user_id=uuid.uuid4().bytes,
+            id=sid,
+            user_id=generate_uuid(),
             title="AI 모의면접 결과",
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
@@ -44,15 +38,18 @@ def get_or_create_qa_pair(
             db.flush()
         except Exception:
             db.rollback()
-            # 경쟁조건 등으로 이미 생성되었을 수 있으니 재조회
-            session = db.query(EvaluationSession).filter(EvaluationSession.id == session_id_bytes).one_or_none()
+            session = (
+                db.query(EvaluationSession)
+                .filter(EvaluationSession.id == sid)
+                .one_or_none()
+            )
             if session is None:
                 raise
 
     qa = (
         db.query(QuestionAnswerPair)
         .filter(
-            QuestionAnswerPair.session_id == session_id_bytes,
+            QuestionAnswerPair.session_id == sid,
             QuestionAnswerPair.order == order,
             QuestionAnswerPair.sub_order == sub_order,
         )
@@ -60,11 +57,11 @@ def get_or_create_qa_pair(
     )
     if qa is None:
         qa = QuestionAnswerPair(
-            session_id=session_id_bytes,
+            session_id=sid,
             order=order,
             sub_order=sub_order,
-            question="Analysis Session",  # 기본값
-            answer="",                    # 빈 문자열
+            question="Analysis Session",
+            answer="",  # 미답변 판별 로직과 호환되게 빈 문자열
             is_ended=False,
             reason_end="",
             context_matched=False,
@@ -76,9 +73,8 @@ def get_or_create_qa_pair(
             updated_at=datetime.utcnow(),
         )
         db.add(qa)
-        db.flush()  # id 부여
+        db.flush()  # PK 부여
     return qa
-
 
 def save_results_to_qa(
     db: Session,
@@ -88,19 +84,16 @@ def save_results_to_qa(
     thumbnail_url: Optional[str] = None,
     result: Dict[str, Any],
 ) -> QuestionAnswerPair:
-    # analyze_all 결과 -> DB 컬럼 매핑
-    # posture_result ← result["posture"]
-    # face_result    ← result["emotion"]
     if video_url:
         qa.video_url = video_url
     if thumbnail_url:
         qa.thumbnail_url = thumbnail_url
 
     qa.posture_result = result.get("posture")
-    qa.face_result    = result.get("emotion")
-    qa.gaze_result    = result.get("gaze")
-
+    qa.face_result = result.get("emotion")
+    qa.gaze_result = result.get("gaze")
     qa.updated_at = datetime.utcnow()
+
     db.commit()
     db.refresh(qa)
     return qa
