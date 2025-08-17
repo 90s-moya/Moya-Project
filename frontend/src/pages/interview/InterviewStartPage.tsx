@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import Header from "@/components/common/Header";
 import { useNavigate } from "react-router-dom";
+import aiCharacter from "@/assets/images/ai-character.png"
 
 export default function Component() {
   const navigate = useNavigate();
@@ -80,11 +81,6 @@ export default function Component() {
                 <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 opacity-75 blur-sm group-hover:opacity-100 transition-opacity duration-300" />
               </Button>
               
-
-              <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
-                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
-                <span>시작을 누르면 서류 선택 화면으로 이동합니다</span>
-              </div>
             </div>
           </div>
 
@@ -124,14 +120,22 @@ export default function Component() {
                 <div className="p-8">
                   <div className="relative h-56 rounded-2xl bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 border border-slate-200/60 overflow-hidden backdrop-blur-sm">
                     {/* Enhanced chat bubbles */}
-                    <div className="absolute left-4 top-4 max-w-[60%] rounded-2xl border border-blue-200/60 bg-white/90 backdrop-blur-sm px-4 py-3 text-sm text-slate-700 shadow-lg shadow-blue-100/50 animate-fade-in-left">
-                      안녕하세요! 면접을 시작하겠습니다 ✨
-                      <div className="absolute -right-2 top-4 h-0 w-0 border-l-8 border-l-white border-y-8 border-y-transparent" />
+                    <div className="absolute left-4 top-4 flex items-start gap-2">
+                      {/* 프로필 아바타*/}
+                      <img
+                        src={aiCharacter}
+                        alt="AI 프로필"
+                        className="h-8 w-8 rounded-full border border-blue-200/60 shadow-sm object-cover"
+                        draggable={false}
+                      />
+                      <div className="max-w-[90%] whitespace-nowrap rounded-2xl border border-blue-200/60 bg-white/90 backdrop-blur-sm px-4 py-3 text-sm text-slate-700 shadow-lg shadow-blue-100/50 animate-fade-in-left relative">
+                        안녕하세요! 면접을 시작하겠습니다 
+                      </div>
                     </div>
+
 
                     <div className="absolute right-4 bottom-4 max-w-[60%] rounded-2xl border border-indigo-200/60 bg-white/90 backdrop-blur-sm px-4 py-3 text-sm text-slate-700 shadow-lg shadow-indigo-100/50 animate-fade-in-right">
                       준비되었습니다! 💪
-                      <div className="absolute -left-2 bottom-4 h-0 w-0 border-r-8 border-r-white border-y-8 border-y-transparent" />
                     </div>
 
                     {/* Enhanced avatar placeholders */}
