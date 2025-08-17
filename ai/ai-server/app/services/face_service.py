@@ -27,6 +27,108 @@ except ImportError as e:
 
 CLASS_NAMES = ["angry","disgust","fear","happy","sad","surprise","neutral"]
 
+def classify_emotion_to_3_categories(emotion: str) -> str:
+    """7가지 감정을 3가지 카테고리로 분류"""
+    if emotion == "happy":
+        return "positive"
+    elif emotion == "neutral":
+        return "neutral"
+    else:  # angry, disgust, fear, sad, surprise
+        return "negative"
+
+def _convert_distribution_to_3_categories(distribution: Dict[str, int]) -> Dict[str, int]:
+    """7가지 감정 분포를 3가지 카테고리로 변환"""
+    result = {"positive": 0, "neutral": 0, "negative": 0}
+    
+    for emotion, count in distribution.items():
+        category = classify_emotion_to_3_categories(emotion)
+        result[category] += count
+    
+    return result
+
+def _convert_segments_to_3_categories(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """세그먼트의 감정 라벨을 3가지 카테고리로 변환"""
+    result = []
+    current_category = None
+    current_start = None
+    
+    for segment in segments:
+        category = classify_emotion_to_3_categories(segment["label"])
+        
+        if current_category == category:
+            # 같은 카테고리면 연장
+            continue
+        else:
+            # 다른 카테고리면 이전 세그먼트 종료하고 새 세그먼트 시작
+            if current_category is not None:
+                result.append({
+                    "label": current_category,
+                    "start_frame": current_start,
+                    "end_frame": segment["start_frame"] - 1
+                })
+            
+            current_category = category
+            current_start = segment["start_frame"]
+    
+    # 마지막 세그먼트 추가
+    if current_category is not None and segments:
+        result.append({
+            "label": current_category,
+            "start_frame": current_start,
+            "end_frame": segments[-1]["end_frame"]
+        })
+    
+    return result
+
+def _convert_timeline_to_3_categories(timeline: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """타임라인의 감정 라벨을 3가지 카테고리로 변환"""
+    return [
+        {
+            "frame": item["frame"],
+            "label": classify_emotion_to_3_categories(item["label"])
+        }
+        for item in timeline
+    ]
+
+def _analyze_dominant_emotions_by_window(labels_seq: List[str], window_size: int = 30) -> List[Dict[str, Any]]:
+    """윈도우 단위로 dominant emotion 분석 (3가지 카테고리)"""
+    if not labels_seq:
+        return []
+    
+    windows = []
+    
+    for start_idx in range(0, len(labels_seq), window_size):
+        end_idx = min(start_idx + window_size, len(labels_seq))
+        window_labels = labels_seq[start_idx:end_idx]
+        
+        # 윈도우 내 3가지 카테고리별 카운트
+        category_counts = {"positive": 0, "neutral": 0, "negative": 0}
+        original_counts = {}
+        
+        for label in window_labels:
+            category = classify_emotion_to_3_categories(label)
+            category_counts[category] += 1
+            original_counts[label] = original_counts.get(label, 0) + 1
+        
+        # dominant emotion 결정
+        dominant_category = max(category_counts.keys(), key=lambda k: category_counts[k])
+        
+        # 원본 감정 중 가장 많은 것 (참고용)
+        dominant_original = max(original_counts.keys(), key=lambda k: original_counts[k]) if original_counts else "unknown"
+        
+        windows.append({
+            "window_start": start_idx + 1,  # 1-based
+            "window_end": end_idx,          # 1-based
+            "frame_count": len(window_labels),
+            "dominant_emotion": dominant_category,
+            "dominant_original_emotion": dominant_original,
+            "category_distribution": category_counts,
+            "original_distribution": original_counts,
+            "confidence": category_counts[dominant_category] / len(window_labels) if window_labels else 0.0
+        })
+    
+    return windows
+
 _preprocess = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
@@ -215,14 +317,34 @@ def infer_face_frames(
     # 연속구간(1-based)
     segments = _compress_runs_1based(labels_seq)
 
+    # 3가지 카테고리로 변환
+    dist_3_categories = _convert_distribution_to_3_categories(dist)
+    
+    # 30프레임 단위 윈도우 분석
+    window_analysis = _analyze_dominant_emotions_by_window(labels_seq, window_size=30)
+    
+    # detailed_logs를 30프레임 윈도우 기반으로 변경 (confidence 0.5 이하는 neutral로)
+    detailed_logs_windowed = []
+    for window in window_analysis:
+        emotion = window["dominant_emotion"]
+        confidence = window["confidence"]
+        
+        # confidence가 0.5 이하면 neutral로 변경
+        if confidence <= 0.5:
+            emotion = "neutral"
+        
+        detailed_logs_windowed.append({
+            "label": emotion,
+            "start_frame": window["window_start"],
+            "end_frame": window["window_end"],
+            "confidence": confidence
+        })
+    
     result: Dict[str, Any] = {
         "timestamp": datetime.utcnow().isoformat(),
         "total_frames": int(total_frames),
-        "frame_distribution": dist,
-        "detailed_logs": segments,
+        "detailed_logs": detailed_logs_windowed,
     }
-    if return_points:
-        result["timeline"] = timeline
 
     if dev == "cuda":
         cleanup_gpu_memory()
