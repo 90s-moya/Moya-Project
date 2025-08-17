@@ -1,13 +1,22 @@
 # app/services/analysis_service.py
-# - NVDEC(+scale_cuda/npp)+NVENC 전처리 유지
-# - frames 경로에서 posture는 stride=1, face/gaze만 stride 적용
-# - DISABLE_GAZE=1 스위치 유지
-# - debug에 effective fps/프레임 카운트/실행 cmd 기록
+# - 직렬 처리(병렬 X)로 CPU 경합 최소
+# - 해상도 960x540, 기본 fps 30
+# - posture/face 모두 전 프레임 사용(stride=1)
+# - CPU thread 1 강제 (OpenMP/MKL/BLAS/OpenCV/TensorFlow)
+# - NVDEC -> scale_cuda/npp -> NVENC 우선, CPU fallback 기본 차단(ALLOW_CPU_FALLBACK=1로만 허용)
 from __future__ import annotations
 
-import os, json, shutil, subprocess, tempfile
+import os, json, shutil, subprocess, tempfile, time
 from datetime import datetime
 from typing import Optional, Tuple, Dict, Any, List
+
+# ===== CPU thread caps (최대한 이른 시점에) =====
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
 
 # bytes 경로 (호환)
 from app.utils.posture import analyze_video_bytes
@@ -128,25 +137,25 @@ def _can_remux_to_mp4_without_reencode(info: dict,
 # ---------- preprocess NVDEC→(scale_cuda/npp)→NVENC ----------
 def preprocess_video_to_mp4_file(
     video_bytes: bytes,
-    target_fps: int = 15,
-    max_frames: Optional[int] = 1500,
-    resize_to: Optional[Tuple[int, int]] = (288, 216),
+    target_fps: int = 30,                 # 정확도 최우선
+    max_frames: Optional[int] = None,     # 전체 사용
+    resize_to: Optional[Tuple[int, int]] = (960, 540),  # 960x540
     keep_aspect: bool = False,
     drop_audio: bool = True,
 ) -> tuple[str, Dict[str, Any]]:
     ffmpeg = _which_ffmpeg()
-    threads = os.getenv("FFMPEG_THREADS", "1")
+    threads = os.getenv("FFMPEG_THREADS", "1")            # CPU 최소
     filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
-    x264_preset = os.getenv("X264_PRESET", "ultrafast")
-    x264_crf = int(os.getenv("X264_CRF", "30"))
+    x264_preset = os.getenv("X264_PRESET", "veryfast")
+    x264_crf = int(os.getenv("X264_CRF", "28"))
     ff_loglvl = os.getenv("FFMPEG_LOGLEVEL", "error")
 
     nvenc_preset = os.getenv("NVENC_PRESET", "p1")
-    nvenc_tune = os.getenv("NVENC_TUNE", "ull")
-    nvenc_rc = os.getenv("NVENC_RC", "cbr")
-    nvenc_bitrate = os.getenv("NVENC_BITRATE", "1.5M")
-    nvenc_maxrate = os.getenv("NVENC_MAXRATE", "1.5M")
-    nvenc_bufsize = os.getenv("NVENC_BUFSIZE", "3M")
+    nvenc_tune   = os.getenv("NVENC_TUNE", "ull")
+    nvenc_rc     = os.getenv("NVENC_RC", "cbr")
+    nvenc_bitrate= os.getenv("NVENC_BITRATE", "2.5M")
+    nvenc_maxrate= os.getenv("NVENC_MAXRATE", "2.5M")
+    nvenc_bufsize= os.getenv("NVENC_BUFSIZE", "5M")
 
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
         tmp_in.write(video_bytes)
@@ -156,6 +165,7 @@ def preprocess_video_to_mp4_file(
     info = _ffprobe_soft(in_path)
     has_nvenc = _has(ffmpeg, "encoder", "h264_nvenc")
     has_scale_cuda = _has(ffmpeg, "filter", "scale_cuda") or _has(ffmpeg, "filter", "scale_npp")
+    allow_cpu_fallback = _env_true("ALLOW_CPU_FALLBACK", "0")  # 기본: CPU 인코딩 금지
 
     def _scale_vf():
         if not resize_to: return None
@@ -235,6 +245,15 @@ def preprocess_video_to_mp4_file(
         "scale": None,
         "cmd": None,
         "notes": [],
+        "cpu_fallback_allowed": allow_cpu_fallback,
+        "cpu_threads_caps": {
+            "OMP": os.getenv("OMP_NUM_THREADS"),
+            "MKL": os.getenv("MKL_NUM_THREADS"),
+            "OPENBLAS": os.getenv("OPENBLAS_NUM_THREADS"),
+            "NUMEXPR": os.getenv("NUMEXPR_NUM_THREADS"),
+            "TF_INTRA": os.getenv("TF_NUM_INTRAOP_THREADS"),
+            "TF_INTER": os.getenv("TF_NUM_INTEROP_THREADS"),
+        },
     }
 
     try:
@@ -261,21 +280,37 @@ def preprocess_video_to_mp4_file(
                     _run_ffmpeg(cmd); nvenc_success = True
                 except RuntimeError as e:
                     debug["nvenc_error"] = str(e)
+
             if not nvenc_success:
-                cmd = build_x264_cmd()
-                debug.update({
-                    "pipeline": "cpu-fallback",
-                    "encoder": "libx264",
-                    "decoder": "cpu",
-                    "scale": "scale(cpu)" if resize_to else None,
-                    "cmd": " ".join(cmd)
-                })
-                _run_ffmpeg(cmd)
+                if allow_cpu_fallback:
+                    cmd = build_x264_cmd()
+                    debug.update({
+                        "pipeline": "cpu-fallback",
+                        "encoder": "libx264",
+                        "decoder": "cpu",
+                        "scale": "scale(cpu)" if resize_to else None,
+                        "cmd": " ".join(cmd)
+                    })
+                    _run_ffmpeg(cmd)
+                else:
+                    # CPU 인코딩 금지: 그냥 원본 파일로 진행 (리사이즈/타겟 fps 미적용)
+                    debug.update({
+                        "pipeline": "no-transcode (nvenc-missing, cpu-fallback-disabled)",
+                        "encoder": "n/a",
+                        "decoder": "n/a",
+                        "scale": None,
+                        "cmd": None,
+                        "notes": debug.get("notes", []) + ["skipped transcode to avoid CPU usage"]
+                    })
+                    return in_path, debug
+
         return out_path, debug
-    finally:
-        try:
-            if os.path.exists(in_path): os.remove(in_path)
-        except Exception: pass
+
+    except Exception:
+        # 실패 시 원본 경로라도 반환 (최소한 진행)
+        debug.setdefault("notes", []).append("transcode failed; using original")
+        return in_path, debug
+    # in_path 정리는 analyze_all() 쪽 finally에서 수행
 
 
 # ---------- single-decode iterator ----------
@@ -284,8 +319,13 @@ class VideoFrameIterator:
         self.mp4_path = mp4_path
         self.stride = max(1, int(stride))
     def __iter__(self):
+        # OpenCV 자체 스레드도 차단
         try:
-            import cv2  # type: ignore
+            import cv2
+            try:
+                cv2.setNumThreads(0)
+            except Exception:
+                pass
             cap = cv2.VideoCapture(self.mp4_path)
             if not cap.isOpened(): raise RuntimeError("cv2.VideoCapture open failed")
             i = 0
@@ -301,6 +341,7 @@ class VideoFrameIterator:
             return
         except Exception:
             pass
+        # PyAV fallback (필요시)
         try:
             import av  # type: ignore
             i = 0
@@ -315,28 +356,27 @@ class VideoFrameIterator:
 
 
 # ---------- meta fix ----------
-def _fix_posture_meta(posture: Dict[str, Any], decoded_frames: int, target_fps: int, sample_every: int) -> None:
+def _fix_posture_meta(posture: Dict[str, Any], decoded_frames: int, fps_used: float) -> None:
     try:
         meta = posture.get("meta", {}) or {}
-        meta["sample_every"] = int(sample_every)
-        # posture는 stride=1로 돌리므로 duration = decoded_frames/target_fps
-        meta["analyzed_fps"] = float(target_fps / max(1, sample_every))
-        meta["duration_s"] = float(decoded_frames * sample_every / float(target_fps))
+        meta["sample_every"] = 1
+        meta["analyzed_fps"] = float(fps_used)
+        meta["duration_s"] = float(decoded_frames / max(1e-6, fps_used))
         posture["meta"] = meta
     except Exception as e:
         print(f"[{_ts()}][POSTURE] meta fix skipped: {e}")
 
 
-# ---------- orchestration ----------
+# ---------- orchestration (직렬 실행) ----------
 def analyze_all(
     video_bytes: bytes,
     device: Optional[str] = None,
-    stride: int = 5,                # face/gaze에만 적용
+    stride: int = 1,                # 정확도 우선 → face/gaze도 기본 1
     return_points: bool = False,
     calib_data: Optional[dict] = None,
-    target_fps: int = 15,
-    resize_to: Tuple[int, int] = (288, 216),
-    max_frames: int = 1500,
+    target_fps: int = 30,           # 정확도 우선
+    resize_to: Tuple[int, int] = (960, 540),
+    max_frames: Optional[int] = None,
     return_debug: bool = False,
     stream_mode: str = "auto",      # "auto" | "frames" | "bytes"
 ):
@@ -345,10 +385,14 @@ def analyze_all(
         try:
             import torch  # type: ignore
             device = "cuda" if torch.cuda.is_available() else "cpu"
+            try:
+                torch.set_num_threads(1)  # PyTorch CPU 경로도 1스레드
+            except Exception:
+                pass
         except Exception:
             device = "cpu"
 
-    # preprocess
+    # preprocess (가능하면 NVDEC+scale_cuda+NVENC, 아니면 원본 사용)
     mp4_path, dbg = preprocess_video_to_mp4_file(
         video_bytes=video_bytes,
         target_fps=target_fps,
@@ -366,82 +410,76 @@ def analyze_all(
     frames_api_ok = (analyze_video_frames is not None) and (infer_face_frames is not None) and \
                     (disable_gaze or (infer_gaze_frames is not None))
 
-    def _run_frames_path():
-        # 1) 전체 프레임 디코드 (stride=1)
-        frames_all = list(VideoFrameIterator(mp4_path, stride=1))
-        n_all = len(frames_all)
-
-        # 2) posture: 전체 프레임
-        posture = analyze_video_frames(frames_all)  # type: ignore
-        _fix_posture_meta(posture, decoded_frames=n_all, target_fps=target_fps, sample_every=1)
-
-        # 3) face/gaze: stride 적용한 서브셋
-        frames_sub = frames_all[::max(1, stride)]
-        face = infer_face_frames(frames_sub, device=device, stride=stride, return_points=return_points)  # type: ignore
-
-        if disable_gaze:
-            print(f"[{_ts()}][GAZE] disabled via env DISABLE_GAZE=1")
-            gaze = {"status": "disabled", "reason": "env", "count": len(frames_sub)}
-        else:
-            try:
-                gaze = infer_gaze_frames(frames_sub, calib_data=calib_data)  # type: ignore
-            except Exception as e:
-                print(f"[{_ts()}][GAZE] disabled (exception): {e}")
-                gaze = {"status": "disabled", "error": str(e)}
-
-        dbg.update({
-            "analyze_mode": "single-decode/frames",
-            "frames_api": True,
-            "stride_face_gaze": stride,
-            "postprocess_fps": target_fps,
-            "effective_fps_face_gaze": (target_fps / max(1, stride)),
-            "frames_total_decoded": n_all,
-            "frames_used_face_gaze": len(frames_sub),
-        })
-        return posture, face, gaze
-
-    def _run_bytes_path():
-        with open(mp4_path, "rb") as f:
-            processed_bytes = f.read()
-
-        posture = analyze_video_bytes(processed_bytes)
-        # posture bytes 경로는 내부 구현에 따라 fps 보고가 다를 수 있음 (그대로 둠)
-
-        face = infer_face_video(processed_bytes, device, stride, None, return_points)
-
-        if disable_gaze:
-            print(f"[{_ts()}][GAZE] disabled via env DISABLE_GAZE=1")
-            gaze = {"status": "disabled", "reason": "env"}
-        else:
-            try:
-                gaze = infer_gaze(processed_bytes, calib_data=calib_data)
-            except Exception as e:
-                print(f"[{_ts()}][GAZE] disabled (exception): {e}")
-                gaze = {"status": "disabled", "error": str(e)}
-
-        dbg.update({
-            "analyze_mode": "bytes(compat)",
-            "frames_api": False,
-            "stride_face_gaze": stride,
-            "postprocess_fps": target_fps,
-            "effective_fps_face_gaze": (target_fps / max(1, stride)),
-        })
-        return posture, face, gaze
-
     try:
-        if stream_mode == "frames":
-            if not frames_api_ok:
-                raise RuntimeError("stream_mode='frames'인데 *_frames API가 없습니다.")
-            posture, face, gaze = _run_frames_path()
-        elif stream_mode == "auto" and frames_api_ok:
-            posture, face, gaze = _run_frames_path()
+        t0 = time.time()
+
+        if stream_mode == "frames" or (stream_mode == "auto" and frames_api_ok):
+            # 전체 프레임 디코드 (stride=1)
+            frames_all = list(VideoFrameIterator(mp4_path, stride=1))
+            n_all = len(frames_all)
+            fps_used = float(target_fps) if target_fps else 0.0
+
+            # posture (CPU 위주) — 전 프레임
+            posture = analyze_video_frames(frames_all)  # type: ignore
+            _fix_posture_meta(posture, decoded_frames=n_all, fps_used=fps_used)
+
+            # face (GPU) — 전 프레임
+            face = infer_face_frames(frames_all, device=device, stride=1, return_points=return_points)  # type: ignore
+
+            # gaze
+            if disable_gaze:
+                print(f"[{_ts()}][GAZE] disabled via env DISABLE_GAZE=1")
+                gaze = {"status": "disabled", "reason": "env", "count": n_all}
+            else:
+                try:
+                    gaze = infer_gaze_frames(frames_all, calib_data=calib_data)  # type: ignore
+                except Exception as e:
+                    print(f"[{_ts()}][GAZE] disabled (exception): {e}")
+                    gaze = {"status": "disabled", "error": str(e)}
+
+            dbg.update({
+                "analyze_mode": "single-decode/frames",
+                "frames_api": True,
+                "stride_face_gaze": 1,
+                "postprocess_fps": target_fps,
+                "effective_fps_face_gaze": target_fps,
+                "frames_total_decoded": n_all,
+                "timings_s": {"total": time.time() - t0},
+                "parallel": False
+            })
+
         else:
-            posture, face, gaze = _run_bytes_path()
+            # bytes 경로(표준화 파일로 재디코드) — 직렬
+            with open(mp4_path, "rb") as f:
+                processed_bytes = f.read()
+
+            posture = analyze_video_bytes(processed_bytes)
+            face = infer_face_video(processed_bytes, device, 1, None, return_points)
+
+            if disable_gaze:
+                print(f"[{_ts()}][GAZE] disabled via env DISABLE_GAZE=1")
+                gaze = {"status": "disabled", "reason": "env"}
+            else:
+                try:
+                    gaze = infer_gaze(processed_bytes, calib_data=calib_data)
+                except Exception as e:
+                    print(f"[{_ts()}][GAZE] disabled (exception): {e}")
+                    gaze = {"status": "disabled", "error": str(e)}
+
+            dbg.update({
+                "analyze_mode": "bytes(compat)",
+                "frames_api": False,
+                "stride_face_gaze": 1,
+                "postprocess_fps": target_fps,
+                "effective_fps_face_gaze": target_fps,
+                "timings_s": {"total": time.time() - t0},
+                "parallel": False
+            })
 
         out: Dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "device": device,
-            "stride": stride,
+            "stride": 1,
             "posture": posture,
             "emotion": face,
             "gaze": gaze,
@@ -449,6 +487,7 @@ def analyze_all(
         if return_debug:
             out["debug"] = dbg
         return out
+
     finally:
         try:
             if os.path.exists(mp4_path): os.remove(mp4_path)
