@@ -50,6 +50,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 # 런타임 의존성 설치
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 \
     libgl1 libglib2.0-0 libsm6 libxext6 \
     xz-utils curl ca-certificates jq \
     && rm -rf /var/lib/apt/lists/*
@@ -74,12 +75,71 @@ RUN set -eux; \
 # ============================ #
 # 최적화 ENV (기존 설정 유지)
 # ============================ #
-# (이전 Dockerfile의 모든 최적화 ENV 설정을 여기에 그대로 붙여넣으세요)
-# 예시:
-# ENV OMP_NUM_THREADS=2
-# ENV NVENC_PRESET=p1
-# ENV CUDA_VISIBLE_DEVICES=0
+###Tesla T4 (4 vCPU, 15GB RAM) 최적화
+ENV OMP_NUM_THREADS=2 \
+    OPENBLAS_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2 \
+    NUMEXPR_NUM_THREADS=2 \
+    TFLITE_NUM_THREADS=2 \
+    TOKENIZERS_PARALLELISM=false \
+    TF_CPP_MIN_LOG_LEVEL=2 \
+    GLOG_minloglevel=3 \
+    UVICORN_WORKERS=1
 
+###FFmpeg 설정
+ENV FFMPEG_PREFER_ORDER=h264_nvenc,libx264 \
+    FFMPEG_THREADS=3 \
+    FFMPEG_FILTER_THREADS=2 \
+    X264_PRESET=veryfast \
+    X264_CRF=28
+
+###라이브러리 경로
+ENV LD_LIBRARY_PATH=/usr/local/lib:/opt/ffmpeg/lib:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+
+###NVENC 설정
+ENV NVENC_PRESET=p1 \
+    NVENC_TUNE=ull \
+    NVENC_RC=cbr \
+    NVENC_BITRATE=1.5M \
+    NVENC_MAXRATE=1.5M \
+    NVENC_BUFSIZE=3M
+
+###CUDA/PyTorch 설정
+ENV CUDA_VISIBLE_DEVICES=0 \
+    TORCH_CUDNN_V8_API_ENABLED=1 \
+    PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512 \
+    CUDA_LAUNCH_BLOCKING=0
+
+###TensorFlow/MediaPipe GPU 전용 설정 (CPU 완전 차단)
+ENV TF_FORCE_GPU_ALLOW_GROWTH=true \
+    TF_GPU_ALLOCATOR=cuda_malloc_async \
+    TF_CPP_MIN_LOG_LEVEL=3 \
+    TF_DISABLE_XNNPACK=1 \
+    TF_DISABLE_ONEDNN=1 \
+    TF_DISABLE_MKL=1 \
+    TF_DISABLE_SEGMENT_REDUCTION=1 \
+    TF_LITE_DISABLE_CPU_DELEGATE=1 \
+    TF_LITE_DISABLE_XNNPACK=1 \
+    TF_LITE_FORCE_GPU_DELEGATE=1 \
+    TF_XLA_FLAGS="--tf_xla_auto_jit=0" \
+    TF_ENABLE_ONEDNN_OPTS=0 \
+    TF_FORCE_GPU_ONLY=1 \
+    MEDIAPIPE_ENABLE_GPU=1 \
+    MEDIAPIPE_GPU_DEVICE=0 \
+    MEDIAPIPE_FORCE_GPU_DELEGATE=1 \
+    MEDIAPIPE_DISABLE_CPU_DELEGATE=1 \
+    MEDIAPIPE_DISABLE_XNNPACK=1 \
+    MEDIAPIPE_DISABLE_CPU_INFERENCE=1 \
+    MEDIAPIPE_FORCE_GPU_ONLY=1
+
+###OpenCV GPU 가속 설정
+ENV OPENCV_DNN_BACKEND=5 \
+    OPENCV_DNN_TARGET=6
+
+###기타 GPU 가속 라이브러리 설정
+ENV NUMBA_ENABLE_CUDASIM=0 \
+    OPENVINO_DISABLE_CPU_PLUGIN=1 \
+    TENSORFLOW_LITE_DISABLE_CPU_DELEGATES=1
 # ============================ #
 # 빌더 산출물 복사
 # ============================ #
@@ -92,4 +152,4 @@ COPY --from=builder /app /app
 # ============================ #
 EXPOSE 8000
 # ✨ [수정] python 대신 가상 환경의 파이썬 실행 파일 전체 경로를 명시
-CMD ["/opt/venv/bin/python", "-m", "uvicorn", "app.main:app", "—host", "0.0.0.0", "—port", "8000"]
+CMD ["/opt/venv/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
