@@ -5,7 +5,6 @@ type Participant = {
   id: string;
   stream: MediaStream | null;
   isLocal?: boolean;
-  nickname?: string;
 };
 
 type ParticipantsDocs = {
@@ -61,7 +60,6 @@ export default function StudyRoomHeader({
                   stream={p.stream}
                   isLocal={p.isLocal}
                   userId={p.id}
-                  nickname={p.nickname}
                   roomId={roomId}
                   userDocs={getParticipantDocs(p.id)}
                   onDocsClick={handleDocsClick}
