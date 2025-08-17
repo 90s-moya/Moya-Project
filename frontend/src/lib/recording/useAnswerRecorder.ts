@@ -18,11 +18,13 @@ declare var ImageCapture: {
 export function useAnswerRecorder({ 
   key, 
   maxDurationSec = 60,
-  onUploadComplete
+  onUploadComplete,
+  onInterviewFinished
 }: { 
   key: QuestionKey; 
   maxDurationSec?: number;
   onUploadComplete?: () => void;
+  onInterviewFinished?: () => void;
 }) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -288,12 +290,19 @@ export function useAnswerRecorder({
         const fileName = `answer_${key.sessionId}_o${key.order}_s${key.subOrder}_${Date.now()}.wav`;
         const file = new File([wavBlob], fileName, { type: "audio/wav" });
         console.log("audiofile=======",file);
-        await sendFollowupAudio({
+        const result = await sendFollowupAudio({
           sessionId: key.sessionId,
           order1: key.order,
           subOrder: key.subOrder,
           audio: file,
         });
+
+        // 면접 완료 체크
+        if (result?.finished) {
+          console.log("🎉 useAnswerRecorder: 면접 완료 감지!");
+          onInterviewFinished?.();
+          return; // 더 이상 진행하지 않음
+        }
 
         // 응답 바디가 없다 → 성공만 표기
         markSynced(key, {});

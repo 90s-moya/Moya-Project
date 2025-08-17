@@ -6,6 +6,7 @@ import InterviewFileSelectPage from "@/pages/interview/InterviewFileSelectPage";
 import InterviewModeListPage from "@/pages/interview/InterviewModeListPage";
 import InterviewSetupPage from "@/pages/interview/InterviewSetupPage";
 import InterviewPage from "@/pages/interview/InterviewPage";
+import InterviewFinishPage from "@/pages/interview/InterviewFinishPage";
 
 const interviewRoutes: RouteObject[] = [
     {
@@ -27,6 +28,10 @@ const interviewRoutes: RouteObject[] = [
     {
         path: "interview",
         element: <InterviewPage />,
+    },
+    {
+        path: "interview/finish",
+        element: <InterviewFinishPage />,
     },
 ];
 export default interviewRoutes;
