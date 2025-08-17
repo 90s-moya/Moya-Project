@@ -6,6 +6,9 @@ import Header from "@/components/common/Header";
 import CloudFriends from "@/assets/images/cloud-friends.png";
 import { Mouse } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import InterviewGif from "@/assets/images/Interview.gif";
+import StudyGif from "@/assets/images/study.gif";
+import StudyGif2 from "@/assets/images/studymeeting.gif";
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -164,13 +167,14 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#2b7fff] to-[#1e5bcc] flex items-center justify-center aspect-[5/4]">
-                      <div className="text-white text-center p-8">
-                        <div className="text-4xl mb-4">🎯</div>
-                        <h3 className="text-xl font-bold mb-2">AI 면접</h3>
-                        <p className="text-sm opacity-90">맞춤형 질문 생성</p>
-                      </div>
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                      <img 
+                        src={InterviewGif} 
+                        alt="AI Interview" 
+                        className="w-full h-full object-cover"
+                      />
                     </div>
+
                   </div>
                   <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
                     <h2 className="text-3xl font-bold text-gray-800">AI 면접을 시작해보세요</h2>
@@ -183,12 +187,12 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row-reverse gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#ff6b6b] to-[#ee5a52] flex items-center justify-center aspect-[5/4]">
-                      <div className="text-white text-center p-8">
-                        <div className="text-4xl mb-4">📊</div>
-                        <h3 className="text-xl font-bold mb-2">결과 리포트</h3>
-                        <p className="text-sm opacity-90">상세한 분석 제공</p>
-                      </div>
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                      <img 
+                        src={CloudFriends} // import 한 gif 파일 경로
+                        alt="AI Interview" 
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   </div>
                   <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
@@ -202,12 +206,12 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#4ecdc4] to-[#44a08d] flex items-center justify-center aspect-[5/4]">
-                      <div className="text-white text-center p-8">
-                        <div className="text-4xl mb-4">👥</div>
-                        <h3 className="text-xl font-bold mb-2">스터디 매칭</h3>
-                        <p className="text-sm opacity-90">원하는 조건으로 매칭</p>
-                      </div>
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                      <img 
+                        src={StudyGif} 
+                        alt="AI Interview" 
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   </div>
                   <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
@@ -221,12 +225,12 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row-reverse gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#9b59b6] to-[#8e44ad] flex items-center justify-center aspect-[5/4]">
-                      <div className="text-white text-center p-8">
-                        <div className="text-4xl mb-4">💻</div>
-                        <h3 className="text-xl font-bold mb-2">온라인 스터디</h3>
-                        <p className="text-sm opacity-90">편리한 피드백 시스템</p>
-                      </div>
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                      <img 
+                        src={StudyGif2}
+                        alt="AI Interview" 
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   </div>
                   <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
@@ -240,12 +244,12 @@ export default function HomePage() {
               <div className="section relative z-10">
                 <div className="max-w-5xl mx-auto w-full px-6 flex flex-col lg:flex-row gap-12 items-center h-full">
                   <div className="flex justify-center w-full lg:w-1/2">
-                    <div className="w-full max-w-md rounded-xl shadow-2xl bg-gradient-to-br from-[#f39c12] to-[#e67e22] flex items-center justify-center aspect-[5/4]">
-                      <div className="text-white text-center p-8">
-                        <div className="text-4xl mb-4">💬</div>
-                        <h3 className="text-xl font-bold mb-2">피드백 관리</h3>
-                        <p className="text-sm opacity-90">체계적인 피드백 확인</p>
-                      </div>
+                    <div className="w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+                      <img 
+                        src={CloudFriends} // import 한 gif 파일 경로
+                        alt="AI Interview" 
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                   </div>
                   <div className="w-full lg:w-1/2 text-center lg:text-left space-y-6">
