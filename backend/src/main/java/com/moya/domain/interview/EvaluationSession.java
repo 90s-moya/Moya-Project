@@ -3,6 +3,7 @@ package com.moya.domain.interview;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -20,17 +21,19 @@ import java.util.UUID;
 public class EvaluationSession {
 
     @Id
-    @Column(name = "id", length = 36, nullable = false)
-    private String id; // UUID 문자열
+    @GeneratedValue(generator = "uuid2")
+    @GenericGenerator(name = "uuid2", strategy = "uuid2")
+    @Column(name = "id", columnDefinition = "BINARY(16)")
+    private UUID id;
 
-    @Column(name = "user_id", length = 36, nullable = false)
-    private String userId;
+    @Column(name = "user_id", columnDefinition = "BINARY(16)", nullable = false)
+    private UUID userId;
 
     @Column(name = "title", length = 100)
     private String title;
 
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
@@ -47,9 +50,6 @@ public class EvaluationSession {
 
     @PrePersist
     public void prePersist() {
-        if (this.id == null) {
-            this.id = UUID.randomUUID().toString();
-        }
         if (this.title == null) {
             this.title = "AI 모의면접 결과";
         }
