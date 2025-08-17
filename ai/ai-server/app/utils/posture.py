@@ -1,4 +1,6 @@
+# app/utils/posture.py
 from __future__ import annotations
+
 # ===== CPU 사용 최소화를 위한 환경변수 (반드시 mediapipe 임포트 전) =====
 import os
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -103,25 +105,38 @@ def _env_int(name: str, default: int) -> int:
     except Exception:
         return default
 
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except Exception:
+        return default
+
 # ----- 메인 -----
 def analyze_video_frames(
     frames: Iterable[np.ndarray],
     mode: str = "segments",
-    sample_every: int = None,                 # ← None면 env 또는 1
-    analyzed_fps: float | None = 15.0,
-    reported_fps: int | None = 30,
-    input_is_rgb: bool = True                 # frames 경로는 RGB, bytes 경로는 BGR
+    sample_every: int | None = None,        # ← None면 env 또는 1
+    analyzed_fps: float | None = 30.0,      # ← 기본 30fps로 “시간/프레임 환산”
+    reported_fps: int | None = 30,          # ← 리포트 프레임 환산도 30fps 고정
+    input_is_rgb: bool = True               # frames 경로는 RGB, bytes 경로는 BGR
 ) -> Dict[str, Any]:
     """
     - CPU 사용 최소화를 위해 XNNPACK 비활성화 및 스레드 1로 고정.
     - frames 경로일 때는 input_is_rgb=True로 전달하여 추가 변환을 피함.
     - sample_every는 환경변수 POSTURE_SAMPLE_EVERY로도 제어 가능(기본 1).
+    - analyzed_fps 기본값을 30.0으로 두어 detailed_logs_seconds / frames_reported 가 30fps 기준으로 산출되게 함.
     """
     assert mode in ("segments","samples")
     # 샘플링 주기: env가 우선
     if sample_every is None:
         sample_every = _env_int("POSTURE_SAMPLE_EVERY", 1)
     sample_every = max(1, int(sample_every))
+
+    # fps 기본값 보정 (env가 있으면 우선)
+    if analyzed_fps is None:
+        analyzed_fps = _env_float("POSTURE_ANALYZED_FPS", 30.0)
+    if reported_fps is None:
+        reported_fps = int(round(_env_float("POSTURE_REPORTED_FPS", analyzed_fps or 30.0)))
 
     # 가장 가벼운 설정 (CPU↓)
     pose_ctx = mp_pose.Pose(
@@ -168,7 +183,7 @@ def analyze_video_frames(
     else:
         detailed_logs = _compress_runs(sampled_frames, per_frame_labels, step=sample_every)
 
-    def _f2s(fr): return fr / float(analyzed_fps or 15.0)
+    def _f2s(fr): return fr / float(analyzed_fps or 30.0)
     def _f_report(fr):
         if not reported_fps: return int(fr)
         return int(round(_f2s(fr) * reported_fps))
@@ -184,6 +199,7 @@ def analyze_video_frames(
     total_seconds = None
     total_frames_reported = None
     if analyzed_fps:
+        # 주의: total_frames_read는 “전체 프레임 수”(샘플링 전) 기준
         total_seconds = total_frames_read / float(analyzed_fps)
         if reported_fps:
             detailed_logs_frames_reported = [{
@@ -200,8 +216,8 @@ def analyze_video_frames(
         "detailed_logs": detailed_logs,
         "detailed_logs_seconds": detailed_logs_seconds,
         "meta": {
-            "analyzed_fps": float(analyzed_fps or 15.0),
-            "reported_fps": int(reported_fps or (analyzed_fps or 15.0)),
+            "analyzed_fps": float(analyzed_fps or 30.0),
+            "reported_fps": int(reported_fps or (analyzed_fps or 30.0)),
             "sample_every": int(sample_every),
             "duration_s": float(total_seconds) if total_seconds is not None else None,
             "xnnpack_disabled": os.getenv("TF_LITE_DISABLE_XNNPACK") == "1",
@@ -219,13 +235,18 @@ def analyze_video_bytes(
     file_bytes: bytes,
     mode: str = "segments",
     sample_every: int | None = None,
-    analyzed_fps: float | None = None,
+    analyzed_fps: float | None = None,   # ← None이면 파일 FPS → 실패시 30
     reported_fps: int | None = None
 ):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
         tmp.write(file_bytes)
         tmp_path = tmp.name
     cap = cv2.VideoCapture(tmp_path)
+
+    # 파일 FPS 추출 (실패/비정상값이면 30으로)
+    cap_fps = cap.get(cv2.CAP_PROP_FPS)
+    if not cap_fps or cap_fps != cap_fps or cap_fps < 1.0 or cap_fps > 240.0:
+        cap_fps = _env_float("POSTURE_FILE_FPS_FALLBACK", 30.0)
 
     # 스트리밍 처리(리스트로 전부 안 올림 → 메모리↓)
     def _gen():
@@ -235,17 +256,13 @@ def analyze_video_bytes(
                 break
             yield frame  # BGR
 
-    # analyzed_fps가 없으면 보수적으로 15.0
-    if analyzed_fps is None:
-        analyzed_fps = 15.0
-
     try:
         return analyze_video_frames(
             _gen(),
             mode=mode,
             sample_every=sample_every,
-            analyzed_fps=analyzed_fps,
-            reported_fps=reported_fps or 30,
+            analyzed_fps=analyzed_fps if analyzed_fps is not None else float(cap_fps),
+            reported_fps=reported_fps if reported_fps is not None else int(round(cap_fps)),
             input_is_rgb=False,  # bytes 경로는 BGR
         )
     finally:

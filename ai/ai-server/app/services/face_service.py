@@ -1,6 +1,6 @@
 # app/services/face_service.py
 from __future__ import annotations
-import os, sys, io, tempfile, glob
+import os, sys, io, tempfile
 from pathlib import Path
 from functools import lru_cache
 from typing import List, Dict, Any, Optional, Iterable
@@ -33,12 +33,13 @@ _preprocess = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize(mean=(0.485,0.456,0.406), std=(0.229,0.224,0.225)),
 ])
+
 def _autocast_ctx(dev: str):
     if dev == "cuda":
         try:
-            return torch.amp.autocast("cuda")      # 신 API
+            return torch.amp.autocast("cuda")
         except Exception:
-            return torch.cuda.amp.autocast()       # 구버전 폴백
+            return torch.cuda.amp.autocast()
     return nullcontext()
 
 def cleanup_gpu_memory():
@@ -47,24 +48,10 @@ def cleanup_gpu_memory():
         import gc; gc.collect()
 
 def _resolve_ckpt() -> Optional[str]:
-    """
-    세 가지(또는 임의) 체크포인트를 유연하게 선택:
-    - FACE_CKPT: 절대/상대 경로 직접 지정 (최우선)
-    - FACE_MODEL_CHOICE: A/B/C/FER/RAF/AFFECT 중 택1
-        A -> FACE_CKPT_A
-        B -> FACE_CKPT_B
-        C -> FACE_CKPT_C
-        FER -> <FACE_CKPT_DIR>/fer2013*.pt(스캔)
-        RAF -> <FACE_CKPT_DIR>/raf*.pt(스캔)
-        AFFECT -> <FACE_CKPT_DIR>/affect*.pt(스캔)
-    - 없으면 FACE_CKPT_DIR(기본 Face_Resnet)에서 *.pt/*.pth/*.ckpt 자동 탐색
-    """
-    # 1) 명시 경로가 있으면 그것부터
     env_ckpt = os.getenv("FACE_CKPT")
     if env_ckpt and os.path.isfile(env_ckpt):
         return env_ckpt
 
-    # 2) 선택지 기반 (A/B/C or 별칭)
     choice = (os.getenv("FACE_MODEL_CHOICE") or "").strip().upper()
     ckpt_dir = Path(os.getenv("FACE_CKPT_DIR") or str(FACE_DIR))
     mapping_env = {
@@ -77,7 +64,6 @@ def _resolve_ckpt() -> Optional[str]:
         if os.path.isfile(p):
             return p
 
-    # 3) 별칭: FER/RAF/AFFECT → 디렉터리 스캔
     patterns_by_choice = {
         "FER":    ["fer2013*.pt", "fer*.pt", "fer*.pth", "fer*.ckpt"],
         "RAF":    ["raf*.pt", "raf*.pth", "raf*.ckpt"],
@@ -89,7 +75,6 @@ def _resolve_ckpt() -> Optional[str]:
                 if path.is_file():
                     return str(path)
 
-    # 4) 마지막으로 일반 스캔 (가장 그럴듯한 이름 우선)
     scan_patterns = [
         "raf*.pt", "fer*.pt", "affect*.pt",
         "*.pt", "*.pth", "*.ckpt"
@@ -99,15 +84,12 @@ def _resolve_ckpt() -> Optional[str]:
             if path.is_file():
                 return str(path)
 
-    # 5) 못 찾으면 None → ImageNet 사전학습만 사용
     return None
 
 @lru_cache(maxsize=1)
 def get_face_model(device: str = "cuda"):
     dev = "cuda" if (device == "cuda" and torch.cuda.is_available()) else "cpu"
     model = load_model(_resolve_ckpt(), device=dev, num_classes=len(CLASS_NAMES))
-
-    # ★★ 여기 추가: Dynamo eager로 강제 (Triton/컴파일러 불필요)
     try:
         import torch._dynamo as dynamo
         model = dynamo.optimize("eager")(model)
@@ -122,7 +104,10 @@ def get_face_model(device: str = "cuda"):
     return model, dev
 
 def _detect_face_roi(bgr: np.ndarray, margin: float = 0.25) -> np.ndarray:
-    # 가장 단순하고 가벼운 Haar 사용(없으면 중앙크롭 폴백)
+    """
+    간단 Haar 기반. 실패 시 중앙크롭 폴백 → 항상 ROI 반환하도록 해서
+    'total_frames == 처리한 프레임 수'가 되도록 보장.
+    """
     try:
         cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
         face_cascade = cv2.CascadeClassifier(cascade_path)
@@ -144,6 +129,21 @@ def _detect_face_roi(bgr: np.ndarray, margin: float = 0.25) -> np.ndarray:
         y0 = max(0, (h - size)//2); x0 = max(0, (w - size)//2)
         return bgr[y0:y0+size, x0:x0+size]
 
+def _compress_runs_1based(labels: List[str]) -> List[Dict[str, int | str]]:
+    """
+    라벨 시퀀스를 1-based 연속구간으로 압축.
+    """
+    n = len(labels)
+    if n == 0: return []
+    segs: List[Dict[str, int | str]] = []
+    cur = labels[0]; start = 1
+    for i in range(2, n + 1):
+        if labels[i - 1] != cur:
+            segs.append({"label": cur, "start_frame": start, "end_frame": i - 1})
+            cur = labels[i - 1]; start = i
+    segs.append({"label": cur, "start_frame": start, "end_frame": n})
+    return segs
+
 def infer_face_frames(
     frames: Iterable[np.ndarray],
     device: str = "cuda",
@@ -151,57 +151,79 @@ def infer_face_frames(
     return_points: bool = False,
     batch: int = 16
 ) -> Dict[str, Any]:
+    """
+    반환 형식:
+    {
+      "timestamp": "...",
+      "total_frames": N,                 # 처리된 프레임 개수 (stride 반영)
+      "frame_distribution": {"fear":186, "sad":22, ...},
+      "detailed_logs": [
+        {"label":"sad","start_frame":1,"end_frame":5},
+        {"label":"fear","start_frame":6,"end_frame":8},
+        ...
+      ],
+      # (옵션) return_points=True면
+      "timeline": [{"frame": i, "label": "..."} ...]
+    }
+    """
     model, dev = get_face_model(device)
     xs: List[torch.Tensor] = []
-    frame_ids: List[int] = []
-    probs_sum = torch.zeros(len(CLASS_NAMES), dtype=torch.float32, device=("cuda" if dev=="cuda" else "cpu"))
+    frame_ids: List[int] = []          # 원본 인덱스(0-based)
+    labels_seq: List[str] = []         # 처리 순서대로 라벨(1프레임=1라벨; stride 반영)
+    timeline: List[Dict[str, int | str]] = []
 
     def _flush():
-        nonlocal xs, frame_ids, probs_sum
-        if not xs: return []
+        nonlocal xs, frame_ids, labels_seq, timeline
+        if not xs: return
         x = torch.stack(xs, dim=0).to(dev, non_blocking=True)
         if dev == "cuda":
             x = x.half()
         with torch.no_grad():
             with _autocast_ctx(dev):
                 logits = model(x)
-        p = F.softmax(logits, dim=1)  
-        probs_sum += p.sum(dim=0)
-        outs = p.detach().cpu().numpy()
-        xs.clear(); ids = frame_ids[:]; frame_ids.clear()
-        return [{"frame_idx": ids[i], "probs": outs[i]} for i in range(len(ids))]
+        probs = F.softmax(logits, dim=1)  # (B, C)
+        top_idx = torch.argmax(probs, dim=1).tolist()
+        for j, tid in enumerate(top_idx):
+            lbl = CLASS_NAMES[int(tid)]
+            labels_seq.append(lbl)
+            if return_points:
+                # timeline은 "처리된 프레임 순번"이 아니라 "원본 인덱스"도 함께 줄 수 있음
+                timeline.append({"frame": frame_ids[j], "label": lbl})
+        xs.clear(); frame_ids.clear()
 
-    timeline: List[Dict[str, Any]] = []
-    samples_cnt = 0
+    # iterate frames
+    processed = 0
     for i, bgr in enumerate(frames):
-        if i % max(1, stride) != 0: continue
+        if i % max(1, stride) != 0:
+            continue
         roi = _detect_face_roi(bgr, margin=0.25)
         img = Image.fromarray(cv2.cvtColor(roi, cv2.COLOR_BGR2RGB))
         xs.append(_preprocess(img))
-        frame_ids.append(i); samples_cnt += 1
+        frame_ids.append(i)
+        processed += 1
         if len(xs) >= batch:
-            frame_outs = _flush()
-            if return_points:
-                for fo in frame_outs:
-                    top = int(np.argmax(fo["probs"]))
-                    timeline.append({"frame": fo["frame_idx"], "label": CLASS_NAMES[top]})
-    # 잔여 플러시
-    frame_outs = _flush()
-    if return_points:
-        for fo in frame_outs:
-            top = int(np.argmax(fo["probs"]))
-            timeline.append({"frame": fo["frame_idx"], "label": CLASS_NAMES[top]})
+            _flush()
 
-    probs_mean = (probs_sum / max(1, samples_cnt)).cpu().numpy()
-    top_idx = int(np.argmax(probs_mean))
-    result = {
-        "label": CLASS_NAMES[top_idx],
-        "score": float(probs_mean[top_idx]),
-        "probs": {CLASS_NAMES[i]: float(probs_mean[i]) for i in range(len(CLASS_NAMES))},
-        "samples": int(samples_cnt),
+    _flush()  # 남은 배치
+
+    # 리포트 생성
+    total_frames = len(labels_seq)      # stride 반영된 샘플 개수
+    # 분포
+    dist: Dict[str, int] = {}
+    for lb in labels_seq:
+        dist[lb] = dist.get(lb, 0) + 1
+    # 연속구간(1-based)
+    segments = _compress_runs_1based(labels_seq)
+
+    result: Dict[str, Any] = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "total_frames": int(total_frames),
+        "frame_distribution": dist,
+        "detailed_logs": segments,
     }
     if return_points:
         result["timeline"] = timeline
+
     if dev == "cuda":
         cleanup_gpu_memory()
     return result
@@ -215,18 +237,28 @@ def infer_face_video(
     return_points: bool = False,
     optimization_level: str = "balanced",
 ) -> Dict[str, Any]:
+    """
+    비디오 바이트를 읽어 프레임 시퀀스로 변환 후 infer_face_frames에 위임.
+    결과는 세그먼트 리포트 형식.
+    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
         tmp.write(video_bytes); tmp_path = tmp.name
     cap = cv2.VideoCapture(tmp_path)
     frames: List[np.ndarray] = []
-    while True:
-        ok, frame = cap.read()
-        if not ok: break
-        frames.append(frame)
-        if max_frames and len(frames) >= max_frames: break
-    cap.release()
-    try: os.remove(tmp_path)
-    except Exception: pass
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok: break
+            frames.append(frame)
+            if max_frames and len(frames) >= max_frames: break
+    finally:
+        cap.release()
+        try: os.remove(tmp_path)
+        except Exception: pass
+
     if not frames:
         raise RuntimeError("no frames")
-    return infer_face_frames(frames, device=device, stride=stride, return_points=return_points)
+
+    return infer_face_frames(
+        frames, device=device, stride=stride, return_points=return_points
+    )

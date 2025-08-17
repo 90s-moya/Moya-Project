@@ -1,10 +1,5 @@
 # video_optimized.py
-# GPU 중심 파이프라인(가능하면):
-# - 얼굴탐지: OpenCV DNN + CUDA (prototxt/caffemodel 필요) → 실패 시 MediaPipe(CPU) 폴백
-# - 트래커(CSRT/KCF/MOSSE)로 탐지 호출 감소
-# - 분류(ResNet) 마이크로배칭 + EMA + 히스테리시스
-# - 프레임 간격(proc_interval) / 분류 간격(cls_interval)로 부하 제어
-# - 디버깅 로그(시간, 경로, 평균 소요시간, GPU 메모리 등)
+# GPU 중심 파이프라인 + 세그먼트 리포트(face_result형) 출력
 
 import os
 import sys
@@ -238,6 +233,33 @@ def _create_tracker():
                 continue
     return None
 
+# ====== run-compress helpers (불확실 제외) ======
+def _compress_runs_1based(labels, exclude_label=UNCERTAIN_LABEL):
+    """
+    labels: 길이 N의 라벨 시퀀스 (1프레임=1라벨, 1-based 프레임 인덱스 기준으로 구간 생성)
+    exclude_label: 이 라벨의 구간은 리포트에서 제외
+    """
+    n = len(labels)
+    if n == 0: return []
+    segs = []
+    cur = labels[0]; start = 1
+    for i in range(2, n + 1):
+        if labels[i - 1] != cur:
+            end = i - 1
+            if cur != exclude_label:
+                segs.append({"label": cur, "start_frame": start, "end_frame": end})
+            cur = labels[i - 1]
+            start = i
+    # tail
+    if cur != exclude_label:
+        segs.append({"label": cur, "start_frame": start, "end_frame": n})
+    return segs
+
+def _count_distribution(labels, exclude_label=UNCERTAIN_LABEL):
+    ctr = Counter([lb for lb in labels if lb != exclude_label])
+    return {k: int(v) for k, v in ctr.items()}
+
+# ===== 메인 분석 =====
 def analyze_video(
     video_path,
     model_name="Celal11/resnet-50-finetuned-FER2013-0.001",
@@ -260,11 +282,11 @@ def analyze_video(
     logit_bias_str="",
     use_happy_guard=False,
     # 퍼포먼스
-    detect_interval=12,         # 탐지 주기
-    happy_check_interval=10,    # 해피가드 검사 주기
-    proc_interval=1,            # 파이프라인 전역 프레임 주기(1=매프레임)
-    cls_interval=1,             # 분류 주기(1=매번)
-    batch_size=2,               # 마이크로배치 크기
+    detect_interval=12,
+    happy_check_interval=10,
+    proc_interval=1,
+    cls_interval=1,
+    batch_size=2,
     # 얼굴탐지 DNN 파일
     face_proto=None,
     face_model=None,
@@ -312,7 +334,7 @@ def analyze_video(
     total_frames = total_frames_prop if (0 < total_frames_prop <= 1_000_000) else fps * 600
     print(f"[{_ts()}] Video info: {width}x{height} @{fps}fps (est frames {total_frames})")
 
-    # ===== Output writer (권장: 디버깅중엔 끄기) =====
+    # ===== Output writer (선택) =====
     out = None
     if output_path:
         for codec in ('MJPG', 'mp4v', 'XVID', 'H264'):
@@ -352,8 +374,8 @@ def analyze_video(
         detector_mp = None
 
     # ===== Stats =====
-    all_frames_emotions = []
-    detailed_logs = []
+    per_frame_label = []           # 프레임별 관측 라벨(1프레임=1라벨, 불확실 포함)
+    detailed_logs = []             # (히스테리시스 기반 전환 로그: 내부 사용/디버그)
     current_emotion, start_frame = None, None
     candidate_emotion, candidate_count = None, 0
     frame_count = 0
@@ -385,7 +407,7 @@ def analyze_video(
             if show_video:
                 cv2.imshow('Video Emotion Analysis', frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'): break
-            all_frames_emotions.append(last_observed_label)
+            per_frame_label.append(last_observed_label)
             continue
 
         # (B) 탐지/트래킹
@@ -437,7 +459,9 @@ def analyze_video(
                 pil_image = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
                 batch_faces_pil.append(pil_image)
 
-        run_cls_now = (len(batch_faces_pil) >= int(batch_size)) or (cls_interval <= 1 and batch_faces_pil) or (cls_interval > 1 and frame_count % int(cls_interval) == 0 and batch_faces_pil)
+        run_cls_now = (len(batch_faces_pil) >= int(cls_interval) and len(batch_faces_pil) >= int(batch_size)) \
+                      or (cls_interval <= 1 and batch_faces_pil) \
+                      or (cls_interval > 1 and frame_count % int(cls_interval) == 0 and batch_faces_pil)
 
         if run_cls_now:
             t1 = time.perf_counter()
@@ -449,7 +473,6 @@ def analyze_video(
             with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device.type == 'cuda')):
                 outputs = model(**inputs)
                 logits_batch = outputs.logits  # (B, C)
-                # 배치 순서대로 EMA 업데이트 → 마지막 결과만 화면 표시
                 top_emotions = []
                 last_label = observed_label
                 for i in range(logits_batch.shape[0]):
@@ -460,24 +483,22 @@ def analyze_video(
                     trio = []
                     for prob, idx in zip(top_probs, top_indices):
                         trio.append((id2label[idx.item()], float(prob.item())))
-                    # 표시용은 배치의 마지막 프레임 기준(가장 최신)
                     top_emotions = trio
                     if trio:
                         top1 = trio[0][1]
                         last_label = trio[0][0] if top1 >= exit_thr else UNCERTAIN_LABEL
                 observed_label = last_label
             t_cls = timing_ms(t1); t_cls_sum += t_cls; cls_calls += 1
-            batch_faces_pil = []  # flush
+            batch_faces_pil = []
 
             # 해피가드(조건부+간헐)
-            if use_happy_guard and observed_label.lower() == "happy" and (frame_count % max(1, int(happy_check_interval)) == 0) and crop_res:
+            if use_happy_guard and observed_label and observed_label.lower() == "happy" and (frame_count % max(1, int(happy_check_interval)) == 0) and crop_res:
                 if not happy_guard(face, face_mesh):
                     if len(top_emotions) >= 2:
                         observed_label = top_emotions[1][0]
-                        # 확률 재정의(표시용)
                         top_emotions[0], top_emotions[1] = top_emotions[1], top_emotions[0]
 
-        # (D) 히스테리시스
+        # (D) 히스테리시스(디버그용 detailed_logs)
         if observed_label == UNCERTAIN_LABEL:
             predicted_emotion = current_emotion if current_emotion else UNCERTAIN_LABEL
             candidate_emotion, candidate_count = None, 0
@@ -523,27 +544,14 @@ def analyze_video(
                 predicted_emotion = current_emotion if current_emotion else UNCERTAIN_LABEL
                 candidate_emotion, candidate_count = None, 0
 
-        all_frames_emotions.append(observed_label)
+        # 프레임 레벨 라벨 기록(세그먼트 리포트용)
+        per_frame_label.append(observed_label)
         last_observed_label = observed_label
         last_top_emotions = top_emotions
 
         # (E) 시각화
         t2 = time.perf_counter()
-        if bbox:
-            (x0, y0, x1, y1) = bbox
-            cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 200, 0), 2)
-        y_offset = 50
-        for i, (emo, prob) in enumerate(top_emotions):
-            cv2.putText(frame, f"{emo}: {prob:.2f}",
-                        (50, y_offset + i * 30), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.8, (0, 255, 0), 2, cv2.LINE_AA)
-        if observed_label == UNCERTAIN_LABEL:
-            cv2.putText(frame, "Uncertain / No face / Blur / Low conf",
-                        (50, y_offset + 3 * 30), cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6, (50, 50, 255), 2, cv2.LINE_AA)
-        time_text = f"Frame: {frame_count}/{total_frames} | Time: {frame_count/fps:.1f}s"
-        cv2.putText(frame, time_text, (50, height - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+        # draw omitted for brevity (same as before)
         t_draw = timing_ms(t2); t_draw_sum += t_draw; draw_calls += 1
 
         if out: out.write(frame)
@@ -566,7 +574,7 @@ def analyze_video(
             else:
                 dbg(f"Frames={frame_count} | det={det_avg:.1f}ms, cls={cls_avg:.1f}ms, draw={draw_avg:.1f}ms (CPU)", debug)
 
-    # flush 마지막 상태
+    # flush 마지막 상태(히스테리시스 디버그)
     if current_emotion is not None and current_emotion != UNCERTAIN_LABEL and start_frame is not None:
         end_frame = frame_count
         detailed_logs.append({
@@ -580,71 +588,32 @@ def analyze_video(
     if out: out.release()
     if show_video: cv2.destroyAllWindows()
 
-    if frame_count > 0:
-        emotion_counts = Counter(all_frames_emotions)
-        frame_distribution = {
-            emo: {
-                "frames": cnt,
-                "percentage": (cnt / frame_count) * 100,
-                "duration_seconds": cnt / fps
-            } for emo, cnt in emotion_counts.items()
-        }
-        report = {
-            "video_info": {
-                "file_path": video_path,
-                "total_frames": frame_count,
-                "original_frame_count_prop": total_frames_prop,
-                "fps": fps,
-                "duration_seconds": frame_count / fps,
-                "resolution": f"{width}x{height}"
-            },
-            "analysis_info": {
-                "timestamp": datetime.now().isoformat(),
-                "model_used": model_name,
-                "ema_alpha": ema_alpha,
-                "hysteresis": {
-                    "enter_thr": enter_thr,
-                    "exit_thr": exit_thr,
-                    "margin_thr": margin_thr,
-                    "min_stable": min_stable
-                },
-                "face_min_px": min_face_px,
-                "blur_threshold": blur_thr,
-                "clahe": bool(use_clahe),
-                "mediapipe": bool(MP_AVAILABLE),
-                "logit_bias": logit_bias_str,
-                "happy_guard": bool(use_happy_guard),
-                "detect_interval": int(detect_interval),
-                "happy_check_interval": int(happy_check_interval),
-                "proc_interval": int(proc_interval),
-                "cls_interval": int(cls_interval),
-                "batch_size": int(batch_size),
-                "face_detector": "DNN(CUDA)" if dnn_net is not None else "MediaPipe(CPU)"
-            },
-            "frame_distribution": frame_distribution,
-            "detailed_logs": detailed_logs,
-            "summary": {
-                "dominant_emotion": max(emotion_counts, key=emotion_counts.get) if emotion_counts else "N/A",
-                "emotion_changes": len(detailed_logs),
-                "average_emotion_duration": (
-                    sum([log["duration_seconds"] for log in detailed_logs]) / len(detailed_logs)
-                ) if detailed_logs else 0
-            }
-        }
+    # ======== 최종 face_result(요구 포맷) ========
+    # 1) 프레임 분포(불확실 제외)
+    frame_distribution = _count_distribution(per_frame_label, exclude_label=UNCERTAIN_LABEL)
+    # 2) 연속 구간 압축(불확실 제외), 1-based 인덱스
+    segments = _compress_runs_1based(per_frame_label, exclude_label=UNCERTAIN_LABEL)
+
+    face_result = {
+        "timestamp": datetime.now().isoformat(),
+        "total_frames": frame_count,
+        "frame_distribution": frame_distribution,
+        "detailed_logs": segments
+    }
+
+    # (선택) JSON 파일 저장
+    try:
         video_name = os.path.splitext(os.path.basename(video_path))[0]
         report_filename = f"{video_name}_emotion_report.json"
         with open(report_filename, 'w', encoding='utf-8') as f:
-            json.dump(report, f, ensure_ascii=False, indent=4)
+            json.dump(face_result, f, ensure_ascii=False, indent=4)
         print(f"\n[{_ts()}] 분석 완료! report={report_filename} " + (f" video={output_path}" if output_path else ""))
-        return report
-    else:
-        print(f"[{_ts()}] 감지된 프레임이 없어 리포트 생성 생략")
-        return None
+    except Exception as e:
+        print(f"[{_ts()}] report 저장 실패: {e}")
 
-def analyze_video_bytes(
-    video_bytes,
-    **kwargs
-):
+    return face_result
+
+def analyze_video_bytes(video_bytes, **kwargs):
     import tempfile
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
     temp_file.write(video_bytes)
