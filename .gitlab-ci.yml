@@ -183,6 +183,7 @@ deploy-ai-dev-gpu:
     - docker rm ai-dev || true
     - >
       docker run -d --name ai-dev -p 8001:8000 --gpus all
+      -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
       -e DB_HOST="$DB_HOST"
@@ -234,6 +235,7 @@ deploy-ai-prod-gpu:
     - docker rm ai-main || true
     - >
       docker run -d --name ai-main -p 8000:8000 --gpus all
+      -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
       -e DB_HOST="$DB_HOST"
