@@ -352,7 +352,7 @@ export function useAnswerRecorder({
             `${order}_${subOrder}.webm`,
             { type: usedMime }
           )
-          const calibData = localStorage.getItem("calibData");
+          const calibData = localStorage.getItem("gaze_calibration_data");
           const formData = new FormData();
           formData.append("file", file);
           formData.append("interviewSessionId", localStorage.getItem("interviewSessionId") ?? "");
