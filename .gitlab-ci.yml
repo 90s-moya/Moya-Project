@@ -123,6 +123,7 @@ build-ai-ec2:
     - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
     - docker push gyujh630/moya-ai:cache
     - docker image prune -f
+  tags:
     - ec2
   only:
     - ai-dev
