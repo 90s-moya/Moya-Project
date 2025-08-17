@@ -37,8 +37,9 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
 
     // 감정 상태별 y축 값 매핑
     const emotionYValues = {
-      'sad': 2,
-      'fear': 1
+      'negative': 1,
+      'neutral': 2,
+      'positive': 3
     };
 
     const data: { frame: number; emotion: number }[] = [];
@@ -51,11 +52,33 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
 
       data.push({
         frame,
-        emotion: currentEmotion ? emotionYValues[currentEmotion.label as keyof typeof emotionYValues] : 0
+        emotion: currentEmotion ? emotionYValues[currentEmotion.label as keyof typeof emotionYValues] || 2 : 2
       });
     }
 
     return data;
+  };
+
+  // X축 틱 간격을 동적으로 계산하는 함수
+  const calculateXAxisInterval = () => {
+    if (!face_result?.detailed_logs || face_result.detailed_logs.length === 0) {
+      return 1;
+    }
+    
+    const firstStart = face_result.detailed_logs[0]?.start_frame || 0;
+    const lastEnd = face_result.detailed_logs[face_result.detailed_logs.length - 1]?.end_frame || 0;
+    const totalSeconds = (lastEnd - firstStart) / 30; // 총 영상 길이 (초)
+    
+    // 영상 길이에 따른 적절한 간격 계산
+    if (totalSeconds <= 15) {
+      return 1; // 15초 이하: 1초마다 표시
+    } else if (totalSeconds <= 30) {
+      return 2; // 30초 이하: 2초마다 표시
+    } else if (totalSeconds <= 60) {
+      return 4; // 60초 이하: 4초마다 표시
+    } else {
+      return Math.ceil(totalSeconds / 15); // 60초 초과: 약 15개 틱이 되도록 조정
+    }
   };
 
   // 원형 그래프용 데이터 생성
@@ -73,6 +96,7 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
 
   const lineChartData = generateLineChartData();
   const pieChartData = generatePieChartData();
+  const xAxisInterval = calculateXAxisInterval();
 
   // 데이터가 없는 경우 처리
   if (!face_result || !face_result.detailed_logs || face_result.detailed_logs.length === 0) {
@@ -112,15 +136,16 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
                     tickFormatter={frameToTime}
                     fontSize={10}
                     tick={{ fill: '#9CA3AF' }}
-                    interval={2}
+                    interval={xAxisInterval}
                   />
                   <YAxis
-                    domain={[0.5, 2.5]}
-                    ticks={[1, 2]}
+                    domain={[0.5, 3.5]}
+                    ticks={[1, 2, 3]}
                     tickFormatter={(value) => {
                       switch (value) {
-                        case 1: return getFaceStatusText('fear');
-                        case 2: return getFaceStatusText('sad');
+                        case 1: return getFaceStatusText('negative');
+                        case 2: return getFaceStatusText('neutral');
+                        case 3: return getFaceStatusText('positive');
                         default: return '';
                       }
                     }}
@@ -133,8 +158,9 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
                     labelFormatter={frameToTime}
                     formatter={(value) => {
                       switch (value) {
-                        case 1: return [getFaceStatusText('fear')];
-                        case 2: return [getFaceStatusText('sad')];
+                        case 1: return [getFaceStatusText('negative')];
+                        case 2: return [getFaceStatusText('neutral')];
+                        case 3: return [getFaceStatusText('positive')];
                         default: return ['Unknown'];
                       }
                     }}
@@ -172,26 +198,42 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
             <h4 className="text-sm font-semibold text-[#2B7FFF]">감정 상태 분포</h4>
           </div>
           <div className="bg-white p-4 rounded-lg border border-[#dedee4] shadow-sm">
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieChartData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    innerRadius={50}
-                    dataKey="value"
-                    label={({ percent }) => `${((percent || 0) * 100).toFixed(1)}%`}
-                    labelLine={false}
-                  >
-                    {pieChartData.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+            {pieChartData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center">
+                <p className="text-gray-500">원형 그래프 데이터가 없습니다.</p>
+              </div>
+            ) : (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      innerRadius={50}
+                      dataKey="value"
+                      label={({ percent }) => `${((percent || 0) * 100).toFixed(1)}%`}
+                      labelLine={false}
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value, name) => [`${value}프레임`, name]}
+                      contentStyle={{
+                        fontSize: '11px',
+                        border: '1px solid #dedee4',
+                        borderRadius: '6px',
+                        backgroundColor: 'white',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
             <div className="mt-4 flex flex-wrap gap-3">
               {pieChartData.map((entry, index) => (
                 <div key={index} className="flex items-center gap-2 text-xs">
@@ -210,31 +252,49 @@ const FaceAnalysis: React.FC<FaceAnalysisProps> = ({ face_result, onFrameChange 
             <h4 className="text-sm font-semibold text-[#2B7FFF]">감정 피드백</h4>
           </div>
           {(() => {
-            const fearData = pieChartData.find(entry => entry.name === getFaceStatusText('fear'));
-            const fearPercentage =
-              fearData
-                ? (fearData.value / pieChartData.reduce((sum, entry) => sum + entry.value, 0)) * 100
-                : 0;
+            const totalFrames = pieChartData.reduce((sum, entry) => sum + entry.value, 0);
+            
+            const positiveData = pieChartData.find(entry => entry.name === getFaceStatusText('positive'));
+            const negativeData = pieChartData.find(entry => entry.name === getFaceStatusText('negative'));
+            const neutralData = pieChartData.find(entry => entry.name === getFaceStatusText('neutral'));
+            
+            const positivePercentage = positiveData ? (positiveData.value / totalFrames) * 100 : 0;
+            const negativePercentage = negativeData ? (negativeData.value / totalFrames) * 100 : 0;
+            const neutralPercentage = neutralData ? (neutralData.value / totalFrames) * 100 : 0;
 
-            if (fearPercentage >= 70) {
+            // 긍정적인 표정이 50% 이상
+            if (positivePercentage >= 50) {
+              return (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200 shadow-sm">
+                  <p className="text-sm font-medium text-green-700 mb-2">긍정적인 표정이 인상적이에요! 😊</p>
+                  <p className="mt-1 text-xs text-gray-600">밝고 긍정적인 표정으로 좋은 인상을 주고 있어요. 면접관에게 호감을 줄 수 있습니다.</p>
+                </div>
+              );
+            }
+            // 부정적인 표정이 30% 이상
+            else if (negativePercentage >= 30) {
               return (
                 <div className="bg-gradient-to-r from-red-50 to-rose-50 p-4 rounded-lg border border-red-200 shadow-sm">
-                  <p className="text-sm font-medium text-red-700 mb-2">긴장감이 많이 보여요 😰</p>
-                  <p className="mt-1 text-xs text-gray-600">면접 중에 두려움이 많이 드러나고 있어요. 긴장을 풀고 자신감을 가져보세요.</p>
+                  <p className="text-sm font-medium text-red-700 mb-2">부정적인 표정이 자주 보여요 😰</p>
+                  <p className="mt-1 text-xs text-gray-600">스트레스나 긴장감이 표정에 드러나고 있어요. 심호흡을 하며 편안한 마음을 가져보세요.</p>
                 </div>
               );
-            } else if (fearPercentage >= 30) {
+            }
+            // 중립적인 표정이 대부분 (70% 이상)
+            else if (neutralPercentage >= 70) {
+              return (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200 shadow-sm">
+                  <p className="text-sm font-medium text-blue-700 mb-2">안정적인 표정을 유지했어요 😌</p>
+                  <p className="mt-1 text-xs text-gray-600">차분하고 안정적인 표정을 보여주고 있어요. 조금 더 밝은 표정을 지어보면 더욱 좋을 것 같아요.</p>
+                </div>
+              );
+            }
+            // 균형잡힌 상태
+            else {
               return (
                 <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-lg border border-yellow-200 shadow-sm">
-                  <p className="text-sm font-medium text-yellow-700 mb-2">적당한 긴장감이 있어요 😊</p>
-                  <p className="mt-1 text-xs text-gray-600">면접에 대한 긴장감이 적절히 나타나고 있어요. 자연스러운 모습입니다.</p>
-                </div>
-              );
-            } else {
-              return (
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg border border-green-200 shadow-sm">
-                  <p className="text-sm font-medium text-green-700 mb-2">자연스러운 표정을 잘 유지했어요! 😌</p>
-                  <p className="mt-1 text-xs text-gray-600">긴장감 없이 편안하고 자연스러운 표정을 보여주고 있어요.</p>
+                  <p className="text-sm font-medium text-yellow-700 mb-2">자연스러운 표정 변화를 보여줘요 😊</p>
+                  <p className="mt-1 text-xs text-gray-600">다양한 감정이 자연스럽게 드러나고 있어요. 상황에 맞는 적절한 표현력을 보여주고 있습니다.</p>
                 </div>
               );
             }
