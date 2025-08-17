@@ -1,16 +1,35 @@
-# app/utils/posture.py
 from __future__ import annotations
+# ===== CPU 사용 최소화를 위한 환경변수 (반드시 mediapipe 임포트 전) =====
+import os
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+# TFLite/XNNPACK 멀티스레딩 억제 → CPU 사용량↓ (느려질 수 있음)
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+os.environ.setdefault("TF_LITE_DISABLE_XNNPACK", "1")   # 중요: XNNPACK CPU delegate 끄기
+# XNNPACK이 내부적으로 쓰는 pthreadpool도 제한 (가능한 경우에만)
+os.environ.setdefault("PTHREADPOOL_THREADS", "1")
+
 import cv2
+try:
+    # OpenCV 자체 스레드도 차단
+    cv2.setNumThreads(0)
+except Exception:
+    pass
+
 import mediapipe as mp
 from collections import Counter
 import numpy as np
 import datetime
 import tempfile
-import os
 from typing import Iterable, List, Dict, Any, Optional
 
 mp_pose = mp.solutions.pose
 
+# ----- 유틸 -----
 def _get_center(p1, p2):
     return [(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]
 
@@ -24,14 +43,18 @@ def _extract_feedbacks(landmarks, mp_pose):
     nose = get_xy(mp_pose.PoseLandmark.NOSE.value)
     r_eye = get_xy(mp_pose.PoseLandmark.RIGHT_EYE.value)
     l_eye = get_xy(mp_pose.PoseLandmark.LEFT_EYE.value)
+
     shoulder_center = _get_center(r_shoulder, l_shoulder)
     eye_center = _get_center(r_eye, l_eye)
+
     shoulder_diff_y = abs(r_shoulder[1] - l_shoulder[1])
     head_down_ratio = abs(nose[1] - eye_center[1])
     off_center_ratio = abs(nose[0] - shoulder_center[0])
+
     if shoulder_diff_y > 0.03: feedbacks.append("Shoulders Uneven")
     if head_down_ratio > 0.07: feedbacks.append("Head Down")
     if off_center_ratio > 0.05: feedbacks.append("Head Off-Center")
+
     upper_parts = [
         mp_pose.PoseLandmark.LEFT_ELBOW, mp_pose.PoseLandmark.RIGHT_ELBOW,
         mp_pose.PoseLandmark.LEFT_WRIST, mp_pose.PoseLandmark.RIGHT_WRIST,
@@ -43,6 +66,7 @@ def _extract_feedbacks(landmarks, mp_pose):
         if part_y < shoulder_y:
             feedbacks.append("Hands Above Shoulders")
             break
+
     if not feedbacks:
         feedbacks.append("Good Posture")
     return feedbacks
@@ -73,32 +97,64 @@ def _compress_runs(sampled_frames, labels, step):
     segments.append({"label": cur_label, "start_frame": int(seg_start), "end_frame": int(prev_frame)})
     return segments
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except Exception:
+        return default
+
+# ----- 메인 -----
 def analyze_video_frames(
     frames: Iterable[np.ndarray],
     mode: str = "segments",
-    sample_every: int = 1,
+    sample_every: int = None,                 # ← None면 env 또는 1
     analyzed_fps: float | None = 15.0,
-    reported_fps: int | None = 30
+    reported_fps: int | None = 30,
+    input_is_rgb: bool = True                 # frames 경로는 RGB, bytes 경로는 BGR
 ) -> Dict[str, Any]:
+    """
+    - CPU 사용 최소화를 위해 XNNPACK 비활성화 및 스레드 1로 고정.
+    - frames 경로일 때는 input_is_rgb=True로 전달하여 추가 변환을 피함.
+    - sample_every는 환경변수 POSTURE_SAMPLE_EVERY로도 제어 가능(기본 1).
+    """
     assert mode in ("segments","samples")
-    assert sample_every >= 1
+    # 샘플링 주기: env가 우선
+    if sample_every is None:
+        sample_every = _env_int("POSTURE_SAMPLE_EVERY", 1)
+    sample_every = max(1, int(sample_every))
+
+    # 가장 가벼운 설정 (CPU↓)
     pose_ctx = mp_pose.Pose(
-        static_image_mode=False, min_detection_confidence=0.5, model_complexity=0,
-        enable_segmentation=False, smooth_landmarks=True, min_tracking_confidence=0.5
+        static_image_mode=False,
+        model_complexity=0,
+        enable_segmentation=False,
+        smooth_landmarks=True,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
     )
+
     try:
         total_frames_read = 0
         sampled_frames: List[int] = []
         per_frame_labels: List[str] = []
-        for i, bgr in enumerate(frames):
+
+        for i, frame in enumerate(frames):
             total_frames_read += 1
             if (i % sample_every) != 0:
                 continue
-            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+
+            # frames 경로: 이미 RGB. bytes 경로: BGR → RGB 변환 필요.
+            if input_is_rgb:
+                rgb = frame
+            else:
+                rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
             results = pose_ctx.process(rgb)
-            feedbacks = []
             if results.pose_landmarks:
                 feedbacks = _extract_feedbacks(results.pose_landmarks.landmark, mp_pose)
+            else:
+                feedbacks = []
+
             label = _choose_label(feedbacks)
             sampled_frames.append(i)
             per_frame_labels.append(label)
@@ -106,6 +162,7 @@ def analyze_video_frames(
         pose_ctx.close()
 
     frame_distribution = {k: int(v) for k, v in Counter(per_frame_labels).items()} if per_frame_labels else {}
+
     if mode == "samples":
         detailed_logs = [{"frame": int(f), "label": lb} for f, lb in zip(sampled_frames, per_frame_labels)]
     else:
@@ -147,6 +204,8 @@ def analyze_video_frames(
             "reported_fps": int(reported_fps or (analyzed_fps or 15.0)),
             "sample_every": int(sample_every),
             "duration_s": float(total_seconds) if total_seconds is not None else None,
+            "xnnpack_disabled": os.getenv("TF_LITE_DISABLE_XNNPACK") == "1",
+            "cv2_threads": 0,
         }
     }
     if detailed_logs_frames_reported is not None:
@@ -154,11 +213,12 @@ def analyze_video_frames(
         report["total_frames_reported"] = total_frames_reported
     return report
 
-# ====== 기존 analyze_video_bytes는 호환용으로 유지 ======
+
+# ====== bytes 경로(호환) — 이 경로는 프레임이 BGR라 input_is_rgb=False ======
 def analyze_video_bytes(
     file_bytes: bytes,
     mode: str = "segments",
-    sample_every: int = 1,
+    sample_every: int | None = None,
     analyzed_fps: float | None = None,
     reported_fps: int | None = None
 ):
@@ -166,16 +226,29 @@ def analyze_video_bytes(
         tmp.write(file_bytes)
         tmp_path = tmp.name
     cap = cv2.VideoCapture(tmp_path)
-    frames = []
-    while True:
-        ok, frame = cap.read()
-        if not ok: break
-        frames.append(frame)
-    cap.release()
-    try: os.remove(tmp_path)
-    except Exception: pass
-    # analyzed_fps가 없으면 VideoCapture 추정값 사용(대략)
+
+    # 스트리밍 처리(리스트로 전부 안 올림 → 메모리↓)
+    def _gen():
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            yield frame  # BGR
+
+    # analyzed_fps가 없으면 보수적으로 15.0
     if analyzed_fps is None:
         analyzed_fps = 15.0
-    return analyze_video_frames(frames, mode=mode, sample_every=sample_every,
-                                analyzed_fps=analyzed_fps, reported_fps=reported_fps or 30)
+
+    try:
+        return analyze_video_frames(
+            _gen(),
+            mode=mode,
+            sample_every=sample_every,
+            analyzed_fps=analyzed_fps,
+            reported_fps=reported_fps or 30,
+            input_is_rgb=False,  # bytes 경로는 BGR
+        )
+    finally:
+        cap.release()
+        try: os.remove(tmp_path)
+        except Exception: pass
