@@ -10,13 +10,11 @@ import {
 } from "@/api/studyApi";
 import { useMediaStore } from "@/store/useMediaStore";
 import type { StudyRoomDetail } from "@/types/study";
-import UserApi from "@/api/userApi";
 
 type Participant = {
   id: string;
   stream: MediaStream | null;
   isLocal?: boolean;
-  nickname?: string;
 };
 
 type ParticipantsDocs = {
@@ -66,24 +64,6 @@ export function useStudyRoom() {
   >(null);
   const [feedbackTargetUserId, setFeedbackTargetUserId] = useState<string>("");
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
-
-  // 닉네임 관련
-  const [myNickname, setMyNickname] = useState<string>("");
-
-  // 내 닉네임 가져오기
-  useEffect(() => {
-    const fetchMyNickname = async () => {
-      try {
-        const res = await UserApi.getMyInfo();
-        console.log("닉네임 API 응답:", res.data);
-        setMyNickname(res.data.nickname || "");
-      } catch (error) {
-        console.error("닉네임 조회 실패:", error);
-      }
-    };
-
-    fetchMyNickname();
-  }, []);
 
   // 방 정보 가져오기
   useEffect(() => {
@@ -446,9 +426,9 @@ export function useStudyRoom() {
     }
   }, [participants.length, roomId]); // participants.length를 의존성에 추가
 
-  // WebRTC 연결 설정 (닉네임 로드 후에 시작)
+  // WebRTC 연결 설정
   useEffect(() => {
-    if (signalingRef.current || !myNickname) return;
+    if (signalingRef.current) return;
 
     const userInfo = localStorage.getItem("auth-storage") || "{}";
     const parsed = JSON.parse(userInfo);
@@ -469,12 +449,7 @@ export function useStudyRoom() {
         // console.log("받은 메세지", data);
 
         if (data.type === "join") {
-          console.log(
-            "새 참가자 join:",
-            data.senderId,
-            "닉네임:",
-            data.nickname
-          );
+          // console.log("새 참가자 join입니다.", data.senderId);
 
           // 연결 생성과 participants 추가를 더 신중하게 처리
           await peerManager.createConnectionWith(data.senderId);
@@ -489,29 +464,18 @@ export function useStudyRoom() {
             const exists = prev.some((p) => p.id === data.senderId);
 
             if (exists) {
-              console.log("이미 존재하는 참가자입니다.", data.senderId);
+              // console.log("이미 존재하는 참가자입니다.", data.senderId);
               return prev;
             }
 
-            console.log(
-              "새 참가자 추가:",
-              data.senderId,
-              "닉네임:",
-              data.nickname
-            );
+            // console.log("새 참가자 추가합니다.", data.senderId);
             return [
               ...prev,
-              {
-                id: data.senderId,
-                stream: null,
-                isLocal: false,
-                nickname:
-                  data.nickname || `참가자 ${data.senderId.slice(0, 8)}`,
-              },
+              { id: data.senderId, stream: null, isLocal: false },
             ];
           });
 
-          console.log("새 참여자 연결!");
+          // console.log("새 참여자 연결!");
           return;
         }
 
@@ -601,47 +565,16 @@ export function useStudyRoom() {
       stopFixedRef.current = stopFixed;
       setParticipants((prev) => [
         ...prev.filter((p) => p.id !== myId),
-        {
-          id: myId,
-          stream: fixed30,
-          isLocal: true,
-          nickname: myNickname || "",
-        }, // 내 모습
+        { id: myId, stream: fixed30, isLocal: true }, // 내 모습
       ]);
       peerManager.setLocalStream(fixed30); // 다른 참가자들에게
-      console.log("join 메시지 전송:", {
-        type: "join",
-        senderId: myId,
-        nickname: myNickname || "",
-      });
-      signaling.send({
-        type: "join",
-        senderId: myId,
-        nickname: myNickname || "",
-      });
+      signaling.send({ type: "join", senderId: myId });
     })();
-  }, []);
+  }, []); // 의존성 배열을 비워서 한 번만 실행
 
-  // 내 닉네임이 로드되면 다른 참가자들에게 재전송
-  useEffect(() => {
-    if (myNickname && signalingRef.current && myIdRef.current) {
-      console.log("닉네임 로드 완료, 재전송:", myNickname);
+  // 피드백 관련 함수들
 
-      // 다른 참가자들에게 업데이트된 닉네임 전송
-      signalingRef.current.send({
-        type: "join",
-        senderId: myIdRef.current,
-        nickname: myNickname,
-      });
-
-      // 내 participants 정보도 업데이트
-      setParticipants((prev) =>
-        prev.map((p) => (p.isLocal ? { ...p, nickname: myNickname } : p))
-      );
-    }
-  }, [myNickname]); // 닉네임이 로드되면 실행
-
-  // 피드백 팝업 열기
+  // 피드백 팝업 열기기
   const handleOpenFeedback = useCallback(
     (userId: string, type: "POSITIVE" | "NEGATIVE") => {
       setFeedbackTargetUserId(userId);
@@ -716,7 +649,5 @@ export function useStudyRoom() {
     handleCloseFeedback,
     handleSubmitFeedback,
     setFeedbackMessage,
-    // 닉네임 관련
-    myNickname,
   };
 }

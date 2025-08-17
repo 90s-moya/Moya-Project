@@ -1,13 +1,11 @@
 import VideoTile from "./VideoTile";
 import Carousel from "./FileCarousel";
 import { Card } from "@/components/ui/card";
-import { FileText, Users, X } from "lucide-react";
 
 type Participant = {
   id: string;
   stream: MediaStream | null;
   isLocal?: boolean;
-  nickname?: string;
 };
 
 type ParticipantsDocs = {
@@ -66,7 +64,6 @@ export default function StudyRoomContent({
           stream={participant.stream}
           isLocal={participant.isLocal}
           userId={participant.id}
-          nickname={participant.nickname}
           roomId={roomId}
           userDocs={userDocs}
           onDocsClick={handleDocsClick}
@@ -99,7 +96,6 @@ export default function StudyRoomContent({
                     stream={participant.stream}
                     isLocal={participant.isLocal}
                     userId={participant.id}
-                    nickname={participant.nickname}
                     roomId={roomId}
                     userDocs={getParticipantDocs(participant.id)}
                     onDocsClick={handleDocsClick}
