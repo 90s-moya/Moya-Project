@@ -9,8 +9,8 @@ import com.moya.infras.report.ReportDto;
 import com.moya.infras.report.ResultDetailResponse;
 import com.moya.infras.report.ResultDto;
 import com.moya.infras.report.TitleUpdateDto;
-import com.moya.interfaces.api.report.TitleUpdateRequest;
-import com.moya.interfaces.api.report.UserIdRequest;
+import com.moya.interfaces.api.report.request.TitleUpdateRequest;
+import com.moya.interfaces.api.report.request.UserIdRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
@@ -21,7 +21,7 @@ import org.springframework.web.client.RestTemplate;
 @Service
 public class ReportService {
 
-    @Value("${PYTHON_PATH}") // FastAPI 베이스 URL
+    @Value("${STT_PATH}") // FastAPI 베이스 URL
     private String pythonPath;
 
     private final RestTemplate restTemplate;
