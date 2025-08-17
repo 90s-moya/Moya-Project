@@ -17,6 +17,16 @@ os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
 os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
 
+def _ts() -> str:
+    return datetime.now().strftime("%H:%M:%S")
+
+print(f"[{_ts()}][BOOT] OMP_NUM_THREADS={os.getenv('OMP_NUM_THREADS')} "
+      f"MKL_NUM_THREADS={os.getenv('MKL_NUM_THREADS')} "
+      f"OPENBLAS_NUM_THREADS={os.getenv('OPENBLAS_NUM_THREADS')} "
+      f"NUMEXPR_NUM_THREADS={os.getenv('NUMEXPR_NUM_THREADS')} "
+      f"TF_INTRA={os.getenv('TF_NUM_INTRAOP_THREADS')} "
+      f"TF_INTER={os.getenv('TF_NUM_INTEROP_THREADS')}")
+
 # bytes 경로 (호환)
 from app.utils.posture import analyze_video_bytes
 from app.services.gaze_service import infer_gaze, infer_gaze_frames
@@ -25,14 +35,13 @@ from app.services.face_service import infer_face_video, infer_face_frames
 # frames 경로 지원 여부 확인
 try:
     from app.utils.posture import analyze_video_frames  # type: ignore
-except Exception:
+    print(f"[{_ts()}][IMPORT] analyze_video_frames FOUND (single-decode frames path available)")
+except Exception as e:
     analyze_video_frames = None  # type: ignore
+    print(f"[{_ts()}][IMPORT] analyze_video_frames NOT FOUND -> will use bytes path if needed ({e})")
 
 
 # ---------- helpers ----------
-def _ts() -> str:
-    return datetime.now().strftime("%H:%M:%S")
-
 def _env_true(name: str, default: str = "0") -> bool:
     v = os.getenv(name, default)
     return str(v).lower() in ("1", "true", "yes", "on")
@@ -46,7 +55,10 @@ def _which(ffbin_env: str, fallback_names: list[str]) -> str:
     cand += fallback_names
     for name in cand:
         path = name if "/" in name else shutil.which(name or "")
-        if path: return path
+        if path:
+            print(f"[{_ts()}][FFMPEG] {_ts()} {_ts()} {_ts()} {_ts()}")  # keep simple
+            print(f"[{_ts()}][FFMPEG] Resolved {ffbin_env} -> {path}")
+            return path
     raise RuntimeError(f"{ffbin_env} / ff binary not found among: {cand}")
 
 def _which_ffmpeg() -> str:
@@ -61,15 +73,26 @@ def _which_ffprobe_soft() -> Optional[str]:
                  "ffprobe", "/usr/bin/ffprobe"]:
         if not name: continue
         path = name if "/" in name else shutil.which(name)
-        if path: return path
+        if path:
+            print(f"[{_ts()}][FFPROBE] Resolved -> {path}")
+            return path
+    print(f"[{_ts()}][FFPROBE] Not found (soft)")
     return None
 
 def _run_ffmpeg(cmd: list[str]) -> None:
+    print(f"[{_ts()}][FFMPEG] RUN: {' '.join(cmd)}")
     res = subprocess.run(cmd, capture_output=True, text=True)
     if res.returncode != 0:
+        print(f"[{_ts()}][FFMPEG] STDERR:\n{res.stderr.strip()}")
         raise RuntimeError(
             f"FFmpeg 실패(code={res.returncode})\nCMD: {' '.join(cmd)}\nSTDERR:\n{res.stderr.strip()}"
         )
+    else:
+        if res.stderr.strip():
+            print(f"[{_ts()}][FFMPEG] STDERR(non-fatal):\n{res.stderr.strip()}")
+        if res.stdout.strip():
+            print(f"[{_ts()}][FFMPEG] STDOUT:\n{res.stdout.strip()}")
+        print(f"[{_ts()}][FFMPEG] OK")
 
 def _ffprobe_soft(in_path: str) -> dict:
     ffprobe = _which_ffprobe_soft()
@@ -78,8 +101,14 @@ def _ffprobe_soft(in_path: str) -> dict:
             "-select_streams", "v:0", "-of", "json", in_path]
     try:
         out = subprocess.check_output(args, text=True)
-        return json.loads(out)
-    except Exception:
+        info = json.loads(out)
+        v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
+        print(f"[{_ts()}][FFPROBE] ok: codec={v.get('codec_name')} "
+              f"pix_fmt={v.get('pix_fmt')} size={v.get('width')}x{v.get('height')} "
+              f"r_frame_rate={v.get('r_frame_rate')} format={info.get('format',{}).get('format_name')}")
+        return info
+    except Exception as e:
+        print(f"[{_ts()}][FFPROBE] failed: {e}")
         return {}
 
 def _has(ffmpeg: str, kind: str, name: str) -> bool:
@@ -90,8 +119,11 @@ def _has(ffmpeg: str, kind: str, name: str) -> bool:
             out = subprocess.check_output([ffmpeg, "-v", "error", "-filters"], text=True)
         else:
             return False
-        return name in out
-    except Exception:
+        ok = name in out
+        print(f"[{_ts()}][FFMPEG] has {kind} {name}? -> {ok}")
+        return ok
+    except Exception as e:
+        print(f"[{_ts()}][FFMPEG] has {kind} {name}? -> fail ({e})")
         return False
 
 def _parse_fps(r_frame_rate: Optional[str]) -> float:
@@ -130,6 +162,8 @@ def preprocess_video_to_mp4_file(
     keep_aspect: bool = False,
     drop_audio: bool = True,
 ) -> tuple[str, Dict[str, Any]]:
+    print(f"[{_ts()}][PRE] target_fps={target_fps} resize_to={resize_to} "
+          f"max_frames={max_frames} drop_audio={drop_audio}")
     ffmpeg = _which_ffmpeg()
     threads = os.getenv("FFMPEG_THREADS", "1")
     filter_threads = os.getenv("FFMPEG_FILTER_THREADS", "1")
@@ -144,15 +178,22 @@ def preprocess_video_to_mp4_file(
     nvenc_maxrate= os.getenv("NVENC_MAXRATE", "2.5M")
     nvenc_bufsize= os.getenv("NVENC_BUFSIZE", "5M")
 
+    print(f"[{_ts()}][PRE] FFMPEG_THREADS={threads} FILTER_THREADS={filter_threads} "
+          f"NVENC(preset={nvenc_preset}, tune={nvenc_tune}, rc={nvenc_rc}) "
+          f"bitrate={nvenc_bitrate}/{nvenc_maxrate}, buf={nvenc_bufsize}")
+
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp_in:
         tmp_in.write(video_bytes)
         in_path = tmp_in.name
     out_path = in_path + "_processed.mp4"
+    print(f"[{_ts()}][PRE] temp in={in_path} out={out_path}")
 
     info = _ffprobe_soft(in_path)
     has_nvenc = _has(ffmpeg, "encoder", "h264_nvenc")
     has_scale_cuda = _has(ffmpeg, "filter", "scale_cuda") or _has(ffmpeg, "filter", "scale_npp")
     allow_cpu_fallback = _env_true("ALLOW_CPU_FALLBACK", "0")
+    print(f"[{_ts()}][PRE] has_nvenc={has_nvenc} has_scale_cuda/npp={has_scale_cuda} "
+          f"ALLOW_CPU_FALLBACK={allow_cpu_fallback}")
 
     def _scale_vf():
         if not resize_to: return None
@@ -247,6 +288,7 @@ def preprocess_video_to_mp4_file(
         can_copy = False
         if info and not resize_to and (not target_fps or target_fps <= 0) and (max_frames is None):
             can_copy = _can_remux_to_mp4_without_reencode(info, None, None)
+        print(f"[{_ts()}][PRE] remux_copy_possible={can_copy}")
 
         if can_copy:
             cmd = build_copy_cmd()
@@ -265,8 +307,10 @@ def preprocess_video_to_mp4_file(
                 })
                 try:
                     _run_ffmpeg(cmd); nvenc_success = True
+                    print(f"[{_ts()}][PRE] GPU path OK (NVDEC->NVENC)")
                 except RuntimeError as e:
                     debug["nvenc_error"] = str(e)
+                    print(f"[{_ts()}][PRE] GPU path FAILED -> {e}")
 
             if not nvenc_success:
                 if allow_cpu_fallback:
@@ -278,6 +322,7 @@ def preprocess_video_to_mp4_file(
                         "scale": "scale(cpu)" if resize_to else None,
                         "cmd": " ".join(cmd)
                     })
+                    print(f"[{_ts()}][PRE] CPU fallback ENABLED -> run x264")
                     _run_ffmpeg(cmd)
                 else:
                     debug.update({
@@ -288,12 +333,14 @@ def preprocess_video_to_mp4_file(
                         "cmd": None,
                         "notes": debug.get("notes", []) + ["skipped transcode to avoid CPU usage"]
                     })
+                    print(f"[{_ts()}][PRE] SKIP transcode (no NVENC & CPU fallback disabled) -> use original")
                     return in_path, debug
 
         return out_path, debug
 
-    except Exception:
-        debug.setdefault("notes", []).append("transcode failed; using original")
+    except Exception as e:
+        debug.setdefault("notes", []).append(f"transcode failed; using original ({e})")
+        print(f"[{_ts()}][PRE] TRANSCODE FAILED -> use original input ({e})")
         return in_path, debug
 
 
@@ -302,36 +349,58 @@ class VideoFrameIterator:
     def __init__(self, mp4_path: str, stride: int = 1):
         self.mp4_path = mp4_path
         self.stride = max(1, int(stride))
+        print(f"[{_ts()}][ITER] init path={mp4_path} stride={self.stride}")
+
     def __iter__(self):
+        debug_frames = _env_true("DEBUG_FRAMES", "0")
+        printed = 0
+        # Try OpenCV first
         try:
             import cv2
-            try: cv2.setNumThreads(0)
-            except Exception: pass
+            try:
+                cv2.setNumThreads(0)
+            except Exception:
+                pass
+            print(f"[{_ts()}][ITER] OpenCV version={cv2.__version__} (try VideoCapture)")
             cap = cv2.VideoCapture(self.mp4_path)
-            if not cap.isOpened(): raise RuntimeError("cv2.VideoCapture open failed")
+            if not cap.isOpened():
+                raise RuntimeError("cv2.VideoCapture open failed")
             i = 0
             try:
                 while True:
                     ok, bgr = cap.read()
                     if not ok: break
                     if (i % self.stride) == 0:
+                        if debug_frames and printed < 3:
+                            print(f"[{_ts()}][ITER] cv2 frame {i} shape={bgr.shape}")
+                            printed += 1
                         yield bgr[..., ::-1]  # BGR->RGB
                     i += 1
+                print(f"[{_ts()}][ITER] cv2 done (frames={i})")
             finally:
                 cap.release()
             return
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[{_ts()}][ITER] cv2 path failed -> {e}")
+
+        # Fallback to PyAV
         try:
             import av  # type: ignore
+            print(f"[{_ts()}][ITER] PyAV path (decode)")
             i = 0
             with av.open(self.mp4_path) as c:
                 for frame in c.decode(video=0):
                     if (i % self.stride) == 0:
-                        yield frame.to_ndarray(format="rgb24")
+                        arr = frame.to_ndarray(format="rgb24")
+                        if debug_frames and printed < 3:
+                            print(f"[{_ts()}][ITER] av frame {i} shape={arr.shape}")
+                            printed += 1
+                        yield arr
                     i += 1
+            print(f"[{_ts()}][ITER] PyAV done (frames={i})")
             return
         except Exception as e:
+            print(f"[{_ts()}][ITER] PyAV path failed -> {e}")
             raise RuntimeError(f"VideoFrameIterator failed: {e}")
 
 
@@ -343,6 +412,7 @@ def _fix_posture_meta(posture: Dict[str, Any], decoded_frames: int, fps_used: fl
         meta["analyzed_fps"] = float(fps_used)
         meta["duration_s"] = float(decoded_frames / max(1e-6, fps_used))
         posture["meta"] = meta
+        print(f"[{_ts()}][POSTURE] meta fixed: frames={decoded_frames} fps={fps_used}")
     except Exception as e:
         print(f"[{_ts()}][POSTURE] meta fix skipped: {e}")
 
@@ -360,14 +430,31 @@ def analyze_all(
     return_debug: bool = False,
     stream_mode: str = "auto",
 ):
+    print(f"[{_ts()}][ENTRY] analyze_all(start) target_fps={target_fps} resize_to={resize_to} "
+          f"max_frames={max_frames} stream_mode={stream_mode}")
+
     if device is None:
         try:
             import torch  # type: ignore
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            try: torch.set_num_threads(1)
-            except Exception: pass
-        except Exception:
+            dev = "cuda" if torch.cuda.is_available() else "cpu"
+            device = dev
+            try:
+                torch.set_num_threads(1)
+            except Exception:
+                pass
+            print(f"[{_ts()}][DEVICE] torch available={True} cuda={torch.cuda.is_available()} device={device}")
+            if device == "cuda":
+                try:
+                    print(f"[{_ts()}][DEVICE] GPU name: {torch.cuda.get_device_name(0)}")
+                except Exception:
+                    pass
+        except Exception as e:
             device = "cpu"
+            print(f"[{_ts()}][DEVICE] torch not available -> CPU ({e})")
+
+    print(f"[{_ts()}][ENV] DISABLE_GAZE={_env_true('DISABLE_GAZE','0')} "
+          f"ALLOW_CPU_FALLBACK={_env_true('ALLOW_CPU_FALLBACK','0')} "
+          f"DEBUG_FRAMES={_env_true('DEBUG_FRAMES','0')}")
 
     mp4_path, dbg = preprocess_video_to_mp4_file(
         video_bytes=video_bytes,
@@ -383,19 +470,26 @@ def analyze_all(
         dbg.setdefault("notes", []).append("gaze: disabled via env")
 
     frames_api_ok = (analyze_video_frames is not None) and (infer_face_frames is not None)
+    print(f"[{_ts()}][PATH] frames_api_ok={frames_api_ok}")
 
     try:
         t0 = time.time()
 
         if stream_mode == "frames" or (stream_mode == "auto" and frames_api_ok):
+            print(f"[{_ts()}][MODE] single-decode FRAMES path")
             frames_all = list(VideoFrameIterator(mp4_path, stride=1))
             n_all = len(frames_all)
             fps_used = float(target_fps) if target_fps else 0.0
+            print(f"[{_ts()}][FRAMES] decoded={n_all} fps_used={fps_used}")
 
+            t_pose = time.time()
             posture = analyze_video_frames(frames_all)  # type: ignore
             _fix_posture_meta(posture, decoded_frames=n_all, fps_used=fps_used)
+            print(f"[{_ts()}][TIME] posture={time.time()-t_pose:.3f}s")
 
+            t_face = time.time()
             face = infer_face_frames(frames_all, device=device, stride=1, return_points=return_points)  # type: ignore
+            print(f"[{_ts()}][TIME] face={time.time()-t_face:.3f}s")
 
             if disable_gaze:
                 print(f"[{_ts()}][GAZE] disabled via env DISABLE_GAZE=1")
@@ -407,13 +501,15 @@ def analyze_all(
                         "vectors": len(calib_data.get("calibration_vectors", [])),
                         "screen": calib_data.get("screen_settings") or {},
                     }
-                    print(f"[{_ts()}][GAZE] enabled; calib points={dbg['gaze_calib_meta']['points']}, "
-                          f"vectors={dbg['gaze_calib_meta']['vectors']}, "
+                    print(f"[{_ts()}][GAZE] calib provided: points={dbg['gaze_calib_meta']['points']} "
+                          f"vectors={dbg['gaze_calib_meta']['vectors']} "
                           f"screen={dbg['gaze_calib_meta']['screen']}")
                 else:
-                    print(f"[{_ts()}][GAZE] enabled; calib=NONE (will fallback)")
+                    print(f"[{_ts()}][GAZE] calib=NONE (service will fallback if supported)")
+                t_gaze = time.time()
                 try:
                     gaze = infer_gaze_frames(frames_all, calib_data=calib_data)  # type: ignore
+                    print(f"[{_ts()}][TIME] gaze={time.time()-t_gaze:.3f}s")
                 except Exception as e:
                     print(f"[{_ts()}][GAZE] disabled (exception): {e}")
                     gaze = {"status": "disabled", "error": str(e)}
@@ -430,11 +526,17 @@ def analyze_all(
             })
 
         else:
+            print(f"[{_ts()}][MODE] BYTES(compat) path (services re-decode)")
             with open(mp4_path, "rb") as f:
                 processed_bytes = f.read()
 
+            t_pose = time.time()
             posture = analyze_video_bytes(processed_bytes)
+            print(f"[{_ts()}][TIME] posture(bytes)={time.time()-t_pose:.3f}s")
+
+            t_face = time.time()
             face = infer_face_video(processed_bytes, device, 1, None, return_points)
+            print(f"[{_ts()}][TIME] face(bytes)={time.time()-t_face:.3f}s")
 
             if disable_gaze:
                 print(f"[{_ts()}][GAZE] disabled via env DISABLE_GAZE=1")
@@ -446,8 +548,12 @@ def analyze_all(
                         "vectors": len(calib_data.get("calibration_vectors", [])),
                         "screen": calib_data.get("screen_settings") or {},
                     }
+                    print(f"[{_ts()}][GAZE] calib provided: points={dbg['gaze_calib_meta']['points']} "
+                          f"vectors={dbg['gaze_calib_meta']['vectors']}")
+                t_gaze = time.time()
                 try:
                     gaze = infer_gaze(processed_bytes, calib_data=calib_data)
+                    print(f"[{_ts()}][TIME] gaze(bytes)={time.time()-t_gaze:.3f}s")
                 except Exception as e:
                     print(f"[{_ts()}][GAZE] disabled (exception): {e}")
                     gaze = {"status": "disabled", "error": str(e)}
@@ -472,10 +578,13 @@ def analyze_all(
         }
         if return_debug:
             out["debug"] = dbg
+        print(f"[{_ts()}][DONE] analyze_all total={time.time()-t0:.3f}s mode={dbg.get('analyze_mode')}")
         return out
 
     finally:
         try:
-            if os.path.exists(mp4_path): os.remove(mp4_path)
-        except Exception:
-            pass
+            if os.path.exists(mp4_path):
+                os.remove(mp4_path)
+                print(f"[{_ts()}][CLEAN] removed {mp4_path}")
+        except Exception as e:
+            print(f"[{_ts()}][CLEAN] rm failed: {e}")
