@@ -620,30 +620,28 @@ export function useStudyRoom() {
         nickname: myNickname || "",
       });
     })();
-  }, [myNickname]); // myNickname이 로드된 후에 실행
+  }, []);
 
-  // 내 닉네임이 변경되었을 때 participants 업데이트 및 다른 참가자들에게 알림
+  // 내 닉네임이 로드되면 다른 참가자들에게 재전송
   useEffect(() => {
-    if (myNickname && myIdRef.current && signalingRef.current) {
-      console.log("닉네임 업데이트:", myNickname);
+    if (myNickname && signalingRef.current && myIdRef.current) {
+      console.log("닉네임 로드 완료, 재전송:", myNickname);
 
-      // 내 participants 정보 업데이트
-      setParticipants((prev) =>
-        prev.map((p) => (p.isLocal ? { ...p, nickname: myNickname } : p))
-      );
-
-      // 기존 참가자들에게 닉네임 정보 전송 (재입장 형태)
+      // 다른 참가자들에게 업데이트된 닉네임 전송
       signalingRef.current.send({
         type: "join",
         senderId: myIdRef.current,
         nickname: myNickname,
       });
+
+      // 내 participants 정보도 업데이트
+      setParticipants((prev) =>
+        prev.map((p) => (p.isLocal ? { ...p, nickname: myNickname } : p))
+      );
     }
-  }, [myNickname]);
+  }, [myNickname]); // 닉네임이 로드되면 실행
 
-  // 피드백 관련 함수들
-
-  // 피드백 팝업 열기기
+  // 피드백 팝업 열기
   const handleOpenFeedback = useCallback(
     (userId: string, type: "POSITIVE" | "NEGATIVE") => {
       setFeedbackTargetUserId(userId);
