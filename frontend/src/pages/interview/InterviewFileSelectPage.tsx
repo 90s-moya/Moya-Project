@@ -111,7 +111,7 @@ export default function InterviewFileSelectPage() {
     try {
       setLoading(true);
       const extracted = await extractTextFromPdf(payload);
-      navigate("/interview/modelist", { state: { ...extracted } });
+      navigate("/interview/setup", { state: { ...extracted } });
     } catch (err: any) {
       const status = err?.response?.status;
       console.error("[/v1/pdf] failed:", status, err?.response?.data || err);
