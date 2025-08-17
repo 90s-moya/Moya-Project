@@ -14,31 +14,16 @@ async def ask_gpt_if_ends_async(question_list: list[str], answer_list: list[str]
     경량 모델을 사용해 응답 지연을 낮춤.
     """
     prompt = """
-            당신은 면접 지원자를 평가한 경력이 10년 차 되는 면접관입니다.
-            다음은 면접 지원자의 답변입니다.
-            답변을 평가하세요.
-            항목: is_ended, reason_end, context_matched, reason_context, speech_analysis, gpt_comment.
-            출력 형식: 질문 N: ... (기존 형식 그대로)
-
-            평가기준 요약(형식 엄수):
-            - is_ended: 답변 **전체의 모든 문장**이 명확히 종결되었으면 True, 문장 중 **하나라도** 말끝 흐림/미완/군더더기 반복/접속어로 끝나면 False.
-            - 종결 예: “~했습니다”, “~합니다”, “~했다”, “~해요” 등 완결 종결 어미
-            - 비종결 예: “~같고요”, “~했는데요”, “~하고…”, “~그래서…”, “어…”, “음…” 등
-            - context_matched: 질문 의도와 의미상 일치 여부(True/False)
-            - speech_analysis: filler_word_ratio(%), speaking_speed(wpm), ending_style(+/-), verbosity(sentence_count)
-            - ending_style: 모든 문장 종결 시 +, 하나라도 흐리면 -
-            - verbosity: 문장 수
-
-            작성 규칙:
-            - True/False의 대소문자를 정확히 지키세요.
-            - 두 개의 ‘근거:’ 줄에는 **반드시** 답변 원문을 1~2개 **"직접 인용"**하여 포함하세요.
-            - ‘GPT 코멘트:’는 **반드시** 다음으로 시작하세요: [등급: 우수] 또는 [등급: 미흡]
-            - 매핑: is_ended=True → [등급: 우수], is_ended=False → [등급: 미흡]
-            - 왜 그 등급인지 답변의 **"직접 인용"**을 포함해 1~2문장으로 설명하고,
-                가능하면 말미에 (filler X%, wpm Y, 종결 +/-, 문장수 N) 형식의 요약 지표를 괄호로 덧붙이세요.
-            - 지정한 출력 라벨/순서 외의 텍스트나 헤더, 표, 코드블록을 추가하지 마세요.
-            """
-
+        당신은 면접 지원자를 평가한 경력이 10년 차 되는 면접관입니다.
+        다음은 면접 지원자의 답변입니다.
+        답변을 평가하세요.
+        항목: is_ended, reason_end, context_matched, reason_context, speech_analysis, gpt_comment.
+        출력 형식: 질문 N: ... (기존 형식 그대로)
+        평가기준 요약:
+        - is_ended: 답변에서 문장이 면접 상황의 격식을 준수하고 '-했습니다'체면 true, 답변에 사용한 문장이 면접 상황에서 격식을 갖추지 않았거나 말끝을 흐렸으면 false 그리고 reason_end랑 값이 맞도록 주의해주세요
+        - context_matched: 질문 의도와 의미상 일치 여부
+        - speech_analysis: filler_word_ratio(%), speaking_speed(wpm), ending_style(+/-), verbosity(sentence_count)
+        """
 
     for i, (q, a) in enumerate(zip(question_list, answer_list), 1):
         prompt += f"질문 {i}: \"{q}\"\n답변 {i}: \"{a}\"\n\n"

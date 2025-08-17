@@ -27,24 +27,21 @@ except ImportError as e:
 
 CLASS_NAMES = ["angry","disgust","fear","happy","sad","surprise","neutral"]
 
-def classify_emotion_to_3_categories(emotion: str) -> str:
-    """7가지 감정을 3가지 카테고리로 분류"""
+def classify_emotion_to_3_categories(emotion: str, confidence: float = 1.0) -> str:
+    """7가지 감정을 3가지 카테고리로 분류 (negative 감정 비중 조정)"""
     if emotion == "happy":
         return "positive"
     elif emotion == "neutral":
         return "neutral"
     else:  # angry, disgust, fear, sad, surprise
+        # negative 감정들의 threshold를 높여서 neutral로 더 많이 분류
+        if confidence < 0.7:  # negative 감정은 더 확실할 때만 negative로 분류
+            return "neutral"
         return "negative"
 
 def _convert_distribution_to_3_categories(distribution: Dict[str, int]) -> Dict[str, int]:
-    """7가지 감정 분포를 3가지 카테고리로 변환"""
-    result = {"positive": 0, "neutral": 0, "negative": 0}
-    
-    for emotion, count in distribution.items():
-        category = classify_emotion_to_3_categories(emotion)
-        result[category] += count
-    
-    return result
+    """이미 3가지 카테고리로 분류된 분포 반환 (그대로 반환)"""
+    return distribution
 
 def _convert_segments_to_3_categories(segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """세그먼트의 감정 라벨을 3가지 카테고리로 변환"""
@@ -285,12 +282,16 @@ def infer_face_frames(
                 logits = model(x)
         probs = F.softmax(logits, dim=1)  # (B, C)
         top_idx = torch.argmax(probs, dim=1).tolist()
-        for j, tid in enumerate(top_idx):
-            lbl = CLASS_NAMES[int(tid)]
-            labels_seq.append(lbl)
+        top_probs = torch.max(probs, dim=1)[0].tolist()  # confidence 점수
+        
+        for j, (tid, confidence) in enumerate(zip(top_idx, top_probs)):
+            original_emotion = CLASS_NAMES[int(tid)]
+            # confidence를 고려한 3가지 카테고리 분류
+            categorized_emotion = classify_emotion_to_3_categories(original_emotion, confidence)
+            labels_seq.append(categorized_emotion)
+            
             if return_points:
-                # timeline은 "처리된 프레임 순번"이 아니라 "원본 인덱스"도 함께 줄 수 있음
-                timeline.append({"frame": frame_ids[j], "label": lbl})
+                timeline.append({"frame": frame_ids[j], "label": categorized_emotion})
         xs.clear(); frame_ids.clear()
 
     # iterate frames
@@ -343,6 +344,7 @@ def infer_face_frames(
     result: Dict[str, Any] = {
         "timestamp": datetime.utcnow().isoformat(),
         "total_frames": int(total_frames),
+        "frame_distribution": dist_3_categories,  # 3가지 카테고리 분포
         "detailed_logs": detailed_logs_windowed,
     }
 

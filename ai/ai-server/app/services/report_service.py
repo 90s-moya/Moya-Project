@@ -9,16 +9,26 @@ from app.utils.uuid_tools import to_uuid_bytes, to_uuid_str
 import json
 
 def _get_status(r) -> str:
-    if hasattr(r, 'status') and r.status:
+    # 1) 명시 상태가 있으면 우선 사용
+    if getattr(r, 'status', None):
         return r.status
-    if not getattr(r, 'video_url', None):
+
+    # 2) 플래그 계산 (빈 문자열/빈 dict 등은 False)
+    has_answer = bool((getattr(r, 'answer', '') or '').strip())
+    has_video = bool(getattr(r, 'video_url', None))
+    has_posture = bool(getattr(r, 'posture_result', None))
+    has_face = bool(getattr(r, 'face_result', None))
+    has_gpt_comment = bool(getattr(r, 'gpt_comment', None))
+
+    # 3) 시작 전(핵심 입력 없음) → IN_COMPLETE
+    if not has_answer and not has_video:
         return "IN_COMPLETE"
-    has_answer = (r.answer or "").strip() != ""
-    has_posture = getattr(r, 'posture_result', None) is not None
-    has_face = getattr(r, 'face_result', None) is not None
-    has_gpt_comment = getattr(r, 'gpt_comment', None) is not None
+
+    # 4) 모든 분석이 끝났을 때만 완료
     if has_answer and has_posture and has_face and has_gpt_comment:
         return "COMPLETED"
+
+    # 5) 그 외는 진행 중
     return "IN_PROGRESS"
 
 def _maybe_load_json(val):
