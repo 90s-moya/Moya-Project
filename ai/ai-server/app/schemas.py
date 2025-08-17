@@ -1,9 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
 
 
+# -------------------------------
+# Question & Answer Schemas
+# -------------------------------
 class QuestionAnswerPairBase(BaseModel):
     order: int
     sub_order: int
@@ -30,7 +33,16 @@ class QuestionAnswerPairRead(QuestionAnswerPairBase):
     class Config:
         from_attributes = True
 
+    @field_validator("id", "session_id", mode="before")
+    def convert_uuid(cls, v):
+        if isinstance(v, (bytes, bytearray)):  # DB에서 BINARY(16)로 오는 경우
+            return UUID(bytes=v)
+        return v
 
+
+# -------------------------------
+# Evaluation Session Schemas
+# -------------------------------
 class EvaluationSessionBase(BaseModel):
     user_id: UUID
     title: str
@@ -47,3 +59,9 @@ class EvaluationSessionRead(EvaluationSessionBase):
 
     class Config:
         from_attributes = True
+
+    @field_validator("id", "user_id", mode="before")
+    def convert_uuid(cls, v):
+        if isinstance(v, (bytes, bytearray)):
+            return UUID(bytes=v)
+        return v
