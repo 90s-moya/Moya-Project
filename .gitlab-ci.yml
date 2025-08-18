@@ -29,11 +29,20 @@ deploy-be-dev:
     - docker stop be-dev || true
     - docker rm be-dev || true
     - >
-      docker run -d --name be-dev -p 8081:8080
+      docker run -d --name be-dev --network monitoring -p 8081:8080
+      -v /srv/moya/files-dev:/files-dev
+      -e FILE_PATH=/files-dev
       -e DB_URL="$DB_URL_DEV"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
+      -e JWT_SECRET="$JWT_SECRET"
+      -e MAIL_USERNAME="$MAIL_USERNAME"
+      -e MAIL_PASSWORD="$MAIL_PASSWORD"
+      -e PYTHON_PATH="$PYTHON_PATH/dev"
+      -e VIDEO_PATH="$VITE_FILE_URL"
+      -e STT_PATH="$STT_PATH/ai-dev"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+    - docker image prune -f
   tags:
     - ec2
   only:
@@ -47,14 +56,200 @@ deploy-be-prod:
     - docker stop be-main || true
     - docker rm be-main || true
     - >
-      docker run -d --name be-main -p 8080:8080
+      docker run -d --name be-main --network monitoring -p 8080:8080
+      -v /srv/moya/files:/files
+      -e FILE_PATH=/files
       -e DB_URL="$DB_URL_PROD"
       -e DB_USERNAME="$DB_USERNAME"
       -e DB_PASSWORD="$DB_PASSWORD"
+      -e JWT_SECRET="$JWT_SECRET"
+      -e MAIL_USERNAME="$MAIL_USERNAME"
+      -e MAIL_PASSWORD="$MAIL_PASSWORD"
+      -e PYTHON_PATH="$PYTHON_PATH/prod"
+      -e VIDEO_PATH="$VITE_FILE_URL"
+      -e STT_PATH="$STT_PATH/ai"
       $DOCKER_IMAGE:$CI_COMMIT_BRANCH
+    - docker image prune -f
   tags:
     - ec2
   only:
     - be-main
+    - master
+
+# FE - 빌드
+build-fe:
+  stage: build
+  script:
+    - cd frontend
+    - echo "VITE_API_URL=$API_URL" > .env
+    - echo "VITE_RTC_API_URL=$VITE_RTC_API_URL" >> .env
+    - echo "VITE_FILE_URL=$VITE_FILE_URL" >> .env
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/dist
+  tags:
+    - ec2
+  only:
+    - fe-main
+    - master
+
+# FE - 배포
+deploy-fe:
+  stage: deploy
+  script:
+    - sudo rm -rf /var/www/html/*
+    - sudo cp -r frontend/dist/* /var/www/html/
+  tags:
+    - ec2
+  only:
+    - fe-main
+    - master
+
+# ===============================================================
+# AI 서버 파이프라인 (EC2 & GCP 동시 배포 - 하드코딩 방식)
+# ===============================================================
+
+# ----------------------------------------------------
+# AI 빌드 (EC2와 GCP에서 각각 실행)
+# ----------------------------------------------------
+
+# EC2에서 AI 빌드 실행
+build-ai-ec2:
+  stage: build
+  script:
+    - docker pull gyujh630/moya-ai:cache || true
+    - docker build --cache-from=gyujh630/moya-ai:cache --build-arg BUILDKIT_INLINE_CACHE=1 -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai/ai-server
+    - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
+    - docker push gyujh630/moya-ai:cache
+    - docker image prune -f
+  tags:
+    - ec2
+  only:
+    - ai-dev
+    - ai-main
+    - master
+
+# GCP 서버에서 AI 빌드 실행
+build-ai-gpu:
+  stage: build
+  script:
+    - docker pull gyujh630/moya-ai:cache || true
+    - docker build --cache-from=gyujh630/moya-ai:cache --build-arg BUILDKIT_INLINE_CACHE=1 -t gyujh630/moya-ai:$CI_COMMIT_BRANCH ./ai/ai-server
+    - docker push gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker tag gyujh630/moya-ai:$CI_COMMIT_BRANCH gyujh630/moya-ai:cache
+    - docker push gyujh630/moya-ai:cache
+    - docker image prune -f
+  tags:
+    - gcp
+  only:
+    - ai-dev
+    - ai-main
+    - master
+
+# ----------------------------------------------------
+# AI 개발 환경 배포 (EC2, GCP에서 각각 실행)
+# ----------------------------------------------------
+
+# EC2 개발 버전 배포
+deploy-ai-dev-ec2:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-dev || true
+    - docker rm ai-dev || true
+    - >
+      docker run -d --name ai-dev --network monitoring -p 8001:8000
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_DEV"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker image prune -f
+  tags:
+    - ec2
+  only:
+    - ai-dev
+
+# GCP 개발 버전 배포
+deploy-ai-dev-gpu:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-dev || true
+    - docker rm ai-dev || true
+    - >
+      docker run -d --name ai-dev -p 8001:8000 --gpus all
+      -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_DEV"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker image prune -f
+  tags:
+    - gcp
+  only:
+    - ai-dev
+
+# ----------------------------------------------------
+# AI 운영 환경 배포 (EC2, GCP에서 각각 실행)
+# ----------------------------------------------------
+
+# EC2 운영 버전 배포
+deploy-ai-prod-ec2:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-main || true
+    - docker rm ai-main || true
+    - >
+      docker run -d --name ai-main --network monitoring -p 8000:8000
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_PROD"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker image prune -f
+  tags:
+    - ec2
+  only:
+    - ai-main
+    - master
+
+# GCP 운영 버전 배포
+deploy-ai-prod-gpu:
+  stage: deploy
+  script:
+    - docker pull gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker stop ai-main || true
+    - docker rm ai-main || true
+    - >
+      docker run -d --name ai-main -p 8000:8000 --gpus all
+      -e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
+      -e DB_USERNAME="$DB_USERNAME"
+      -e DB_PASSWORD="$DB_PASSWORD"
+      -e DB_HOST="$DB_HOST"
+      -e DB_PORT="$DB_PORT"
+      -e DB_NAME="$DB_NAME_PROD"
+      -e GMS_API_KEY="$GMS_API_KEY"
+      -e GMS_BASE_URL="$GMS_BASE_URL"
+      gyujh630/moya-ai:$CI_COMMIT_BRANCH
+    - docker image prune -f
+  tags:
+    - gcp
+  only:
+    - ai-main
     - master
 

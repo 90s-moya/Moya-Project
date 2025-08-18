@@ -1,0 +1,52 @@
+{
+    "video_info": {
+        "file_path": "C:\\Users\\SSAFY\\AppData\\Local\\Temp\\tmpaa3l_mc9.mp4",
+        "total_frames": 510,
+        "original_frame_count_prop": 510,
+        "fps": 30,
+        "duration_seconds": 17.0,
+        "resolution": "320x240"
+    },
+    "analysis_info": {
+        "timestamp": "2025-08-15T23:01:34.609705",
+        "model_used": "Celal11/resnet-50-finetuned-FER2013-0.001",
+        "ema_alpha": 0.92,
+        "hysteresis": {
+            "enter_thr": 0.6,
+            "exit_thr": 0.5,
+            "margin_thr": 0.2,
+            "min_stable": 6
+        },
+        "face_min_px": 112,
+        "blur_threshold": 90.0,
+        "clahe": false,
+        "mediapipe": true,
+        "logit_bias": "happy=-0.4,neutral=0.2,fear=0.1",
+        "happy_guard": true
+    },
+    "frame_distribution": {
+        "불확실": {
+            "frames": 502,
+            "percentage": 98.4313725490196,
+            "duration_seconds": 16.733333333333334
+        },
+        "neutral": {
+            "frames": 8,
+            "percentage": 1.5686274509803921,
+            "duration_seconds": 0.26666666666666666
+        }
+    },
+    "detailed_logs": [
+        {
+            "label": "neutral",
+            "start_frame": 2,
+            "end_frame": 510,
+            "duration_seconds": 16.966666666666665
+        }
+    ],
+    "summary": {
+        "dominant_emotion": "불확실",
+        "emotion_changes": 1,
+        "average_emotion_duration": 16.966666666666665
+    }
+}

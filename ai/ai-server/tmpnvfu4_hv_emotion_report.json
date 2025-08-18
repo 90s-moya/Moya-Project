@@ -1,0 +1,51 @@
+{
+    "video_info": {
+        "file_path": "C:\\Users\\SSAFY\\AppData\\Local\\Temp\\tmpnvfu4_hv.webm",
+        "total_frames": 98,
+        "fps": 29,
+        "duration_seconds": 3.3793103448275863,
+        "resolution": "960x540"
+    },
+    "analysis_info": {
+        "timestamp": "2025-08-14T17:10:44.987344",
+        "model_used": "Celal11/resnet-50-finetuned-FER2013-0.001",
+        "ema_alpha": 0.92,
+        "hysteresis": {
+            "enter_thr": 0.6,
+            "exit_thr": 0.5,
+            "margin_thr": 0.2,
+            "min_stable": 6
+        },
+        "face_min_px": 112,
+        "blur_threshold": 90.0,
+        "clahe": false,
+        "mediapipe": true,
+        "logit_bias": "happy=-0.4,neutral=0.2,fear=0.1",
+        "happy_guard": true
+    },
+    "frame_distribution": {
+        "neutral": {
+            "frames": 54,
+            "percentage": 55.10204081632652,
+            "duration_seconds": 1.8620689655172413
+        },
+        "불확실": {
+            "frames": 44,
+            "percentage": 44.89795918367347,
+            "duration_seconds": 1.5172413793103448
+        }
+    },
+    "detailed_logs": [
+        {
+            "label": "neutral",
+            "start_frame": 1,
+            "end_frame": 98,
+            "duration_seconds": 3.3793103448275863
+        }
+    ],
+    "summary": {
+        "dominant_emotion": "neutral",
+        "emotion_changes": 1,
+        "average_emotion_duration": 3.3793103448275863
+    }
+}

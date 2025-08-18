@@ -1,0 +1,53 @@
+package com.moya.interfaces.api.report;
+// src/main/java/com/example/reports/controller/ReportController.java
+
+
+import com.moya.infras.report.ReportDto;
+import com.moya.infras.report.ResultDetailResponse;
+import com.moya.infras.report.ResultDto;
+import com.moya.infras.report.TitleUpdateDto;
+import com.moya.service.report.ReportService;
+import com.moya.support.security.auth.CustomUserDetails;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Currency;
+import java.util.List;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/v1/me/report")
+public class ReportController {
+
+    private final ReportService reportService;
+
+
+
+    // React → GET /api/reports?userId=...
+    @GetMapping
+    public ResponseEntity<List<ReportDto>> listReports(@AuthenticationPrincipal CustomUserDetails user) {
+        return ResponseEntity.ok(reportService.fetchReportsByUser(user.getUserId().toString()));
+    }
+
+    // 예: /v1/me/report/detail?resultId=...
+    @GetMapping("/{reportId}/result/{resultId}")
+    public ResponseEntity<ResultDetailResponse> getMyReportDetail(
+            @PathVariable String reportId,
+            @PathVariable String resultId,
+            @AuthenticationPrincipal CustomUserDetails user
+    ) {
+        var body = reportService.fetchResultDetail(reportId, resultId, user.getUserId().toString());
+        return ResponseEntity.ok(body);
+    }
+    @PostMapping("/{reportId}/title")
+    public ResponseEntity<TitleUpdateDto> updateReportTitle(
+            @PathVariable String reportId,
+            @AuthenticationPrincipal CustomUserDetails user,
+            @RequestBody TitleUpdateRequest body
+    ) {
+        TitleUpdateDto dto = reportService.updateReportTitle(reportId, user.getUserId().toString(), body.getTitle());
+        return ResponseEntity.ok(dto);
+    }
+}
