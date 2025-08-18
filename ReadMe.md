@@ -54,8 +54,6 @@ MOYA? 모의면접이야!
 |    | FastAPI  | Grafana   |    |
 |    | DB: MySQL  | Dozzle   |    |
 |    |   | GCP   |    |
-|||||
-
 ## 🔩 시스템 아키텍처
 ![alt text](readmeasset/arch.png)
 
