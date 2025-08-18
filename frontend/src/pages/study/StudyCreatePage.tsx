@@ -86,7 +86,7 @@ export default function StudyCreatePage() {
     if (date) {
       // dayjs를 사용하여 9시간을 더하고 ISO 문자열로 변환
       const isoString = dayjs(date).add(9, "hour").toISOString();
-      setValue("expired_at", isoString);
+      setValue("expired_at", isoString); 
     } else {
       setValue("expired_at", "");
     }
