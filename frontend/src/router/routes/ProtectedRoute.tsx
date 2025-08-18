@@ -1,5 +1,5 @@
 import { useNavigate , Outlet, useLocation } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import {
   AlertDialog,
@@ -24,20 +24,25 @@ export default function ProtectedRoute() {
   }, [isLogin]);
 
   const handleLoginRedirect = () => {
-    setShowLoginDialog(false);
-    navigate("/login", { replace: true, state: { from: location } });
+    
+    // 다양한 방법으로 시도
+    try {
+      navigate("/login");
+    } catch (error) {
+      console.error("navigate 에러:", error);
+      window.location.href = "/login";
+    }
   };
 
-  const handleDialogClose = () => {
+  const handleCancelClick = () => {
     setShowLoginDialog(false);
-    // 다이얼로그를 닫으면 홈으로 이동
     navigate("/", { replace: true });
   };
 
   // 로그인되지 않은 경우 다이얼로그만 표시하고 페이지는 렌더링하지 않음
   if (!isLogin) {
     return (
-      <AlertDialog open={showLoginDialog} onOpenChange={handleDialogClose}>
+      <AlertDialog open={showLoginDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>로그인이 필요합니다</AlertDialogTitle>
@@ -46,7 +51,7 @@ export default function ProtectedRoute() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDialogClose}>
+            <AlertDialogCancel onClick={handleCancelClick}>
               나중에 하기
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleLoginRedirect}>
