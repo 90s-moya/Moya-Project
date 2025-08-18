@@ -28,9 +28,11 @@ MOYA? 모의면접이야!
  |면접 스터디 시작하기|
   |:---:|
   |![면접 스터디 시작하기](readmeasset/study_start.gif)|
+   
    |면접 스터디 진행|
-  |:---:|
+|:---:|
   |![면접 스터디 진행](readmeasset/studing.gif)|
+  
    |면접 스터디 피드백 보내기|
   |:---:|
   |![면접 스터디 피드백 보내기](readmeasset/sendfeedback.gif)|
